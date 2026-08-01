@@ -12,7 +12,7 @@ Die beiden wollen Aufgaben (Einkäufe, Erledigungen, Haushalts-To-Dos …) gemei
 verwalten. Beide sollen jederzeit Aufgaben hinzufügen, abhaken oder ändern können –
 und der jeweils andere sieht diese Änderungen zuverlässig.
 
-**Der zentrale, nicht verhandelbare Kern:**
+**Der zentrale nicht verhandelbare Kern:**
 Die Liste muss **asynchron synchronisieren**. Das bedeutet: Es darf **nicht** vorausgesetzt
 werden, dass beide gleichzeitig online sind. Einer kann offline (z. B. im Supermarkt ohne
 Empfang) eine Aufgabe abhaken; sobald wieder Verbindung besteht, wird der Stand automatisch
