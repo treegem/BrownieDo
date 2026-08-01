@@ -1,0 +1,134 @@
+# BrownieDo – Gemeinsame ToDo-App für zwei Personen
+
+## 1. Projektvision (das WARUM & WAS)
+
+**Worum geht es?**
+BrownieDo ist eine private, geteilte ToDo-Liste für **genau zwei Personen** (ein Paar,
+beide mit Samsung-Galaxy-Android-Phones). Es ist ausdrücklich **kein Produkt für den Massenmarkt**,
+sondern eine maßgeschneiderte App für den gemeinsamen Alltag der beiden Nutzer.
+
+**Welches Problem löst die App?**
+Die beiden wollen Aufgaben (Einkäufe, Erledigungen, Haushalts-To-Dos …) gemeinsam
+verwalten. Beide sollen jederzeit Aufgaben hinzufügen, abhaken oder ändern können –
+und der jeweils andere sieht diese Änderungen zuverlässig.
+
+**Der zentrale, nicht verhandelbare Kern:**
+Die Liste muss **asynchron synchronisieren**. Das bedeutet: Es darf **nicht** vorausgesetzt
+werden, dass beide gleichzeitig online sind. Einer kann offline (z. B. im Supermarkt ohne
+Empfang) eine Aufgabe abhaken; sobald wieder Verbindung besteht, wird der Stand automatisch
+mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud-Instanz
+(Firestore) statt einer reinen Peer-to-Peer-Lösung.
+
+**Was die App bewusst NICHT ist / braucht:**
+- Keine Telefon-Spezifika (kein Gyroskop, keine Kamera, kein Standort etc.).
+- Keine Skalierung auf viele Nutzer, keine komplexe Rechteverwaltung.
+- Keine ausgefeilte Konfliktlösung nötig: Bei zwei Nutzern reicht **Last-Write-Wins**
+  auf Feldebene (über einen `updatedAt`-Zeitstempel). Keine CRDTs.
+
+**Leitprinzipien für Entscheidungen:**
+- **Einfachheit vor Vollständigkeit** – nur bauen, was die zwei Nutzer wirklich brauchen.
+- **Sauberkeit der Architektur** trotzdem einhalten (Schichtentrennung), damit eine
+  spätere Erweiterung (Play Store, iOS via Kotlin Multiplatform) möglich bleibt.
+- Wenig Betriebsaufwand: Backend-as-a-Service (Firestore) statt selbst gehostetem Server.
+
+---
+
+## 2. Technischer Rahmen (der STACK)
+
+| Bereich | Entscheidung | Begründung |
+|---|---|---|
+| Sprache | **Kotlin** | Entwickler kann serverseitig bereits sehr gut Kotlin. |
+| UI | **Jetpack Compose** (Material 3) | Offizieller Android-Standard, deklarativ, ideal für Listen. |
+| IDE | **Android Studio** + GitHub Copilot | Volles Android-Tooling out-of-the-box. |
+| Backend | **Firebase Firestore** | Realtime-Sync + Offline-Persistenz eingebaut, kein eigener Server. |
+| Auth | **Firebase Auth** | Regelt, dass nur die beiden Accounts Zugriff haben. |
+| Architektur | UI (Compose) ⇄ ViewModel ⇄ Repository ⇄ Firestore | Saubere Trennung, testbar, KMP-fähig. |
+| Async | **Coroutines & Flow** | Kotlin-Standard, dem Entwickler bereits vertraut. |
+| Hosting/Kosten | Firebase **Spark (Free) Tier** | Für zwei Nutzer dauerhaft kostenlos (~0 €). |
+| Verteilung | Direkt-Installation (Sideload) der signierten APK | Kein Play Store nötig für den privaten Einsatz. |
+
+**Projekt-Eckdaten:**
+- App-Name: **BrownieDo**
+- Package/Application ID: `eu.sweetgeorgie.browniedo` (weltweit eindeutig, kein `com.example`)
+- Minimum SDK: **API 24** (deckt ~99 % der Geräte ab)
+- Build: **Kotlin DSL** (`build.gradle.kts`)
+- Quellcode gehostet auf **GitHub** (privates Repo)
+
+---
+
+## 3. Umsetzungs-Checkliste (das WIE)
+
+> **Legende:** `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt
+
+### Phase 0 – Vorbereitung & Setup
+- [x] Android Studio installieren (inkl. Android SDK & Emulator)
+- [x] GitHub Copilot Plugin in Android Studio installieren und einloggen
+- [x] Neues Projekt anlegen: **Empty Activity** (Compose), Sprache Kotlin, Package `eu.sweetgeorgie.browniedo`
+- [x] Git-Repository initialisieren & auf GitHub veröffentlichen (`Share Project on GitHub`)
+- [ ] Beide Galaxy-Phones als Testgeräte einrichten (Entwickleroptionen + USB-Debugging)
+
+### Phase 1 – Firebase-Projekt aufsetzen
+- [ ] Firebase-Projekt in der Firebase Console erstellen (Free/Spark-Tier)
+- [ ] Android-App im Firebase-Projekt registrieren (Package-Name `eu.sweetgeorgie.browniedo`)
+- [ ] `google-services.json` herunterladen und ins `app/`-Verzeichnis legen
+- [ ] **`google-services.json` in `.gitignore` eintragen (Secret, nicht committen!)**
+- [ ] Firebase Gradle-Plugins & Dependencies einbinden (Firestore, Auth, BoM)
+- [ ] Firestore-Datenbank in der Console anlegen (Produktionsmodus, Region wählen)
+
+### Phase 2 – Authentifizierung (wer darf auf die Liste?)
+- [ ] Firebase Auth aktivieren (z. B. E-Mail/Passwort oder Google-Login)
+- [ ] Einfache Login-/Anmelde-Oberfläche bauen (Compose)
+- [ ] Zwei Accounts anlegen (beide Partner)
+- [ ] Login-Zustand in der App halten (angemeldet / nicht angemeldet)
+
+### Phase 3 – Datenmodell & Firestore-Struktur
+- [ ] Datenmodell definieren: `Todo` (id, titel, erledigt, erstelltAm, updatedAt, ggf. erledigtVon)
+- [ ] Firestore-Collection-Struktur festlegen (gemeinsame `todos`-Collection / geteilte Liste)
+- [ ] Security Rules: nur die beiden Accounts dürfen lesen/schreiben
+- [ ] `updatedAt`-Feld für Last-Write-Wins-Konfliktlösung vorsehen
+
+### Phase 4 – Kern-Funktionalität (CRUD)
+- [ ] Aufgabe **hinzufügen**
+- [ ] Aufgaben **anzeigen** (LazyColumn / Liste)
+- [ ] Aufgabe als **erledigt / offen** markieren
+- [ ] Aufgabe **bearbeiten**
+- [ ] Aufgabe **löschen**
+- [ ] Repository-Schicht sauber von der Compose-UI trennen
+
+### Phase 5 – Synchronisation & Offline (der KERN der App)
+- [ ] Firestore **Offline-Persistenz** aktivieren (queued Änderungen im Offline-Modus)
+- [ ] **Realtime-Listener** einbinden (Liste aktualisiert sich automatisch)
+- [ ] Offline-Szenario testen: einer offline ändern → wieder online → synct beim anderen
+- [ ] Konflikt-Verhalten prüfen (Last-Write-Wins über `updatedAt`)
+
+### Phase 6 – UI-Feinschliff
+- [ ] Aufgeräumtes Layout (Material 3)
+- [ ] Leerer Zustand („noch keine Aufgaben") & Ladezustand
+- [ ] Optional: Aufgaben sortieren (offen oben, erledigt unten)
+- [ ] Optional: App-Icon & Name anpassen
+- [ ] Optional: Dark Mode prüfen
+
+### Phase 7 – Test & Verteilung an euch zwei
+- [ ] Auf beiden Galaxy-Phones testen
+- [ ] Signierte APK / App Bundle bauen (Keystore NICHT committen!)
+- [ ] Direkt auf beide Geräte installieren (Sideload)
+
+---
+
+## 4. Optionale / spätere Erweiterungen (nice to have)
+- [ ] Push-Benachrichtigung, wenn der andere etwas ändert (Firebase Cloud Messaging)
+- [ ] Fälligkeitsdaten / Erinnerungen
+- [ ] Mehrere Listen / Kategorien
+- [ ] Play-Store-Veröffentlichung (Developer-Account, Store-Eintrag, Datenschutzerklärung)
+- [ ] iOS-Version via Kotlin Multiplatform (Logik-Schicht wiederverwenden)
+
+---
+
+## 5. Architektur-Hinweise für den Coding-Agent
+- **Schichten trennen:** UI (Compose) ⇄ ViewModel ⇄ Repository ⇄ Firestore.
+  Keine Firestore-Aufrufe direkt in Composables.
+- **Kotlin-Standard nutzen:** Coroutines & Flow für asynchrone Daten und Listener.
+- **Secrets schützen:** `google-services.json` und Keystore niemals ins Repo.
+- **Konfliktstrategie:** Für zwei Nutzer reicht Last-Write-Wins auf Feldebene — keine CRDTs.
+- **Zukunftssicherheit:** Business-Logik frei von Android-Framework-Abhängigkeiten halten,
+  damit sie später via Kotlin Multiplatform auf iOS wiederverwendbar ist.
