@@ -124,11 +124,13 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 
 ---
 
-## 5. Architektur-Hinweise für den Coding-Agent
-- **Schichten trennen:** UI (Compose) ⇄ ViewModel ⇄ Repository ⇄ Firestore.
-  Keine Firestore-Aufrufe direkt in Composables.
-- **Kotlin-Standard nutzen:** Coroutines & Flow für asynchrone Daten und Listener.
+## 5. Projektspezifische Vorgaben
+
+Die allgemeinen Coding-, Architektur- und Naming-Regeln stehen in `.github/instructions/`
+und werden vom Coding-Agent automatisch geladen. Hier stehen nur die Entscheidungen,
+die speziell für BrownieDo gelten:
+
 - **Secrets schützen:** `google-services.json` und Keystore niemals ins Repo.
-- **Konfliktstrategie:** Für zwei Nutzer reicht Last-Write-Wins auf Feldebene — keine CRDTs.
+- **Konfliktstrategie:** Für zwei Nutzer reicht Last-Write-Wins auf Feldebene (`updatedAt`) — keine CRDTs.
 - **Zukunftssicherheit:** Business-Logik frei von Android-Framework-Abhängigkeiten halten,
   damit sie später via Kotlin Multiplatform auf iOS wiederverwendbar ist.

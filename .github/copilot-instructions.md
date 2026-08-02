@@ -25,6 +25,7 @@ Copilot loads each rule automatically based on the `applyTo` glob in its frontma
 - `.github/instructions/reuse-shared-constants.instructions.md`
 - `.github/instructions/use-descriptive-names.instructions.md`
 - `.github/instructions/naming.instructions.md`
+- `.github/instructions/roadmap.instructions.md`
 
 ## Scoped rules (loaded by path)
 
