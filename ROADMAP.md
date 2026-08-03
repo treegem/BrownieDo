@@ -73,7 +73,7 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 - [x] `google-services.json` herunterladen und ins `app/`-Verzeichnis legen
 - [x] **`google-services.json` in `.gitignore` eintragen (Secret, nicht committen!)**
 - [x] Firebase Gradle-Plugins & Dependencies einbinden (Firestore, Auth, BoM)
-- [ ] Firestore-Datenbank in der Console anlegen (Produktionsmodus, Region wählen)
+- [x] Firestore-Datenbank in der Console anlegen (Produktionsmodus, Region wählen)
 
 ### Phase 2 – Authentifizierung (wer darf auf die Liste?)
 - [ ] Firebase Auth aktivieren (z. B. E-Mail/Passwort oder Google-Login)
