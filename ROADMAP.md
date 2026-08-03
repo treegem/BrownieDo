@@ -72,7 +72,7 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 - [x] Android-App im Firebase-Projekt registrieren (Package-Name `eu.sweetgeorgie.browniedo`)
 - [x] `google-services.json` herunterladen und ins `app/`-Verzeichnis legen
 - [x] **`google-services.json` in `.gitignore` eintragen (Secret, nicht committen!)**
-- [ ] Firebase Gradle-Plugins & Dependencies einbinden (Firestore, Auth, BoM)
+- [x] Firebase Gradle-Plugins & Dependencies einbinden (Firestore, Auth, BoM)
 - [ ] Firestore-Datenbank in der Console anlegen (Produktionsmodus, Region wählen)
 
 ### Phase 2 – Authentifizierung (wer darf auf die Liste?)
