@@ -65,13 +65,13 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 - [x] GitHub Copilot Plugin in Android Studio installieren und einloggen
 - [x] Neues Projekt anlegen: **Empty Activity** (Compose), Sprache Kotlin, Package `eu.sweetgeorgie.browniedo`
 - [x] Git-Repository initialisieren & auf GitHub veröffentlichen (`Share Project on GitHub`)
-- [ ] Beide Galaxy-Phones als Testgeräte einrichten (Entwickleroptionen + USB-Debugging)
+- [x] Beide Galaxy-Phones als Testgeräte einrichten (Entwickleroptionen + USB-Debugging)
 
 ### Phase 1 – Firebase-Projekt aufsetzen
-- [ ] Firebase-Projekt in der Firebase Console erstellen (Free/Spark-Tier)
-- [ ] Android-App im Firebase-Projekt registrieren (Package-Name `eu.sweetgeorgie.browniedo`)
-- [ ] `google-services.json` herunterladen und ins `app/`-Verzeichnis legen
-- [ ] **`google-services.json` in `.gitignore` eintragen (Secret, nicht committen!)**
+- [x] Firebase-Projekt in der Firebase Console erstellen (Free/Spark-Tier)
+- [x] Android-App im Firebase-Projekt registrieren (Package-Name `eu.sweetgeorgie.browniedo`)
+- [x] `google-services.json` herunterladen und ins `app/`-Verzeichnis legen
+- [x] **`google-services.json` in `.gitignore` eintragen (Secret, nicht committen!)**
 - [ ] Firebase Gradle-Plugins & Dependencies einbinden (Firestore, Auth, BoM)
 - [ ] Firestore-Datenbank in der Console anlegen (Produktionsmodus, Region wählen)
 

@@ -8,3 +8,8 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Firebase-Konfiguration und Signaturschluessel enthalten Secrets
+google-services.json
+*.jks
+*.keystore
