@@ -76,10 +76,10 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 - [x] Firestore-Datenbank in der Console anlegen (Produktionsmodus, Region wählen)
 
 ### Phase 2 – Authentifizierung (wer darf auf die Liste?)
-- [ ] Firebase Auth aktivieren (z. B. E-Mail/Passwort oder Google-Login)
-- [ ] Einfache Login-/Anmelde-Oberfläche bauen (Compose)
-- [ ] Zwei Accounts anlegen (beide Partner)
-- [ ] Login-Zustand in der App halten (angemeldet / nicht angemeldet)
+- [x] Firebase Auth aktivieren (Google-Login als einziger Anbieter)
+- [x] Einfache Login-/Anmelde-Oberfläche bauen (Compose)
+- [ ] Beide Partner melden sich einmal via Google an (legt die zwei Accounts automatisch an)
+- [x] Login-Zustand in der App halten (angemeldet / nicht angemeldet)
 
 ### Phase 3 – Datenmodell & Firestore-Struktur
 - [ ] Datenmodell definieren: `Todo` (id, titel, erledigt, erstelltAm, updatedAt, ggf. erledigtVon)
@@ -111,6 +111,8 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 ### Phase 7 – Test & Verteilung an euch zwei
 - [ ] Auf beiden Galaxy-Phones testen
 - [ ] Signierte APK / App Bundle bauen (Keystore NICHT committen!)
+- [ ] **SHA-1 des Release-Keystores in der Firebase Console hinterlegen** — sonst schlägt der
+  Google-Login in der signierten APK fehl (`google-services.json` danach neu herunterladen)
 - [ ] Direkt auf beide Geräte installieren (Sideload)
 
 ---

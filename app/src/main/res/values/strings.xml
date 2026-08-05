@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">BrownieDo</string>
+    <string name="login_headline">BrownieDo</string>
+    <string name="login_subline">Eure gemeinsame Aufgabenliste</string>
+    <string name="login_sign_in_with_google">Mit Google anmelden</string>
+    <string name="login_error_no_google_account">Auf diesem Gerät ist kein Google-Konto eingerichtet.</string>
+    <string name="login_error_sign_in_failed">Anmeldung fehlgeschlagen. Bitte erneut versuchen.</string>
+    <string name="todo_list_placeholder">Angemeldet als %1$s. Die Aufgabenliste folgt in Phase 4.</string>
+    <string name="todo_list_sign_out">Abmelden</string>
 </resources>
