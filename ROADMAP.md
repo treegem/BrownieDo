@@ -129,8 +129,9 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 ## 5. Projektspezifische Vorgaben
 
 Die allgemeinen Coding-, Architektur- und Naming-Regeln stehen in `.github/instructions/`
-und werden vom Coding-Agent automatisch geladen. Hier stehen nur die Entscheidungen,
-die speziell für BrownieDo gelten:
+und werden vom Coding-Agent automatisch geladen. Die Begründungen hinter den technischen
+Entscheidungen stehen als ADRs in [`docs/decisions/`](docs/decisions/README.md).
+Hier stehen nur die Entscheidungen, die speziell für BrownieDo gelten:
 
 - **Secrets schützen:** `google-services.json` und Keystore niemals ins Repo.
 - **Konfliktstrategie:** Für zwei Nutzer reicht Last-Write-Wins auf Feldebene (`updatedAt`) — keine CRDTs.
