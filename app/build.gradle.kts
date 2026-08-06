@@ -28,6 +28,7 @@ android {
         }
     }
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -37,7 +38,11 @@ android {
 }
 
 dependencies {
-    implementation(platform(libs.androidx.compose.bom))
+    val composeBom = platform(libs.androidx.compose.bom)
+
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
+    @Suppress("AvoidDuplicateDependencies")
+    implementation(composeBom)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
@@ -56,7 +61,10 @@ dependencies {
     implementation(libs.firebase.firestore)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
+    // androidTestImplementation erbt nicht von implementation, die BOM wird hier also erneut
+    // gebraucht. Siehe docs/decisions/0008-compose-bom-in-zwei-konfigurationen.md.
+    @Suppress("AvoidDuplicateDependencies")
+    androidTestImplementation(composeBom)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)

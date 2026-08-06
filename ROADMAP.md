@@ -82,10 +82,10 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 - [x] Login-Zustand in der App halten (angemeldet / nicht angemeldet)
 
 ### Phase 3 – Datenmodell & Firestore-Struktur
-- [ ] Datenmodell definieren: `Todo` (id, titel, erledigt, erstelltAm, updatedAt, ggf. erledigtVon)
+- [x] Datenmodell definieren: `Todo` (id, titel, erledigt, erstelltAm, updatedAt, ggf. erledigtVon)
 - [ ] Firestore-Collection-Struktur festlegen (gemeinsame `todos`-Collection / geteilte Liste)
 - [ ] Security Rules: nur die beiden Accounts dürfen lesen/schreiben
-- [ ] `updatedAt`-Feld für Last-Write-Wins-Konfliktlösung vorsehen
+- [x] `updatedAt`-Feld für Last-Write-Wins-Konfliktlösung vorsehen
 
 ### Phase 4 – Kern-Funktionalität (CRUD)
 - [ ] Aufgabe **hinzufügen**

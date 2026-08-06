@@ -35,3 +35,6 @@ der den alten als „abgelöst" markiert.
 | [0003](0003-credential-manager-statt-googlesignin.md) | Credential Manager statt GoogleSignIn-SDK | akzeptiert |
 | [0004](0004-manuelle-dependency-injection-ohne-hilt.md) | Manuelle Dependency Injection ohne Hilt | akzeptiert |
 | [0005](0005-web-client-id-aus-google-services-json.md) | Web-Client-ID aus `google-services.json` beziehen | akzeptiert |
+| [0006](0006-server-zeitstempel-fuer-last-write-wins.md) | Server-Zeitstempel für Last-Write-Wins | akzeptiert |
+| [0007](0007-java-time-per-core-library-desugaring.md) | `java.time` per Core Library Desugaring | akzeptiert |
+| [0008](0008-compose-bom-in-zwei-konfigurationen.md) | Compose-BOM in zwei Konfigurationen deklarieren | akzeptiert |
