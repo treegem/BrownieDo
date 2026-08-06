@@ -78,7 +78,7 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 ### Phase 2 – Authentifizierung (wer darf auf die Liste?)
 - [x] Firebase Auth aktivieren (Google-Login als einziger Anbieter)
 - [x] Einfache Login-/Anmelde-Oberfläche bauen (Compose)
-- [ ] Beide Partner melden sich einmal via Google an (legt die zwei Accounts automatisch an)
+- [x] Beide Partner melden sich einmal via Google an (legt die zwei Accounts automatisch an)
 - [x] Login-Zustand in der App halten (angemeldet / nicht angemeldet)
 
 ### Phase 3 – Datenmodell & Firestore-Struktur
