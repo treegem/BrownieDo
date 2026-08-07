@@ -79,4 +79,12 @@ class TodoListViewModel(
             onFailure = { mutableUiState.update { it.copy(error = TodoListError.UPDATE_FAILED) } }
         )
     }
+
+    fun onDeleteTodoClick() {
+        val editedTodo = mutableUiState.value.editedTodo ?: return
+        todoRepository.deleteTodo(editedTodo.todoId).fold(
+            onSuccess = { mutableUiState.update { it.copy(editedTodo = null, error = null) } },
+            onFailure = { mutableUiState.update { it.copy(error = TodoListError.DELETE_FAILED) } }
+        )
+    }
 }

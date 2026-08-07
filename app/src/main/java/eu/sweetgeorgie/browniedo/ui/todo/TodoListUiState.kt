@@ -5,7 +5,8 @@ import eu.sweetgeorgie.browniedo.domain.todo.Todo
 enum class TodoListError {
     LOAD_FAILED,
     ADD_FAILED,
-    UPDATE_FAILED
+    UPDATE_FAILED,
+    DELETE_FAILED
 }
 
 data class TodoListUiState(

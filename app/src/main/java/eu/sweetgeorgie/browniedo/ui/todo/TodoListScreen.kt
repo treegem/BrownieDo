@@ -35,6 +35,7 @@ fun TodoListScreen(
     onEditTodoClick: (Todo) -> Unit,
     onEditedTitleChange: (String) -> Unit,
     onEditConfirm: () -> Unit,
+    onDeleteTodoClick: () -> Unit,
     onEditDismiss: () -> Unit,
     onSignOutClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -100,6 +101,7 @@ fun TodoListScreen(
             title = editedTodo.title,
             onTitleChange = onEditedTitleChange,
             onConfirm = onEditConfirm,
+            onDelete = onDeleteTodoClick,
             onDismiss = onEditDismiss
         )
     }
@@ -109,6 +111,7 @@ private fun TodoListError.messageResId() = when (this) {
     TodoListError.LOAD_FAILED -> R.string.todo_list_error_load_failed
     TodoListError.ADD_FAILED -> R.string.todo_list_error_add_failed
     TodoListError.UPDATE_FAILED -> R.string.todo_list_error_update_failed
+    TodoListError.DELETE_FAILED -> R.string.todo_list_error_delete_failed
 }
 
 @Composable
@@ -139,6 +142,7 @@ private fun EditTodoDialog(
     title: String,
     onTitleChange: (String) -> Unit,
     onConfirm: () -> Unit,
+    onDelete: () -> Unit,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -158,8 +162,16 @@ private fun EditTodoDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(text = stringResource(R.string.todo_list_cancel))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onDelete) {
+                    Text(
+                        text = stringResource(R.string.todo_list_delete),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                TextButton(onClick = onDismiss) {
+                    Text(text = stringResource(R.string.todo_list_cancel))
+                }
             }
         }
     )

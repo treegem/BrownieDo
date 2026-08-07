@@ -99,7 +99,7 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 - [x] Aufgaben **anzeigen** (LazyColumn / Liste)
 - [x] Aufgabe als **erledigt / offen** markieren
 - [x] Aufgabe **bearbeiten**
-- [ ] Aufgabe **löschen**
+- [x] Aufgabe **löschen**
 - [x] Repository-Schicht sauber von der Compose-UI trennen
 
 ### Phase 5 – Synchronisation & Offline (der KERN der App)

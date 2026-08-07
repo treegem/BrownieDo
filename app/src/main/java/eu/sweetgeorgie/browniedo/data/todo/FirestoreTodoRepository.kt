@@ -76,6 +76,9 @@ class FirestoreTodoRepository(
             )
         }.map { }
 
+    override fun deleteTodo(todoId: String): Result<Unit> =
+        runCatching { todoCollection.document(todoId).delete() }.map { }
+
     companion object {
         /** The single list the app works with until list management arrives in roadmap phase 8. */
         const val DEFAULT_LIST_ID = "shared"

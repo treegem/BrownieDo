@@ -188,6 +188,35 @@ class TodoListViewModelTest {
         assertNull(viewModel.uiState.value.editedTodo)
     }
 
+    @Test
+    fun `deleting an entry removes it and closes the dialog`() = runTest(testDispatcher) {
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onDeleteTodoClick()
+
+        assertEquals(TODO_ENTRY.id, todoRepository.deletedTodoId)
+        assertNull(viewModel.uiState.value.editedTodo)
+        assertNull(viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `a failing delete keeps the dialog open and reports a delete error`() =
+        runTest(testDispatcher) {
+            todoRepository.deleteResult = Result.failure(IllegalStateException("no permission"))
+
+            viewModel.onEditTodoClick(TODO_ENTRY)
+            viewModel.onDeleteTodoClick()
+
+            assertEquals(TodoListError.DELETE_FAILED, viewModel.uiState.value.error)
+            assertEquals(TODO_ENTRY.id, viewModel.uiState.value.editedTodo?.todoId)
+        }
+
+    @Test
+    fun `nothing is deleted while no dialog is open`() = runTest(testDispatcher) {
+        viewModel.onDeleteTodoClick()
+
+        assertNull(todoRepository.deletedTodoId)
+    }
+
     private companion object {
         val SIGNED_IN_USER = SignedInUser(uid = "uid-1", displayName = "Georg", email = null)
 
@@ -210,6 +239,7 @@ private class FakeTodoRepository : TodoRepository {
     var addResult: Result<Unit> = Result.success(Unit)
     var setDoneResult: Result<Unit> = Result.success(Unit)
     var setTitleResult: Result<Unit> = Result.success(Unit)
+    var deleteResult: Result<Unit> = Result.success(Unit)
     var addedTitle: String? = null
         private set
     var addCallCount = 0
@@ -217,6 +247,8 @@ private class FakeTodoRepository : TodoRepository {
     var lastSetDoneCall: SetDoneCall? = null
         private set
     var lastSetTitleCall: SetTitleCall? = null
+        private set
+    var deletedTodoId: String? = null
         private set
 
     private val emittedTodos = MutableStateFlow<Result<List<Todo>>>(Result.success(emptyList()))
@@ -237,6 +269,11 @@ private class FakeTodoRepository : TodoRepository {
     override fun setTitle(todoId: String, title: String): Result<Unit> {
         lastSetTitleCall = SetTitleCall(todoId, title)
         return setTitleResult
+    }
+
+    override fun deleteTodo(todoId: String): Result<Unit> {
+        deletedTodoId = todoId
+        return deleteResult
     }
 
     fun emit(result: Result<List<Todo>>) {

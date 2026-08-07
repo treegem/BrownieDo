@@ -25,4 +25,6 @@ interface TodoRepository {
     fun setDone(todoId: String, isDone: Boolean, completedBy: String?): Result<Unit>
 
     fun setTitle(todoId: String, title: String): Result<Unit>
+
+    fun deleteTodo(todoId: String): Result<Unit>
 }
