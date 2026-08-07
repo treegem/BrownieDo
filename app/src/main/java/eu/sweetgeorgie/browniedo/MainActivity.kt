@@ -53,6 +53,10 @@ class MainActivity : ComponentActivity() {
                             onNewTodoTitleChange = todoListViewModel::onNewTodoTitleChange,
                             onAddTodoClick = todoListViewModel::addTodo,
                             onTodoDoneChange = todoListViewModel::onTodoDoneChange,
+                            onEditTodoClick = todoListViewModel::onEditTodoClick,
+                            onEditedTitleChange = todoListViewModel::onEditedTitleChange,
+                            onEditConfirm = todoListViewModel::onEditConfirm,
+                            onEditDismiss = todoListViewModel::onEditDismiss,
                             onSignOutClick = { appContainer.authRepository.signOut() },
                             modifier = contentModifier
                         )

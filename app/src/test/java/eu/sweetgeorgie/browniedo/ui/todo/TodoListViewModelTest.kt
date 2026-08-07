@@ -131,6 +131,63 @@ class TodoListViewModelTest {
         assertEquals(TodoListError.UPDATE_FAILED, viewModel.uiState.value.error)
     }
 
+    @Test
+    fun `opening the edit dialog shows the current title`() = runTest(testDispatcher) {
+        viewModel.onEditTodoClick(TODO_ENTRY)
+
+        assertEquals(
+            TodoEdit(todoId = TODO_ENTRY.id, title = TODO_ENTRY.title),
+            viewModel.uiState.value.editedTodo
+        )
+    }
+
+    @Test
+    fun `saving an edit writes the trimmed title and closes the dialog`() =
+        runTest(testDispatcher) {
+            viewModel.onEditTodoClick(TODO_ENTRY)
+            viewModel.onEditedTitleChange("  Brot kaufen  ")
+            viewModel.onEditConfirm()
+
+            assertEquals(
+                SetTitleCall(TODO_ENTRY.id, "Brot kaufen"),
+                todoRepository.lastSetTitleCall
+            )
+            assertNull(viewModel.uiState.value.editedTodo)
+            assertNull(viewModel.uiState.value.error)
+        }
+
+    @Test
+    fun `an edit with a blank title is not written`() = runTest(testDispatcher) {
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onEditedTitleChange("   ")
+        viewModel.onEditConfirm()
+
+        assertNull(todoRepository.lastSetTitleCall)
+    }
+
+    @Test
+    fun `a failing edit keeps the dialog open and reports an update error`() =
+        runTest(testDispatcher) {
+            todoRepository.setTitleResult = Result.failure(IllegalStateException("no permission"))
+
+            viewModel.onEditTodoClick(TODO_ENTRY)
+            viewModel.onEditedTitleChange("Brot kaufen")
+            viewModel.onEditConfirm()
+
+            assertEquals(TodoListError.UPDATE_FAILED, viewModel.uiState.value.error)
+            assertEquals("Brot kaufen", viewModel.uiState.value.editedTodo?.title)
+        }
+
+    @Test
+    fun `cancelling an edit writes nothing`() = runTest(testDispatcher) {
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onEditedTitleChange("Brot kaufen")
+        viewModel.onEditDismiss()
+
+        assertNull(todoRepository.lastSetTitleCall)
+        assertNull(viewModel.uiState.value.editedTodo)
+    }
+
     private companion object {
         val SIGNED_IN_USER = SignedInUser(uid = "uid-1", displayName = "Georg", email = null)
 
@@ -147,14 +204,19 @@ class TodoListViewModelTest {
 
 private data class SetDoneCall(val todoId: String, val isDone: Boolean, val completedBy: String?)
 
+private data class SetTitleCall(val todoId: String, val title: String)
+
 private class FakeTodoRepository : TodoRepository {
     var addResult: Result<Unit> = Result.success(Unit)
     var setDoneResult: Result<Unit> = Result.success(Unit)
+    var setTitleResult: Result<Unit> = Result.success(Unit)
     var addedTitle: String? = null
         private set
     var addCallCount = 0
         private set
     var lastSetDoneCall: SetDoneCall? = null
+        private set
+    var lastSetTitleCall: SetTitleCall? = null
         private set
 
     private val emittedTodos = MutableStateFlow<Result<List<Todo>>>(Result.success(emptyList()))
@@ -170,6 +232,11 @@ private class FakeTodoRepository : TodoRepository {
     override fun setDone(todoId: String, isDone: Boolean, completedBy: String?): Result<Unit> {
         lastSetDoneCall = SetDoneCall(todoId, isDone, completedBy)
         return setDoneResult
+    }
+
+    override fun setTitle(todoId: String, title: String): Result<Unit> {
+        lastSetTitleCall = SetTitleCall(todoId, title)
+        return setTitleResult
     }
 
     fun emit(result: Result<List<Todo>>) {

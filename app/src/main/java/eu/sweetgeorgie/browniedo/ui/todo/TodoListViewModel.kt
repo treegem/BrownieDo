@@ -58,4 +58,25 @@ class TodoListViewModel(
             mutableUiState.update { it.copy(error = TodoListError.UPDATE_FAILED) }
         }
     }
+
+    fun onEditTodoClick(todo: Todo) = mutableUiState.update {
+        it.copy(editedTodo = TodoEdit(todoId = todo.id, title = todo.title), error = null)
+    }
+
+    fun onEditedTitleChange(title: String) = mutableUiState.update {
+        it.copy(editedTodo = it.editedTodo?.copy(title = title))
+    }
+
+    fun onEditDismiss() = mutableUiState.update { it.copy(editedTodo = null) }
+
+    fun onEditConfirm() {
+        val editedTodo = mutableUiState.value.editedTodo ?: return
+        val title = editedTodo.title.trim()
+        if (title.isEmpty()) return
+        todoRepository.setTitle(editedTodo.todoId, title).fold(
+            // The dialog stays open on failure so the typed title is not lost.
+            onSuccess = { mutableUiState.update { it.copy(editedTodo = null, error = null) } },
+            onFailure = { mutableUiState.update { it.copy(error = TodoListError.UPDATE_FAILED) } }
+        )
+    }
 }

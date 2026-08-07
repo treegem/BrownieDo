@@ -1,5 +1,6 @@
 package eu.sweetgeorgie.browniedo.ui.todo
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
@@ -30,6 +32,10 @@ fun TodoListScreen(
     onNewTodoTitleChange: (String) -> Unit,
     onAddTodoClick: () -> Unit,
     onTodoDoneChange: (Todo, Boolean) -> Unit,
+    onEditTodoClick: (Todo) -> Unit,
+    onEditedTitleChange: (String) -> Unit,
+    onEditConfirm: () -> Unit,
+    onEditDismiss: () -> Unit,
     onSignOutClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -74,7 +80,8 @@ fun TodoListScreen(
             items(items = uiState.todos, key = Todo::id) { todo ->
                 TodoRow(
                     todo = todo,
-                    onDoneChange = { isDone -> onTodoDoneChange(todo, isDone) }
+                    onDoneChange = { isDone -> onTodoDoneChange(todo, isDone) },
+                    onClick = { onEditTodoClick(todo) }
                 )
                 HorizontalDivider()
             }
@@ -87,6 +94,15 @@ fun TodoListScreen(
             Text(text = stringResource(R.string.todo_list_sign_out))
         }
     }
+
+    uiState.editedTodo?.let { editedTodo ->
+        EditTodoDialog(
+            title = editedTodo.title,
+            onTitleChange = onEditedTitleChange,
+            onConfirm = onEditConfirm,
+            onDismiss = onEditDismiss
+        )
+    }
 }
 
 private fun TodoListError.messageResId() = when (this) {
@@ -96,9 +112,11 @@ private fun TodoListError.messageResId() = when (this) {
 }
 
 @Composable
-private fun TodoRow(todo: Todo, onDoneChange: (Boolean) -> Unit) {
+private fun TodoRow(todo: Todo, onDoneChange: (Boolean) -> Unit, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -114,4 +132,35 @@ private fun TodoRow(todo: Todo, onDoneChange: (Boolean) -> Unit) {
             }
         )
     }
+}
+
+@Composable
+private fun EditTodoDialog(
+    title: String,
+    onTitleChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = stringResource(R.string.todo_list_edit_headline)) },
+        text = {
+            OutlinedTextField(
+                value = title,
+                onValueChange = onTitleChange,
+                label = { Text(text = stringResource(R.string.todo_list_title_label)) },
+                singleLine = true
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = title.isNotBlank()) {
+                Text(text = stringResource(R.string.todo_list_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(R.string.todo_list_cancel))
+            }
+        }
+    )
 }

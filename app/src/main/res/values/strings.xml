@@ -7,6 +7,10 @@
     <string name="login_error_sign_in_failed">Anmeldung fehlgeschlagen. Bitte erneut versuchen.</string>
     <string name="todo_list_new_todo_hint">Neue Aufgabe</string>
     <string name="todo_list_add">Hinzufügen</string>
+    <string name="todo_list_edit_headline">Aufgabe bearbeiten</string>
+    <string name="todo_list_title_label">Titel</string>
+    <string name="todo_list_save">Speichern</string>
+    <string name="todo_list_cancel">Abbrechen</string>
     <string name="todo_list_error_load_failed">Die Liste konnte nicht geladen werden.</string>
     <string name="todo_list_error_add_failed">Die Aufgabe konnte nicht gespeichert werden.</string>
     <string name="todo_list_error_update_failed">Die Änderung konnte nicht gespeichert werden.</string>

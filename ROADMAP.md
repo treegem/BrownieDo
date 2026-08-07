@@ -98,7 +98,7 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 - [x] Aufgabe **hinzufügen**
 - [x] Aufgaben **anzeigen** (LazyColumn / Liste)
 - [x] Aufgabe als **erledigt / offen** markieren
-- [ ] Aufgabe **bearbeiten**
+- [x] Aufgabe **bearbeiten**
 - [ ] Aufgabe **löschen**
 - [x] Repository-Schicht sauber von der Compose-UI trennen
 

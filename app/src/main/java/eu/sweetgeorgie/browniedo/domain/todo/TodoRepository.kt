@@ -23,4 +23,6 @@ interface TodoRepository {
      * off and is `null` whenever [isDone] is `false`.
      */
     fun setDone(todoId: String, isDone: Boolean, completedBy: String?): Result<Unit>
+
+    fun setTitle(todoId: String, title: String): Result<Unit>
 }

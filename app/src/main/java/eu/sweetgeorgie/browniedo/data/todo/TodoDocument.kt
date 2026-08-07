@@ -28,6 +28,7 @@ data class TodoDocument(
  * the names are needed literally — and must stay in sync with its properties.
  */
 internal object TodoField {
+    const val TITLE = "title"
     const val DONE = "done"
     const val UPDATED_AT = "updatedAt"
     const val COMPLETED_BY = "completedBy"

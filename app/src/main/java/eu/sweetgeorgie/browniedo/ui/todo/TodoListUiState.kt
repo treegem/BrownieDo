@@ -12,5 +12,12 @@ data class TodoListUiState(
     val todos: List<Todo> = emptyList(),
     val isLoading: Boolean = true,
     val newTodoTitle: String = "",
+    val editedTodo: TodoEdit? = null,
     val error: TodoListError? = null
+)
+
+/** The entry currently open in the edit dialog, together with the text typed so far. */
+data class TodoEdit(
+    val todoId: String,
+    val title: String
 )
