@@ -39,3 +39,5 @@ der den alten als „abgelöst" markiert.
 | [0007](0007-java-time-per-core-library-desugaring.md) | `java.time` per Core Library Desugaring | akzeptiert |
 | [0008](0008-compose-bom-in-zwei-konfigurationen.md) | Compose-BOM in zwei Konfigurationen deklarieren | akzeptiert |
 | [0009](0009-listen-dokument-mit-todo-subcollection.md) | Listen-Dokument mit Todo-Sub-Collection | akzeptiert |
+| [0010](0010-sortierung-im-client-statt-orderby.md) | Sortierung im Client statt `orderBy` | akzeptiert |
+| [0011](0011-schreibvorgaenge-nicht-abwarten.md) | Schreibvorgänge nicht auf den Server warten lassen | akzeptiert |

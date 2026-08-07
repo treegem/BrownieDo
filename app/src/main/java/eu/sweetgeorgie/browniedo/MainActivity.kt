@@ -15,6 +15,7 @@ import eu.sweetgeorgie.browniedo.ui.auth.LoginScreen
 import eu.sweetgeorgie.browniedo.ui.auth.LoginViewModel
 import eu.sweetgeorgie.browniedo.ui.theme.BrownieDoTheme
 import eu.sweetgeorgie.browniedo.ui.todo.TodoListScreen
+import eu.sweetgeorgie.browniedo.ui.todo.TodoListViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,8 +29,7 @@ class MainActivity : ComponentActivity() {
 
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     val contentModifier = Modifier.padding(innerPadding)
-                    val user = signedInUser
-                    if (user == null) {
+                    if (signedInUser == null) {
                         val loginViewModel: LoginViewModel =
                             viewModel(factory = appContainer.viewModelFactory)
                         val loginUiState by loginViewModel.uiState.collectAsStateWithLifecycle()
@@ -44,8 +44,14 @@ class MainActivity : ComponentActivity() {
                             modifier = contentModifier
                         )
                     } else {
+                        val todoListViewModel: TodoListViewModel =
+                            viewModel(factory = appContainer.viewModelFactory)
+                        val todoListUiState by todoListViewModel.uiState
+                            .collectAsStateWithLifecycle()
                         TodoListScreen(
-                            signedInUserLabel = user.displayName ?: user.email ?: user.uid,
+                            uiState = todoListUiState,
+                            onNewTodoTitleChange = todoListViewModel::onNewTodoTitleChange,
+                            onAddTodoClick = todoListViewModel::addTodo,
                             onSignOutClick = { appContainer.authRepository.signOut() },
                             modifier = contentModifier
                         )

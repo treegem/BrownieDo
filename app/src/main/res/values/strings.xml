@@ -5,6 +5,9 @@
     <string name="login_sign_in_with_google">Mit Google anmelden</string>
     <string name="login_error_no_google_account">Auf diesem Gerät ist kein Google-Konto eingerichtet.</string>
     <string name="login_error_sign_in_failed">Anmeldung fehlgeschlagen. Bitte erneut versuchen.</string>
-    <string name="todo_list_placeholder">Angemeldet als %1$s. Die Aufgabenliste folgt in Phase 4.</string>
+    <string name="todo_list_new_todo_hint">Neue Aufgabe</string>
+    <string name="todo_list_add">Hinzufügen</string>
+    <string name="todo_list_error_load_failed">Die Liste konnte nicht geladen werden.</string>
+    <string name="todo_list_error_add_failed">Die Aufgabe konnte nicht gespeichert werden.</string>
     <string name="todo_list_sign_out">Abmelden</string>
 </resources>

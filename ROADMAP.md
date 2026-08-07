@@ -95,16 +95,16 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 
 ### Phase 4 – Kern-Funktionalität (CRUD)
 > Arbeitet gegen die feste Standardliste `lists/shared`; die Listen-Auswahl kommt in Phase 8.
-- [ ] Aufgabe **hinzufügen**
-- [ ] Aufgaben **anzeigen** (LazyColumn / Liste)
+- [x] Aufgabe **hinzufügen**
+- [x] Aufgaben **anzeigen** (LazyColumn / Liste)
 - [ ] Aufgabe als **erledigt / offen** markieren
 - [ ] Aufgabe **bearbeiten**
 - [ ] Aufgabe **löschen**
-- [ ] Repository-Schicht sauber von der Compose-UI trennen
+- [x] Repository-Schicht sauber von der Compose-UI trennen
 
 ### Phase 5 – Synchronisation & Offline (der KERN der App)
-- [ ] Firestore **Offline-Persistenz** aktivieren (queued Änderungen im Offline-Modus)
-- [ ] **Realtime-Listener** einbinden (Liste aktualisiert sich automatisch)
+- [x] Firestore **Offline-Persistenz** aktivieren — auf Android standardmäßig aktiv, kein Zutun nötig
+- [x] **Realtime-Listener** einbinden (Liste aktualisiert sich automatisch)
 - [ ] Offline-Szenario testen: einer offline ändern → wieder online → synct beim anderen
 - [ ] Konflikt-Verhalten prüfen (Last-Write-Wins über `updatedAt`)
 
