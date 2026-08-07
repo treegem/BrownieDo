@@ -1,5 +1,7 @@
 package eu.sweetgeorgie.browniedo.ui.todo
 
+import eu.sweetgeorgie.browniedo.domain.auth.AuthRepository
+import eu.sweetgeorgie.browniedo.domain.auth.SignedInUser
 import eu.sweetgeorgie.browniedo.domain.todo.Todo
 import eu.sweetgeorgie.browniedo.domain.todo.TodoRepository
 import java.time.Instant
@@ -24,12 +26,13 @@ class TodoListViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private val todoRepository = FakeTodoRepository()
+    private val authRepository = FakeAuthRepository(SIGNED_IN_USER)
     private lateinit var viewModel: TodoListViewModel
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        viewModel = TodoListViewModel(todoRepository)
+        viewModel = TodoListViewModel(todoRepository, authRepository)
     }
 
     @After
@@ -97,7 +100,40 @@ class TodoListViewModelTest {
         assertNull(viewModel.uiState.value.error)
     }
 
+    @Test
+    fun `ticking an entry off records it as done by the signed in user`() =
+        runTest(testDispatcher) {
+            viewModel.onTodoDoneChange(TODO_ENTRY, isDone = true)
+
+            assertEquals(
+                SetDoneCall(TODO_ENTRY.id, isDone = true, completedBy = SIGNED_IN_USER.uid),
+                todoRepository.lastSetDoneCall
+            )
+            assertNull(viewModel.uiState.value.error)
+        }
+
+    @Test
+    fun `reopening an entry clears who completed it`() = runTest(testDispatcher) {
+        viewModel.onTodoDoneChange(TODO_ENTRY.copy(isDone = true), isDone = false)
+
+        assertEquals(
+            SetDoneCall(TODO_ENTRY.id, isDone = false, completedBy = null),
+            todoRepository.lastSetDoneCall
+        )
+    }
+
+    @Test
+    fun `a failing update reports an update error`() = runTest(testDispatcher) {
+        todoRepository.setDoneResult = Result.failure(IllegalStateException("no permission"))
+
+        viewModel.onTodoDoneChange(TODO_ENTRY, isDone = true)
+
+        assertEquals(TodoListError.UPDATE_FAILED, viewModel.uiState.value.error)
+    }
+
     private companion object {
+        val SIGNED_IN_USER = SignedInUser(uid = "uid-1", displayName = "Georg", email = null)
+
         val TODO_ENTRY = Todo(
             id = "todo-1",
             title = "Milch kaufen",
@@ -109,11 +145,16 @@ class TodoListViewModelTest {
     }
 }
 
+private data class SetDoneCall(val todoId: String, val isDone: Boolean, val completedBy: String?)
+
 private class FakeTodoRepository : TodoRepository {
     var addResult: Result<Unit> = Result.success(Unit)
+    var setDoneResult: Result<Unit> = Result.success(Unit)
     var addedTitle: String? = null
         private set
     var addCallCount = 0
+        private set
+    var lastSetDoneCall: SetDoneCall? = null
         private set
 
     private val emittedTodos = MutableStateFlow<Result<List<Todo>>>(Result.success(emptyList()))
@@ -126,7 +167,21 @@ private class FakeTodoRepository : TodoRepository {
         return addResult
     }
 
+    override fun setDone(todoId: String, isDone: Boolean, completedBy: String?): Result<Unit> {
+        lastSetDoneCall = SetDoneCall(todoId, isDone, completedBy)
+        return setDoneResult
+    }
+
     fun emit(result: Result<List<Todo>>) {
         emittedTodos.value = result
     }
+}
+
+private class FakeAuthRepository(override val currentUser: SignedInUser?) : AuthRepository {
+    override val signedInUser: Flow<SignedInUser?> = MutableStateFlow(currentUser)
+
+    override suspend fun signInWithGoogleIdToken(idToken: String): Result<SignedInUser> =
+        Result.failure(UnsupportedOperationException("not used in this test"))
+
+    override fun signOut() = Unit
 }

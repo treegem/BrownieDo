@@ -28,6 +28,6 @@ class AppContainer(applicationContext: Context) {
 
     val viewModelFactory: ViewModelProvider.Factory = viewModelFactory {
         initializer { LoginViewModel(authRepository) }
-        initializer { TodoListViewModel(todoRepository) }
+        initializer { TodoListViewModel(todoRepository, authRepository) }
     }
 }

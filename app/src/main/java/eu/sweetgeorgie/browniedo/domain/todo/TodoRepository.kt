@@ -17,4 +17,10 @@ interface TodoRepository {
      * docs/decisions/0011-schreibvorgaenge-nicht-abwarten.md.
      */
     fun addTodo(title: String): Result<Unit>
+
+    /**
+     * Marks an entry as done or open again. [completedBy] is the uid of the partner who ticked it
+     * off and is `null` whenever [isDone] is `false`.
+     */
+    fun setDone(todoId: String, isDone: Boolean, completedBy: String?): Result<Unit>
 }

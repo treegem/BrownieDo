@@ -22,3 +22,13 @@ data class TodoDocument(
     @ServerTimestamp var updatedAt: Date? = null,
     var completedBy: String? = null
 )
+
+/**
+ * Field names as stored in Firestore. A field-level update cannot go through [TodoDocument], so
+ * the names are needed literally — and must stay in sync with its properties.
+ */
+internal object TodoField {
+    const val DONE = "done"
+    const val UPDATED_AT = "updatedAt"
+    const val COMPLETED_BY = "completedBy"
+}

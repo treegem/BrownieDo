@@ -9,5 +9,6 @@
     <string name="todo_list_add">Hinzufügen</string>
     <string name="todo_list_error_load_failed">Die Liste konnte nicht geladen werden.</string>
     <string name="todo_list_error_add_failed">Die Aufgabe konnte nicht gespeichert werden.</string>
+    <string name="todo_list_error_update_failed">Die Änderung konnte nicht gespeichert werden.</string>
     <string name="todo_list_sign_out">Abmelden</string>
 </resources>

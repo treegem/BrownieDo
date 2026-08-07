@@ -97,7 +97,7 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 > Arbeitet gegen die feste Standardliste `lists/shared`; die Listen-Auswahl kommt in Phase 8.
 - [x] Aufgabe **hinzufügen**
 - [x] Aufgaben **anzeigen** (LazyColumn / Liste)
-- [ ] Aufgabe als **erledigt / offen** markieren
+- [x] Aufgabe als **erledigt / offen** markieren
 - [ ] Aufgabe **bearbeiten**
 - [ ] Aufgabe **löschen**
 - [x] Repository-Schicht sauber von der Compose-UI trennen
