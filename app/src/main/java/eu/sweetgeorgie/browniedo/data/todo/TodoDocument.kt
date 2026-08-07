@@ -11,7 +11,9 @@ import java.util.Date
  * accepted the write. Reading with `ServerTimestampBehavior.ESTIMATE` fills them with a local
  * estimate, so entries created offline stay usable until they sync.
  *
- * The document id is not stored as a field — it only exists on the snapshot.
+ * The document id is not stored as a field — it only exists on the snapshot. The same holds for
+ * the list a todo belongs to: it is given by the path `lists/{listId}/todos/{todoId}`, see
+ * docs/decisions/0009-listen-dokument-mit-todo-subcollection.md.
  */
 data class TodoDocument(
     var title: String = "",

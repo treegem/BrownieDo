@@ -3,7 +3,7 @@ package eu.sweetgeorgie.browniedo.domain.todo
 import java.time.Instant
 
 /**
- * A single entry of the shared list.
+ * A single entry of a list.
  *
  * [updatedAt] is the server-assigned time of the last write and decides last-write-wins conflicts,
  * see docs/decisions/0006-server-zeitstempel-fuer-last-write-wins.md.

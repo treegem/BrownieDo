@@ -38,3 +38,4 @@ der den alten als „abgelöst" markiert.
 | [0006](0006-server-zeitstempel-fuer-last-write-wins.md) | Server-Zeitstempel für Last-Write-Wins | akzeptiert |
 | [0007](0007-java-time-per-core-library-desugaring.md) | `java.time` per Core Library Desugaring | akzeptiert |
 | [0008](0008-compose-bom-in-zwei-konfigurationen.md) | Compose-BOM in zwei Konfigurationen deklarieren | akzeptiert |
+| [0009](0009-listen-dokument-mit-todo-subcollection.md) | Listen-Dokument mit Todo-Sub-Collection | akzeptiert |

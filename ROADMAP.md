@@ -83,11 +83,17 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 
 ### Phase 3 – Datenmodell & Firestore-Struktur
 - [x] Datenmodell definieren: `Todo` (id, titel, erledigt, erstelltAm, updatedAt, ggf. erledigtVon)
-- [ ] Firestore-Collection-Struktur festlegen (gemeinsame `todos`-Collection / geteilte Liste)
-- [ ] Security Rules: nur die beiden Accounts dürfen lesen/schreiben
+- [x] Firestore-Struktur festlegen: `lists/{listId}` mit `members`-Array und Sub-Collection
+  `lists/{listId}/todos` — trägt geteilte und private Listen, siehe
+  [ADR 0009](docs/decisions/0009-listen-dokument-mit-todo-subcollection.md)
+- [ ] **Standardliste `lists/shared` einmalig in der Firebase Console anlegen**
+  (`name`, `members: [uid1, uid2]`, `createdAt`) — beide UIDs stehen unter Authentication → Users
+- [ ] Security Rules: Zugriff auf eine Liste und ihre Aufgaben nur für die uids in deren `members`;
+  Schreiben auf Listen-Dokumente selbst verbieten
 - [x] `updatedAt`-Feld für Last-Write-Wins-Konfliktlösung vorsehen
 
 ### Phase 4 – Kern-Funktionalität (CRUD)
+> Arbeitet gegen die feste Standardliste `lists/shared`; die Listen-Auswahl kommt in Phase 8.
 - [ ] Aufgabe **hinzufügen**
 - [ ] Aufgaben **anzeigen** (LazyColumn / Liste)
 - [ ] Aufgabe als **erledigt / offen** markieren
@@ -115,12 +121,19 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   Google-Login in der signierten APK fehl (`google-services.json` danach neu herunterladen)
 - [ ] Direkt auf beide Geräte installieren (Sideload)
 
+### Phase 8 – Mehrere Listen (geteilt & privat)
+> Die Datenstruktur dafür steht bereits seit Phase 3, es fehlt nur die Bedienung.
+- [ ] Listen des angemeldeten Nutzers laden (`lists`, gefiltert über `members`)
+- [ ] Zwischen Listen umschalten (zuletzt gewählte Liste merken)
+- [ ] Liste anlegen (privat = nur eigene uid, geteilt = beide uids) und umbenennen
+- [ ] Liste löschen inklusive ihrer `todos`-Sub-Collection (Firestore löscht nicht kaskadierend)
+- [ ] Security Rules auf das Anlegen/Ändern von Listen durch die App erweitern
+
 ---
 
 ## 4. Optionale / spätere Erweiterungen (nice to have)
 - [ ] Push-Benachrichtigung, wenn der andere etwas ändert (Firebase Cloud Messaging)
 - [ ] Fälligkeitsdaten / Erinnerungen
-- [ ] Mehrere Listen / Kategorien
 - [ ] Play-Store-Veröffentlichung (Developer-Account, Store-Eintrag, Datenschutzerklärung)
 - [ ] iOS-Version via Kotlin Multiplatform (Logik-Schicht wiederverwenden)
 
@@ -135,5 +148,8 @@ Hier stehen nur die Entscheidungen, die speziell für BrownieDo gelten:
 
 - **Secrets schützen:** `google-services.json` und Keystore niemals ins Repo.
 - **Konfliktstrategie:** Für zwei Nutzer reicht Last-Write-Wins auf Feldebene (`updatedAt`) — keine CRDTs.
+- **Mehrere Listen:** BrownieDo trägt dauerhaft geteilte *und* private Listen. Die Struktur
+  (`lists/{listId}` mit `members` plus Sub-Collection `todos`) steht seit Phase 3, die Bedienung
+  folgt in Phase 8 — siehe [ADR 0009](docs/decisions/0009-listen-dokument-mit-todo-subcollection.md).
 - **Zukunftssicherheit:** Business-Logik frei von Android-Framework-Abhängigkeiten halten,
   damit sie später via Kotlin Multiplatform auf iOS wiederverwendbar ist.
