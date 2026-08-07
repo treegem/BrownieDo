@@ -58,7 +58,8 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 
 ## 3. Umsetzungs-Checkliste (das WIE)
 
-> **Legende:** `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt
+> **Legende:** `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt · `[-]` zurückgestellt
+> (blockiert durch etwas Äußeres, der Grund steht am Punkt)
 
 ### Phase 0 – Vorbereitung & Setup
 - [x] Android Studio installieren (inkl. Android SDK & Emulator)
@@ -105,8 +106,10 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 ### Phase 5 – Synchronisation & Offline (der KERN der App)
 - [x] Firestore **Offline-Persistenz** aktivieren — auf Android standardmäßig aktiv, kein Zutun nötig
 - [x] **Realtime-Listener** einbinden (Liste aktualisiert sich automatisch)
-- [ ] Offline-Szenario testen: einer offline ändern → wieder online → synct beim anderen
-- [ ] Konflikt-Verhalten prüfen (Last-Write-Wins über `updatedAt`)
+- [-] Offline-Szenario testen: einer offline ändern → wieder online → synct beim anderen
+  — zurückgestellt, bis das zweite Handy verfügbar ist
+- [-] Konflikt-Verhalten prüfen (Last-Write-Wins über `updatedAt`)
+  — zurückgestellt, bis das zweite Handy verfügbar ist
 
 ### Phase 6 – UI-Feinschliff
 - [ ] Aufgeräumtes Layout (Material 3)
