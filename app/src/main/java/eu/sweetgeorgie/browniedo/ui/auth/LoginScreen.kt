@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,41 +28,46 @@ fun LoginScreen(
     val activity = LocalActivity.current
     val serverClientId = stringResource(R.string.default_web_client_id)
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = stringResource(R.string.login_headline),
-            style = MaterialTheme.typography.headlineLarge
-        )
-        Text(
-            text = stringResource(R.string.login_subline),
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center
-        )
-
-        if (uiState.isSigningIn) {
-            CircularProgressIndicator()
-        } else {
-            Button(
-                onClick = { activity?.let { onSignInClick(it, serverClientId) } },
-                enabled = activity != null
-            ) {
-                Text(text = stringResource(R.string.login_sign_in_with_google))
-            }
-        }
-
-        uiState.error?.let { error ->
+    // Scaffold ohne Leisten: Es malt den Hintergrund des Farbschemas und hält den Inhalt von
+    // Systemleisten und Display-Aussparung frei — siehe ADR 0012.
+    Scaffold(modifier = modifier.fillMaxSize()) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Text(
-                text = stringResource(error.messageResId()),
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium,
+                text = stringResource(R.string.login_headline),
+                style = MaterialTheme.typography.headlineLarge
+            )
+            Text(
+                text = stringResource(R.string.login_subline),
+                style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center
             )
+
+            if (uiState.isSigningIn) {
+                CircularProgressIndicator()
+            } else {
+                Button(
+                    onClick = { activity?.let { onSignInClick(it, serverClientId) } },
+                    enabled = activity != null
+                ) {
+                    Text(text = stringResource(R.string.login_sign_in_with_google))
+                }
+            }
+
+            uiState.error?.let { error ->
+                Text(
+                    text = stringResource(error.messageResId()),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }

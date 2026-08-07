@@ -112,11 +112,15 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   — zurückgestellt, bis das zweite Handy verfügbar ist
 
 ### Phase 6 – UI-Feinschliff
-- [ ] Aufgeräumtes Layout (Material 3)
+- [x] Aufgeräumtes Layout (Material 3) — TopAppBar mit Overflow-Menü, Eingabefeld als `bottomBar`
+  ([ADR 0013](docs/decisions/0013-eingabefeld-in-der-bottombar-statt-fab.md)), Zeilen als
+  `ListItem`, Schreibfehler als Snackbar; Scaffold pro Bildschirm
+  ([ADR 0012](docs/decisions/0012-scaffold-pro-bildschirm.md))
 - [ ] Leerer Zustand („noch keine Aufgaben") & Ladezustand
 - [ ] Optional: Aufgaben sortieren (offen oben, erledigt unten)
 - [ ] Optional: App-Icon & Name anpassen
-- [ ] Optional: Dark Mode prüfen
+- [ ] Optional: Dark Mode prüfen — der Fensterhintergrund folgt dem Dunkelmodus bereits
+  (`res/values-night/themes.xml`), offen ist die Durchsicht der Compose-Oberfläche auf dem Gerät
 
 ### Phase 7 – Test & Verteilung an euch zwei
 - [ ] Auf beiden Galaxy-Phones testen

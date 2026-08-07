@@ -80,6 +80,13 @@ class TodoListViewModel(
         )
     }
 
+    // LOAD_FAILED bleibt bewusst stehen: Firestore baut den Snapshot-Listener nach einem Fehler
+    // ab, die Liste aktualisiert sich also nicht mehr. Ein Hinweis, der nach ein paar Sekunden
+    // verschwindet, würde den Nutzer vor einer still veralteten Liste sitzen lassen.
+    fun onErrorShown() = mutableUiState.update {
+        if (it.error == TodoListError.LOAD_FAILED) it else it.copy(error = null)
+    }
+
     fun onDeleteTodoClick() {
         val editedTodo = mutableUiState.value.editedTodo ?: return
         todoRepository.deleteTodo(editedTodo.todoId).fold(

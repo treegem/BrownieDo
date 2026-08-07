@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Dunkles Gegenstück zu values/themes.xml. Betrifft nur den Fensterhintergrund, der vor dem
+         ersten Compose-Frame gezeichnet wird — das Farbschema von Compose kommt aus Theme.kt.
+         Ein DayNight-Parent kommt nicht in Frage: android:Theme.Material.DayNight gibt es nicht,
+         und android:Theme.DeviceDefault.DayNight erst ab API 29 (minSdk ist 24). -->
+    <style name="Theme.BrownieDo" parent="android:Theme.Material.NoActionBar" />
+</resources>

@@ -4,11 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import eu.sweetgeorgie.browniedo.ui.auth.LoginScreen
@@ -27,41 +23,39 @@ class MainActivity : ComponentActivity() {
                 val signedInUser by appContainer.authRepository.signedInUser
                     .collectAsStateWithLifecycle(initialValue = appContainer.authRepository.currentUser)
 
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    val contentModifier = Modifier.padding(innerPadding)
-                    if (signedInUser == null) {
-                        val loginViewModel: LoginViewModel =
-                            viewModel(factory = appContainer.viewModelFactory)
-                        val loginUiState by loginViewModel.uiState.collectAsStateWithLifecycle()
-                        LoginScreen(
-                            uiState = loginUiState,
-                            onSignInClick = { activityContext, serverClientId ->
-                                loginViewModel.signIn {
-                                    appContainer.googleIdTokenRequester
-                                        .requestIdToken(activityContext, serverClientId)
-                                }
-                            },
-                            modifier = contentModifier
-                        )
-                    } else {
-                        val todoListViewModel: TodoListViewModel =
-                            viewModel(factory = appContainer.viewModelFactory)
-                        val todoListUiState by todoListViewModel.uiState
-                            .collectAsStateWithLifecycle()
-                        TodoListScreen(
-                            uiState = todoListUiState,
-                            onNewTodoTitleChange = todoListViewModel::onNewTodoTitleChange,
-                            onAddTodoClick = todoListViewModel::addTodo,
-                            onTodoDoneChange = todoListViewModel::onTodoDoneChange,
-                            onEditTodoClick = todoListViewModel::onEditTodoClick,
-                            onEditedTitleChange = todoListViewModel::onEditedTitleChange,
-                            onEditConfirm = todoListViewModel::onEditConfirm,
-                            onDeleteTodoClick = todoListViewModel::onDeleteTodoClick,
-                            onEditDismiss = todoListViewModel::onEditDismiss,
-                            onSignOutClick = { appContainer.authRepository.signOut() },
-                            modifier = contentModifier
-                        )
-                    }
+                // Jeder Bildschirm bringt sein eigenes Scaffold mit, weil dessen Leisten den
+                // jeweiligen UI-State lesen — siehe ADR 0012.
+                if (signedInUser == null) {
+                    val loginViewModel: LoginViewModel =
+                        viewModel(factory = appContainer.viewModelFactory)
+                    val loginUiState by loginViewModel.uiState.collectAsStateWithLifecycle()
+                    LoginScreen(
+                        uiState = loginUiState,
+                        onSignInClick = { activityContext, serverClientId ->
+                            loginViewModel.signIn {
+                                appContainer.googleIdTokenRequester
+                                    .requestIdToken(activityContext, serverClientId)
+                            }
+                        }
+                    )
+                } else {
+                    val todoListViewModel: TodoListViewModel =
+                        viewModel(factory = appContainer.viewModelFactory)
+                    val todoListUiState by todoListViewModel.uiState
+                        .collectAsStateWithLifecycle()
+                    TodoListScreen(
+                        uiState = todoListUiState,
+                        onNewTodoTitleChange = todoListViewModel::onNewTodoTitleChange,
+                        onAddTodoClick = todoListViewModel::addTodo,
+                        onTodoDoneChange = todoListViewModel::onTodoDoneChange,
+                        onEditTodoClick = todoListViewModel::onEditTodoClick,
+                        onEditedTitleChange = todoListViewModel::onEditedTitleChange,
+                        onEditConfirm = todoListViewModel::onEditConfirm,
+                        onDeleteTodoClick = todoListViewModel::onDeleteTodoClick,
+                        onEditDismiss = todoListViewModel::onEditDismiss,
+                        onErrorShown = todoListViewModel::onErrorShown,
+                        onSignOutClick = { appContainer.authRepository.signOut() }
+                    )
                 }
             }
         }

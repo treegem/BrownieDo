@@ -41,3 +41,5 @@ der den alten als „abgelöst" markiert.
 | [0009](0009-listen-dokument-mit-todo-subcollection.md) | Listen-Dokument mit Todo-Sub-Collection | akzeptiert |
 | [0010](0010-sortierung-im-client-statt-orderby.md) | Sortierung im Client statt `orderBy` | akzeptiert |
 | [0011](0011-schreibvorgaenge-nicht-abwarten.md) | Schreibvorgänge nicht auf den Server warten lassen | akzeptiert |
+| [0012](0012-scaffold-pro-bildschirm.md) | Scaffold pro Bildschirm statt app-weit | akzeptiert |
+| [0013](0013-eingabefeld-in-der-bottombar-statt-fab.md) | Eingabefeld in der `bottomBar` statt FAB mit Dialog | akzeptiert |

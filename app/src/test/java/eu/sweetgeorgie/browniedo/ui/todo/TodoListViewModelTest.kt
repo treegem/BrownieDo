@@ -217,6 +217,28 @@ class TodoListViewModelTest {
         assertNull(todoRepository.deletedTodoId)
     }
 
+    @Test
+    fun `a shown write error is cleared`() = runTest(testDispatcher) {
+        todoRepository.addResult = Result.failure(IllegalStateException("offline"))
+        viewModel.onNewTodoTitleChange("Milch kaufen")
+        viewModel.addTodo()
+        advanceUntilIdle()
+
+        viewModel.onErrorShown()
+
+        assertNull(viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `a shown load error stays visible`() = runTest(testDispatcher) {
+        todoRepository.emit(Result.failure(IllegalStateException("no permission")))
+        advanceUntilIdle()
+
+        viewModel.onErrorShown()
+
+        assertEquals(TodoListError.LOAD_FAILED, viewModel.uiState.value.error)
+    }
+
     private companion object {
         val SIGNED_IN_USER = SignedInUser(uid = "uid-1", displayName = "Georg", email = null)
 
