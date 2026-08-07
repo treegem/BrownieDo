@@ -1,0 +1,28 @@
+rules_version = '2';
+
+// Source of truth for the Firestore security rules. Deploy by pasting the content into
+// Firebase Console -> Firestore Database -> Rules -> Publish.
+//
+// Structure and reasoning: docs/decisions/0009-listen-dokument-mit-todo-subcollection.md
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // A todo lives under its list, so membership has to be read from the parent document.
+    function isListMember(listId) {
+      return request.auth != null
+        && request.auth.uid in get(/databases/$(database)/documents/lists/$(listId)).data.members;
+    }
+
+    match /lists/{listId} {
+      allow read: if request.auth != null && request.auth.uid in resource.data.members;
+
+      // List documents are created by hand in the console, so nobody can add themselves to a
+      // list they are not part of. Lifted once the app manages lists itself (roadmap phase 8).
+      allow write: if false;
+
+      match /todos/{todoId} {
+        allow read, write: if isListMember(listId);
+      }
+    }
+  }
+}

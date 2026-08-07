@@ -86,10 +86,11 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 - [x] Firestore-Struktur festlegen: `lists/{listId}` mit `members`-Array und Sub-Collection
   `lists/{listId}/todos` — trägt geteilte und private Listen, siehe
   [ADR 0009](docs/decisions/0009-listen-dokument-mit-todo-subcollection.md)
-- [ ] **Standardliste `lists/shared` einmalig in der Firebase Console anlegen**
+- [x] **Standardliste `lists/shared` einmalig in der Firebase Console anlegen**
   (`name`, `members: [uid1, uid2]`, `createdAt`) — beide UIDs stehen unter Authentication → Users
-- [ ] Security Rules: Zugriff auf eine Liste und ihre Aufgaben nur für die uids in deren `members`;
-  Schreiben auf Listen-Dokumente selbst verbieten
+- [x] Security Rules: Zugriff auf eine Liste und ihre Aufgaben nur für die uids in deren `members`;
+  Schreiben auf Listen-Dokumente selbst verbieten (`firestore.rules`)
+- [x] `firestore.rules` in der Firebase Console veröffentlichen
 - [x] `updatedAt`-Feld für Last-Write-Wins-Konfliktlösung vorsehen
 
 ### Phase 4 – Kern-Funktionalität (CRUD)
@@ -147,6 +148,8 @@ Entscheidungen stehen als ADRs in [`docs/decisions/`](docs/decisions/README.md).
 Hier stehen nur die Entscheidungen, die speziell für BrownieDo gelten:
 
 - **Secrets schützen:** `google-services.json` und Keystore niemals ins Repo.
+- **Security Rules:** `firestore.rules` im Repo-Root ist die Quelle der Wahrheit. Veröffentlicht
+  wird von Hand über die Firebase Console — für zwei Nutzer lohnt kein Firebase-CLI-Setup.
 - **Konfliktstrategie:** Für zwei Nutzer reicht Last-Write-Wins auf Feldebene (`updatedAt`) — keine CRDTs.
 - **Mehrere Listen:** BrownieDo trägt dauerhaft geteilte *und* private Listen. Die Struktur
   (`lists/{listId}` mit `members` plus Sub-Collection `todos`) steht seit Phase 3, die Bedienung
