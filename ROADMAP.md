@@ -166,8 +166,16 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 - [x] Zuletzt gewählte Liste über App-Neustarts hinweg merken — DataStore Preferences, pro Gerät,
   mit Rückfall auf die erste Liste
   ([ADR 0018](docs/decisions/0018-datastore-fuer-die-zuletzt-gewaehlte-liste.md))
-- [ ] Auf dem Gerät prüfen: umschalten, App neu starten, offline starten — dafür muss eine zweite
-  Liste von Hand in der Firebase Console angelegt werden
+- [x] Auf dem Gerät prüfen: umschalten und App neu starten — belegt auf einem SM-S928B mit einer
+  zweiten, von Hand angelegten Liste. Die Auswahl zeigt beide Listen mit der aktuellen farblich
+  hervorgehoben, und nach `am force-stop` plus Neustart steht dieselbe Liste wieder offen. Im
+  DataStore der App liegt `selected_list.preferences_pb` mit `selected_list_id → second-shared`
+- [x] Offline starten — belegt bei aktivem Flugmodus: Die Listen-Query wird aus Firestores lokalem
+  Cache beantwortet, der Listenname steht, kein Ladefehler
+- [x] Symbole und Sortierung auf dem Gerät belegt — mit drei Listen zeigt das Menü das
+  Einzelperson-Symbol für die private und das Gruppen-Symbol für die beiden geteilten, und die
+  Reihenfolge ist alphabetisch (Gemeinsam → Private Liste → Zweite Liste). Damit greift auch
+  `LIST_ORDER` aus [ADR 0010](docs/decisions/0010-sortierung-im-client-statt-orderby.md) sichtbar
 
 #### Phase 8b – Listen anlegen, umbenennen, löschen
 > Die Reihenfolge ist hier nicht beliebig: Ohne die Regeländerung scheitert jeder Schreibvorgang.
@@ -186,12 +194,16 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 - [x] Alle Regeldateien auf always-on umstellen, nachdem gemessen wurde, dass das
   JetBrains-Copilot-Plugin `applyTo` nicht auswertet
   ([ADR 0014](docs/decisions/0014-regeldateien-always-on.md))
-- [ ] **Die instrumentierten Tests einmal wirklich ausführen** (`TodoListScreenTest`, 7 Stück) —
-  sie wurden bisher nur kompiliert, nie gelaufen, weil kein Gerät angeschlossen war. Grün ist also
-  nichts davon belegt. Offen ist dabei besonders, ob `swipeRight()` die 85-%-Wischschwelle aus
-  [ADR 0016](docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md) überhaupt reißt; falls
-  nicht, gehört die Wischstrecke im Test gesetzt und **nicht** die Schwelle gesenkt — die ist eine
-  Produktentscheidung
+- [x] **Die instrumentierten Tests einmal wirklich ausführen** — erledigt, alle 8 grün auf einem
+  SM-S928B. Dabei kam heraus, warum sie nie etwas geprüft hatten: `TodoListScreenTest` importierte
+  `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule`. Mit diesem Import scheitern alle
+  Compose-Tests reproduzierbar an „No compose hierarchies found"; der Standard-Import ohne `v2`
+  behebt es. Nebenbei bestätigt: `swipeRight()` reißt die 85-%-Wischschwelle aus
+  [ADR 0016](docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md), die Tests brauchen
+  keine gesetzte Wischstrecke.
+  **Achtung für den nächsten Lauf:** Sperrt der Bildschirm während des Laufs, brechen die Tests mit
+  demselben „No compose hierarchies"-Fehler ab und Wireless Debugging verliert die Verbindung —
+  per Kabel testen oder in den Entwickleroptionen „Aktiv lassen" einschalten.
 - [~] Prüfen, dass die `@`-Importe in `CLAUDE.md` und die Regeln in Android Studio tatsächlich laden
   (Canary-Methode, siehe ADR 0014)
 
