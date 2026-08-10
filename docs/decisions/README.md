@@ -46,3 +46,4 @@ der den alten als „abgelöst" markiert.
 | [0018](0018-datastore-fuer-die-zuletzt-gewaehlte-liste.md) | DataStore für die zuletzt gewählte Liste | akzeptiert |
 | [0019](0019-schreibrechte-auf-listen-dokumente.md) | Schreibrechte auf Listen-Dokumente | akzeptiert |
 | [0020](0020-partner-aus-users-collection.md) | Partner aus einer handgepflegten `users`-Collection | akzeptiert |
+| [0021](0021-eigene-farbpalette-statt-dynamic-color.md) | Eigene Farbpalette statt Dynamic Color | akzeptiert |

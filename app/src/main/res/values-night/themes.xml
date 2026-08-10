@@ -5,5 +5,7 @@
          ersten Compose-Frame gezeichnet wird — das Farbschema von Compose kommt aus Theme.kt.
          Ein DayNight-Parent kommt nicht in Frage: android:Theme.Material.DayNight gibt es nicht,
          und android:Theme.DeviceDefault.DayNight erst ab API 29 (minSdk ist 24). -->
-    <style name="Theme.BrownieDo" parent="android:Theme.Material.NoActionBar" />
+    <style name="Theme.BrownieDo" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/window_background_night</item>
+    </style>
 </resources>

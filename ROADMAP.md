@@ -131,7 +131,11 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   nicht wischen, siehe [ADR 0016](docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md)
 - [x] Dark Mode prüfen — der Fensterhintergrund folgt dem Dunkelmodus über
   `res/values-night/themes.xml`, das Compose-Farbschema über `BrownieDoTheme`; auf dem Gerät
-  durchgesehen, keine Beanstandung
+  durchgesehen
+- [x] Eigene Farbpalette statt Dynamic Color — aufgefallen war, dass ein aktiver Dialog-Knopf mit
+  2,12 : 1 wie deaktiviert wirkte, weil die Farbe vom Hintergrundbild des Geräts kam. Jetzt zwei
+  vollständige Schemata aus den Icon-Farben, Kontrast von `ColorSchemeContrastTest` abgesichert
+  ([ADR 0021](docs/decisions/0021-eigene-farbpalette-statt-dynamic-color.md))
 
 ### Phase 7 – Test & Verteilung an euch zwei
 - [-] Auf beiden Galaxy-Phones testen — auf dem ersten Gerät (SM-S928B) erfolgreich getestet:

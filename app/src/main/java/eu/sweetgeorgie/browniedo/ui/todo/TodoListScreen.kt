@@ -762,7 +762,7 @@ private fun EditTodoDialog(
 @Composable
 private fun TodoListScreenPreview() {
     // Dynamic Color kann der Vorschau-Renderer nicht, so ist sichtbar was auf API 24-30 läuft.
-    BrownieDoTheme(dynamicColor = false) {
+    BrownieDoTheme {
         TodoListScreen(
             uiState = TodoListUiState(
                 lists = PREVIEW_LISTS,
@@ -803,7 +803,7 @@ private fun TodoListScreenPreview() {
 @Preview(showBackground = true, uiMode = UI_MODE_NIGHT_YES)
 @Composable
 private fun TodoListScreenEmptyPreview() {
-    BrownieDoTheme(dynamicColor = false) {
+    BrownieDoTheme {
         TodoListScreen(
             uiState = TodoListUiState(
                 lists = PREVIEW_LISTS,

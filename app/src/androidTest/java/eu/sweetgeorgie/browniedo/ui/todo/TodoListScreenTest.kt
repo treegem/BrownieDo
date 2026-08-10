@@ -126,7 +126,7 @@ class TodoListScreenTest {
         onTodoSwipedAway: (Todo) -> Unit = {}
     ) {
         composeTestRule.setContent {
-            BrownieDoTheme(dynamicColor = false) {
+            BrownieDoTheme {
                 TodoListScreen(
                     uiState = uiState,
                     onListSelected = {},
