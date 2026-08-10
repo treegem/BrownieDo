@@ -3,6 +3,8 @@ package eu.sweetgeorgie.browniedo.ui.todo
 import android.content.res.Configuration.UI_MODE_NIGHT_YES
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -18,6 +20,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -46,8 +49,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -99,25 +105,34 @@ fun TodoListScreen(
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { innerPadding ->
-        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = innerPadding) {
-            if (uiState.error == TodoListError.LOAD_FAILED) {
-                item(key = LOAD_ERROR_KEY) {
-                    Text(
-                        text = stringResource(R.string.todo_list_error_load_failed),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
+        val hasLoadError = uiState.error == TodoListError.LOAD_FAILED
+        when {
+            uiState.isLoading -> LoadingState(modifier = Modifier.padding(innerPadding))
+            // Ein Ladefehler verdrängt den Leerzustand: „Noch keine Aufgaben" wäre eine Aussage
+            // über die Liste, die wir gerade nicht treffen können.
+            uiState.todos.isEmpty() && !hasLoadError ->
+                EmptyState(modifier = Modifier.padding(innerPadding))
+
+            else -> LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = innerPadding) {
+                if (hasLoadError) {
+                    item(key = LOAD_ERROR_KEY) {
+                        Text(
+                            text = stringResource(R.string.todo_list_error_load_failed),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+                items(items = uiState.todos, key = Todo::id) { todo ->
+                    TodoRow(
+                        todo = todo,
+                        onDoneChange = { isDone -> onTodoDoneChange(todo, isDone) },
+                        onClick = { onEditTodoClick(todo) }
                     )
                 }
-            }
-            items(items = uiState.todos, key = Todo::id) { todo ->
-                TodoRow(
-                    todo = todo,
-                    onDoneChange = { isDone -> onTodoDoneChange(todo, isDone) },
-                    onClick = { onEditTodoClick(todo) }
-                )
             }
         }
     }
@@ -217,6 +232,40 @@ private fun NewTodoBar(title: String, onTitleChange: (String) -> Unit, onAddClic
 }
 
 @Composable
+private fun LoadingState(modifier: Modifier = Modifier) {
+    val label = stringResource(R.string.todo_list_loading)
+
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        // Der Fortschrittskreis trägt von sich aus keine Beschriftung — ohne die Semantik bliebe
+        // der Bildschirm für TalkBack stumm, solange geladen wird.
+        CircularProgressIndicator(modifier = Modifier.semantics { contentDescription = label })
+    }
+}
+
+@Composable
+private fun EmptyState(modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(horizontal = 32.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.todo_list_empty_headline),
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = stringResource(R.string.todo_list_empty_hint),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
 private fun TodoRow(todo: Todo, onDoneChange: (Boolean) -> Unit, onClick: () -> Unit) {
     ListItem(
         headlineContent = {
@@ -289,6 +338,28 @@ private fun TodoListScreenPreview() {
     BrownieDoTheme(dynamicColor = false) {
         TodoListScreen(
             uiState = TodoListUiState(todos = PREVIEW_TODOS, isLoading = false),
+            onNewTodoTitleChange = {},
+            onAddTodoClick = {},
+            onTodoDoneChange = { _, _ -> },
+            onEditTodoClick = {},
+            onEditedTitleChange = {},
+            onEditConfirm = {},
+            onDeleteTodoClick = {},
+            onEditDismiss = {},
+            onErrorShown = {},
+            onSignOutClick = {}
+        )
+    }
+}
+
+// Der Leerzustand ist der Bildschirm beim allerersten Start — er verdient eine eigene Vorschau.
+@Preview(showBackground = true)
+@Preview(showBackground = true, uiMode = UI_MODE_NIGHT_YES)
+@Composable
+private fun TodoListScreenEmptyPreview() {
+    BrownieDoTheme(dynamicColor = false) {
+        TodoListScreen(
+            uiState = TodoListUiState(isLoading = false),
             onNewTodoTitleChange = {},
             onAddTodoClick = {},
             onTodoDoneChange = { _, _ -> },

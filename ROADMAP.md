@@ -118,7 +118,8 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   ([ADR 0013](docs/decisions/0013-eingabefeld-in-der-bottombar-statt-fab.md)), Zeilen als
   `ListItem`, Schreibfehler als Snackbar; Scaffold pro Bildschirm
   ([ADR 0012](docs/decisions/0012-scaffold-pro-bildschirm.md))
-- [ ] Leerer Zustand („noch keine Aufgaben") & Ladezustand
+- [x] Leerer Zustand („noch keine Aufgaben") & Ladezustand — ein Ladefehler verdrängt den
+  Leerzustand, statt beides gleichzeitig zu zeigen
 - [ ] Optional: Aufgaben sortieren (offen oben, erledigt unten)
 - [ ] Optional: App-Icon & Name anpassen
 - [ ] Optional: Dark Mode prüfen — der Fensterhintergrund folgt dem Dunkelmodus bereits

@@ -5,6 +5,9 @@
     <string name="login_sign_in_with_google">Mit Google anmelden</string>
     <string name="login_error_no_google_account">Auf diesem Gerät ist kein Google-Konto eingerichtet.</string>
     <string name="login_error_sign_in_failed">Anmeldung fehlgeschlagen. Bitte erneut versuchen.</string>
+    <string name="todo_list_loading">Liste wird geladen</string>
+    <string name="todo_list_empty_headline">Noch keine Aufgaben</string>
+    <string name="todo_list_empty_hint">Tipp unten die erste ein.</string>
     <string name="todo_list_new_todo_hint">Neue Aufgabe</string>
     <string name="todo_list_add">Hinzufügen</string>
     <string name="todo_list_edit_headline">Aufgabe bearbeiten</string>
