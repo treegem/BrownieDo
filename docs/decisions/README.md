@@ -43,3 +43,4 @@ der den alten als „abgelöst" markiert.
 | [0015](0015-agents-md-als-gemeinsamer-einstieg.md) | `AGENTS.md` als gemeinsamer Agenten-Einstieg | akzeptiert |
 | [0016](0016-wischen-loescht-nur-erledigte-aufgaben.md) | Wischen löscht nur erledigte Aufgaben | akzeptiert |
 | [0017](0017-signatur-zugangsdaten-aus-keystore-properties.md) | Signatur-Zugangsdaten aus `keystore.properties` | akzeptiert |
+| [0018](0018-datastore-fuer-die-zuletzt-gewaehlte-liste.md) | DataStore für die zuletzt gewählte Liste | akzeptiert |

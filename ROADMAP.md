@@ -148,12 +148,36 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   Handy fehlt noch
 
 ### Phase 8 – Mehrere Listen (geteilt & privat)
-> Die Datenstruktur dafür steht bereits seit Phase 3, es fehlt nur die Bedienung.
-- [ ] Listen des angemeldeten Nutzers laden (`lists`, gefiltert über `members`)
-- [ ] Zwischen Listen umschalten (zuletzt gewählte Liste merken)
+> Die Datenstruktur steht seit Phase 3
+> ([ADR 0009](docs/decisions/0009-listen-dokument-mit-todo-subcollection.md)), es fehlt die
+> Bedienung. Aufgeteilt in einen lesenden und einen schreibenden Teil: **8a** kommt ohne Änderung
+> an den Security Rules aus und ist für sich allein benutzbar, **8b** braucht eine Regeländerung,
+> die von Hand veröffentlicht werden muss.
+
+#### Phase 8a – Listen lesen und wechseln
+- [x] `FirestoreTodoRepository` von der festen `DEFAULT_LIST_ID` lösen — jede Methode von
+  `TodoRepository` nimmt die `listId` jetzt als Parameter, damit ein Schreibvorgang während eines
+  Listenwechsels nicht in der falschen Liste landet
+- [x] Listen des angemeldeten Nutzers laden (`lists`, gefiltert über `members`) — der
+  `whereArrayContains`-Filter ist Pflicht, nicht Optimierung: Ohne ihn lehnen die Security Rules die
+  ganze Query ab
+- [x] Listen-Auswahl in der TopAppBar — der Titel ist antippbar und öffnet ein Menü mit Symbol für
+  geteilt/privat ([ADR 0013](docs/decisions/0013-eingabefeld-in-der-bottombar-statt-fab.md))
+- [x] Zuletzt gewählte Liste über App-Neustarts hinweg merken — DataStore Preferences, pro Gerät,
+  mit Rückfall auf die erste Liste
+  ([ADR 0018](docs/decisions/0018-datastore-fuer-die-zuletzt-gewaehlte-liste.md))
+- [ ] Auf dem Gerät prüfen: umschalten, App neu starten, offline starten — dafür muss eine zweite
+  Liste von Hand in der Firebase Console angelegt werden
+
+#### Phase 8b – Listen anlegen, umbenennen, löschen
+> Die Reihenfolge ist hier nicht beliebig: Ohne die Regeländerung scheitert jeder Schreibvorgang.
+- [ ] Security Rules auf das Anlegen und Ändern von Listen erweitern — `firestore.rules` verbietet
+  das heute mit `write: if false` — und **von Hand in der Firebase Console veröffentlichen**
 - [ ] Liste anlegen (privat = nur eigene uid, geteilt = beide uids) und umbenennen
-- [ ] Liste löschen inklusive ihrer `todos`-Sub-Collection (Firestore löscht nicht kaskadierend)
-- [ ] Security Rules auf das Anlegen/Ändern von Listen durch die App erweitern
+- [ ] Liste löschen inklusive ihrer `todos`-Sub-Collection — Firestore löscht nicht kaskadierend,
+  die App muss selbst aufräumen
+- [ ] Verhalten festlegen, wenn die gerade geöffnete Liste verschwindet, weil der Partner sie
+  gelöscht hat
 
 ### Querlaufend – Werkzeuge & Doku
 > Läuft neben den Phasen und gehört zu keiner.
@@ -162,6 +186,12 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 - [x] Alle Regeldateien auf always-on umstellen, nachdem gemessen wurde, dass das
   JetBrains-Copilot-Plugin `applyTo` nicht auswertet
   ([ADR 0014](docs/decisions/0014-regeldateien-always-on.md))
+- [ ] **Die instrumentierten Tests einmal wirklich ausführen** (`TodoListScreenTest`, 7 Stück) —
+  sie wurden bisher nur kompiliert, nie gelaufen, weil kein Gerät angeschlossen war. Grün ist also
+  nichts davon belegt. Offen ist dabei besonders, ob `swipeRight()` die 85-%-Wischschwelle aus
+  [ADR 0016](docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md) überhaupt reißt; falls
+  nicht, gehört die Wischstrecke im Test gesetzt und **nicht** die Schwelle gesenkt — die ist eine
+  Produktentscheidung
 - [~] Prüfen, dass die `@`-Importe in `CLAUDE.md` und die Regeln in Android Studio tatsächlich laden
   (Canary-Methode, siehe ADR 0014)
 

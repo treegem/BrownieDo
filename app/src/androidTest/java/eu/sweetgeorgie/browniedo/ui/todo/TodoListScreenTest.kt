@@ -9,6 +9,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeRight
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import eu.sweetgeorgie.browniedo.R
+import eu.sweetgeorgie.browniedo.domain.list.TodoList
 import eu.sweetgeorgie.browniedo.domain.todo.Todo
 import eu.sweetgeorgie.browniedo.ui.theme.BrownieDoTheme
 import org.junit.Assert.assertEquals
@@ -33,7 +34,7 @@ class TodoListScreenTest {
     fun aWriteErrorIsShownInASnackbarAndClearedAfterwards() {
         var errorShownCount = 0
         setScreenContent(
-            uiState = TodoListUiState(isLoading = false, error = TodoListError.ADD_FAILED),
+            uiState = TodoListUiState(selectedList = LIST, isLoading = false, error = TodoListError.ADD_FAILED),
             onErrorShown = { errorShownCount++ }
         )
 
@@ -48,7 +49,7 @@ class TodoListScreenTest {
     fun aLoadErrorStaysVisibleAndIsNotCleared() {
         var errorShownCount = 0
         setScreenContent(
-            uiState = TodoListUiState(isLoading = false, error = TodoListError.LOAD_FAILED),
+            uiState = TodoListUiState(selectedList = LIST, isLoading = false, error = TodoListError.LOAD_FAILED),
             onErrorShown = { errorShownCount++ }
         )
 
@@ -61,7 +62,7 @@ class TodoListScreenTest {
 
     @Test
     fun theProgressIndicatorIsShownWhileTheListIsLoading() {
-        setScreenContent(uiState = TodoListUiState(isLoading = true))
+        setScreenContent(uiState = TodoListUiState(selectedList = LIST, isLoading = true))
 
         val label = composeTestRule.activity.getString(R.string.todo_list_loading)
         composeTestRule.onNodeWithContentDescription(label).assertIsDisplayed()
@@ -69,7 +70,7 @@ class TodoListScreenTest {
 
     @Test
     fun anEmptyListInvitesTheUserToAddTheFirstEntry() {
-        setScreenContent(uiState = TodoListUiState(isLoading = false))
+        setScreenContent(uiState = TodoListUiState(selectedList = LIST, isLoading = false))
 
         val headline = composeTestRule.activity.getString(R.string.todo_list_empty_headline)
         val hint = composeTestRule.activity.getString(R.string.todo_list_empty_hint)
@@ -80,7 +81,7 @@ class TodoListScreenTest {
     @Test
     fun aLoadErrorIsShownInsteadOfTheEmptyState() {
         setScreenContent(
-            uiState = TodoListUiState(isLoading = false, error = TodoListError.LOAD_FAILED)
+            uiState = TodoListUiState(selectedList = LIST, isLoading = false, error = TodoListError.LOAD_FAILED)
         )
 
         val message = composeTestRule.activity.getString(R.string.todo_list_error_load_failed)
@@ -93,7 +94,7 @@ class TodoListScreenTest {
     fun aFinishedEntrySwipedToTheRightIsDeleted() {
         var swipedAway: Todo? = null
         setScreenContent(
-            uiState = TodoListUiState(isLoading = false, todos = TODOS),
+            uiState = TodoListUiState(selectedList = LIST, isLoading = false, todos = TODOS),
             onTodoSwipedAway = { swipedAway = it }
         )
 
@@ -107,7 +108,7 @@ class TodoListScreenTest {
     fun anEntryThatIsStillOpenCannotBeSwipedAway() {
         var swipedAway: Todo? = null
         setScreenContent(
-            uiState = TodoListUiState(isLoading = false, todos = TODOS),
+            uiState = TodoListUiState(selectedList = LIST, isLoading = false, todos = TODOS),
             onTodoSwipedAway = { swipedAway = it }
         )
 
@@ -128,6 +129,7 @@ class TodoListScreenTest {
             BrownieDoTheme(dynamicColor = false) {
                 TodoListScreen(
                     uiState = uiState,
+                    onListSelected = {},
                     onNewTodoTitleChange = {},
                     onAddTodoClick = {},
                     onTodoDoneChange = { _, _ -> },
@@ -146,6 +148,8 @@ class TodoListScreenTest {
 
     private companion object {
         const val DISMISS_TIMEOUT_MILLIS = 10_000L
+
+        val LIST = TodoList(id = "list-1", name = "Einkauf", isShared = true)
 
         val TIMESTAMP: Instant = Instant.parse("2026-08-07T20:00:00Z")
 

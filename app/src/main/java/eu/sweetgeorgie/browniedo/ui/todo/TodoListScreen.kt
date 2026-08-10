@@ -31,6 +31,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -62,6 +63,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import eu.sweetgeorgie.browniedo.R
+import eu.sweetgeorgie.browniedo.domain.list.TodoList
 import eu.sweetgeorgie.browniedo.domain.todo.Todo
 import eu.sweetgeorgie.browniedo.ui.theme.BrownieDoTheme
 import java.time.Instant
@@ -69,6 +71,7 @@ import java.time.Instant
 @Composable
 fun TodoListScreen(
     uiState: TodoListUiState,
+    onListSelected: (TodoList) -> Unit,
     onNewTodoTitleChange: (String) -> Unit,
     onAddTodoClick: () -> Unit,
     onTodoDoneChange: (Todo, Boolean) -> Unit,
@@ -100,7 +103,14 @@ fun TodoListScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        topBar = { TodoListTopBar(onSignOutClick = onSignOutClick) },
+        topBar = {
+            TodoListTopBar(
+                lists = uiState.lists,
+                selectedList = uiState.selectedList,
+                onListSelected = onListSelected,
+                onSignOutClick = onSignOutClick
+            )
+        },
         bottomBar = {
             NewTodoBar(
                 title = uiState.newTodoTitle,
@@ -113,6 +123,11 @@ fun TodoListScreen(
         val hasLoadError = uiState.error == TodoListError.LOAD_FAILED
         when {
             uiState.isLoading -> LoadingState(modifier = Modifier.padding(innerPadding))
+            // Ohne Liste gibt es nichts, wozu man eine Aufgabe hinzufügen könnte — das ist eine
+            // andere Aussage als „diese Liste ist leer" und bekommt deshalb einen eigenen Text.
+            uiState.selectedList == null && !hasLoadError ->
+                NoListState(modifier = Modifier.padding(innerPadding))
+
             // Ein Ladefehler verdrängt den Leerzustand: „Noch keine Aufgaben" wäre eine Aussage
             // über die Liste, die wir gerade nicht treffen können.
             uiState.todos.isEmpty() && !hasLoadError ->
@@ -179,11 +194,52 @@ private fun TodoListError.messageResId() = when (this) {
 // TopAppBarDefaults-API.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TodoListTopBar(onSignOutClick: () -> Unit) {
+private fun TodoListTopBar(
+    lists: List<TodoList>,
+    selectedList: TodoList?,
+    onListSelected: (TodoList) -> Unit,
+    onSignOutClick: () -> Unit
+) {
     var menuExpanded by remember { mutableStateOf(false) }
+    var listMenuExpanded by remember { mutableStateOf(false) }
 
     TopAppBar(
-        title = { Text(text = stringResource(R.string.app_name)) },
+        title = {
+            // Der Titel ist die Listen-Auswahl: Unten rechts ist durch die Eingabeleiste belegt,
+            // Primäraktionen gehören deshalb in die TopAppBar — siehe ADR 0013.
+            Box {
+                Row(
+                    modifier = Modifier.clickable(
+                        enabled = lists.isNotEmpty(),
+                        onClick = { listMenuExpanded = true }
+                    ),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = selectedList?.name ?: stringResource(R.string.app_name))
+                    if (lists.isNotEmpty()) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_arrow_drop_down),
+                            contentDescription = stringResource(R.string.todo_list_choose_list)
+                        )
+                    }
+                }
+                DropdownMenu(
+                    expanded = listMenuExpanded,
+                    onDismissRequest = { listMenuExpanded = false }
+                ) {
+                    lists.forEach { list ->
+                        ListMenuItem(
+                            list = list,
+                            isSelected = list.id == selectedList?.id,
+                            onClick = {
+                                listMenuExpanded = false
+                                onListSelected(list)
+                            }
+                        )
+                    }
+                }
+            }
+        },
         actions = {
             IconButton(onClick = { menuExpanded = true }) {
                 Icon(
@@ -201,6 +257,40 @@ private fun TodoListTopBar(onSignOutClick: () -> Unit) {
                 )
             }
         }
+    )
+}
+
+@Composable
+private fun ListMenuItem(list: TodoList, isSelected: Boolean, onClick: () -> Unit) {
+    val kindLabel = stringResource(
+        if (list.isShared) R.string.todo_list_shared_list else R.string.todo_list_private_list
+    )
+
+    DropdownMenuItem(
+        text = { Text(text = list.name) },
+        onClick = onClick,
+        leadingIcon = {
+            Icon(
+                painter = painterResource(
+                    if (list.isShared) R.drawable.ic_group else R.drawable.ic_person
+                ),
+                contentDescription = kindLabel
+            )
+        },
+        // Die aktuelle Liste hebt sich über die Farbe ab statt über ein zweites Symbol — rechts
+        // steht sonst nichts, und ein Häkchen neben dem Listen-Symbol wäre eine Reihe zu viel.
+        colors = MenuDefaults.itemColors(
+            textColor = if (isSelected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            leadingIconColor = if (isSelected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+        )
     )
 }
 
@@ -320,7 +410,21 @@ private fun LoadingState(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun EmptyState(modifier: Modifier = Modifier) {
+private fun EmptyState(modifier: Modifier = Modifier) = CenteredMessage(
+    headline = stringResource(R.string.todo_list_empty_headline),
+    hint = stringResource(R.string.todo_list_empty_hint),
+    modifier = modifier
+)
+
+@Composable
+private fun NoListState(modifier: Modifier = Modifier) = CenteredMessage(
+    headline = stringResource(R.string.todo_list_no_list_headline),
+    hint = stringResource(R.string.todo_list_no_list_hint),
+    modifier = modifier
+)
+
+@Composable
+private fun CenteredMessage(headline: String, hint: String, modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -328,12 +432,12 @@ private fun EmptyState(modifier: Modifier = Modifier) {
             modifier = Modifier.padding(horizontal = 32.dp)
         ) {
             Text(
-                text = stringResource(R.string.todo_list_empty_headline),
+                text = headline,
                 style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center
             )
             Text(
-                text = stringResource(R.string.todo_list_empty_hint),
+                text = hint,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center
@@ -419,7 +523,13 @@ private fun TodoListScreenPreview() {
     // Dynamic Color kann der Vorschau-Renderer nicht, so ist sichtbar was auf API 24-30 läuft.
     BrownieDoTheme(dynamicColor = false) {
         TodoListScreen(
-            uiState = TodoListUiState(todos = PREVIEW_TODOS, isLoading = false),
+            uiState = TodoListUiState(
+                lists = PREVIEW_LISTS,
+                selectedList = PREVIEW_LISTS.first(),
+                todos = PREVIEW_TODOS,
+                isLoading = false
+            ),
+            onListSelected = {},
             onNewTodoTitleChange = {},
             onAddTodoClick = {},
             onTodoDoneChange = { _, _ -> },
@@ -442,7 +552,12 @@ private fun TodoListScreenPreview() {
 private fun TodoListScreenEmptyPreview() {
     BrownieDoTheme(dynamicColor = false) {
         TodoListScreen(
-            uiState = TodoListUiState(isLoading = false),
+            uiState = TodoListUiState(
+                lists = PREVIEW_LISTS,
+                selectedList = PREVIEW_LISTS.first(),
+                isLoading = false
+            ),
+            onListSelected = {},
             onNewTodoTitleChange = {},
             onAddTodoClick = {},
             onTodoDoneChange = { _, _ -> },
@@ -459,6 +574,11 @@ private fun TodoListScreenEmptyPreview() {
 }
 
 private val PREVIEW_TIMESTAMP: Instant = Instant.parse("2026-08-07T20:00:00Z")
+
+private val PREVIEW_LISTS = listOf(
+    TodoList(id = "list-shared", name = "Einkauf", isShared = true),
+    TodoList(id = "list-private", name = "Meine Erledigungen", isShared = false)
+)
 
 private val PREVIEW_TODOS = listOf(
     Todo(

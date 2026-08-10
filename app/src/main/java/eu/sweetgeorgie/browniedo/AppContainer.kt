@@ -8,9 +8,13 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import eu.sweetgeorgie.browniedo.data.auth.FirebaseAuthRepository
+import eu.sweetgeorgie.browniedo.data.list.DataStoreSelectedListRepository
+import eu.sweetgeorgie.browniedo.data.list.FirestoreListRepository
+import eu.sweetgeorgie.browniedo.data.list.selectedListDataStoreOf
 import eu.sweetgeorgie.browniedo.data.todo.FirestoreTodoRepository
-import eu.sweetgeorgie.browniedo.data.todo.FirestoreTodoRepository.Companion.DEFAULT_LIST_ID
 import eu.sweetgeorgie.browniedo.domain.auth.AuthRepository
+import eu.sweetgeorgie.browniedo.domain.list.ListRepository
+import eu.sweetgeorgie.browniedo.domain.list.SelectedListRepository
 import eu.sweetgeorgie.browniedo.domain.todo.TodoRepository
 import eu.sweetgeorgie.browniedo.ui.auth.GoogleIdTokenRequester
 import eu.sweetgeorgie.browniedo.ui.auth.LoginViewModel
@@ -22,12 +26,25 @@ class AppContainer(applicationContext: Context) {
     val authRepository: AuthRepository = FirebaseAuthRepository(FirebaseAuth.getInstance())
 
     private val todoRepository: TodoRepository =
-        FirestoreTodoRepository(FirebaseFirestore.getInstance(), DEFAULT_LIST_ID)
+        FirestoreTodoRepository(FirebaseFirestore.getInstance())
+
+    private val listRepository: ListRepository =
+        FirestoreListRepository(FirebaseFirestore.getInstance(), authRepository)
+
+    private val selectedListRepository: SelectedListRepository =
+        DataStoreSelectedListRepository(selectedListDataStoreOf(applicationContext))
 
     val googleIdTokenRequester = GoogleIdTokenRequester(CredentialManager.create(applicationContext))
 
     val viewModelFactory: ViewModelProvider.Factory = viewModelFactory {
         initializer { LoginViewModel(authRepository) }
-        initializer { TodoListViewModel(todoRepository, authRepository) }
+        initializer {
+            TodoListViewModel(
+                todoRepository = todoRepository,
+                listRepository = listRepository,
+                selectedListRepository = selectedListRepository,
+                authRepository = authRepository
+            )
+        }
     }
 }

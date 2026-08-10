@@ -45,6 +45,7 @@ class MainActivity : ComponentActivity() {
                         .collectAsStateWithLifecycle()
                     TodoListScreen(
                         uiState = todoListUiState,
+                        onListSelected = todoListViewModel::onListSelected,
                         onNewTodoTitleChange = todoListViewModel::onNewTodoTitleChange,
                         onAddTodoClick = todoListViewModel::addTodo,
                         onTodoDoneChange = todoListViewModel::onTodoDoneChange,

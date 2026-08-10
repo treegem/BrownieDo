@@ -1,5 +1,6 @@
 package eu.sweetgeorgie.browniedo.ui.todo
 
+import eu.sweetgeorgie.browniedo.domain.list.TodoList
 import eu.sweetgeorgie.browniedo.domain.todo.Todo
 
 enum class TodoListError {
@@ -10,6 +11,9 @@ enum class TodoListError {
 }
 
 data class TodoListUiState(
+    val lists: List<TodoList> = emptyList(),
+    /** Null while the lists are still loading, or when the user belongs to none at all. */
+    val selectedList: TodoList? = null,
     val todos: List<Todo> = emptyList(),
     val isLoading: Boolean = true,
     val newTodoTitle: String = "",
