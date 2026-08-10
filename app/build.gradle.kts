@@ -1,8 +1,29 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.services)
 }
+
+/**
+ * Zugangsdaten der Release-Signatur aus der nicht eingecheckten `keystore.properties` im Repo-Root,
+ * siehe docs/decisions/0017-signatur-zugangsdaten-aus-keystore-properties.md. Die Vorlage mit den
+ * erwarteten Schlüsseln steht in `keystore.properties.example`.
+ *
+ * Gelesen wird über `providers.fileContents`, damit der Configuration Cache die Datei als Eingabe
+ * kennt (`org.gradle.configuration-cache=true` in gradle.properties). Fehlt sie, bleibt der Wert
+ * `null` — der Signatur-Block entfällt dann und `assembleRelease` liefert eine unsignierte APK,
+ * statt den ganzen Build zu blockieren.
+ */
+val keystoreProperties: Properties? = providers
+    .fileContents(rootProject.layout.projectDirectory.file("keystore.properties"))
+    .asText
+    .map { text -> Properties().apply { load(text.reader()) } }
+    .orNull
+
+/** Muss mit den Schluesseln in `keystore.properties.example` uebereinstimmen. */
+val REQUIRED_SIGNING_KEYS = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
 
 android {
     namespace = "eu.sweetgeorgie.browniedo"
@@ -20,11 +41,41 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        keystoreProperties?.let { properties ->
+            // Lieber hier mit einer klaren Ansage abbrechen als später beim Signieren mit einer
+            // nichtssagenden Meldung. Der häufigste Fehler ist ein Backslash im `storeFile`-Pfad:
+            // In einer .properties-Datei leitet er eine Escape-Sequenz ein, aus C:\Users wird
+            // C:Users, und der Keystore ist „weg".
+            val missing = REQUIRED_SIGNING_KEYS.filter { properties.getProperty(it).isNullOrBlank() }
+            check(missing.isEmpty()) {
+                "keystore.properties fehlen diese Eintraege: ${missing.joinToString()}. " +
+                    "Vergleiche mit keystore.properties.example."
+            }
+            val store = rootProject.file(properties.getProperty("storeFile"))
+            check(store.isFile) {
+                "Der Keystore wurde nicht gefunden: $store. Pruefe storeFile in " +
+                    "keystore.properties — Pfade dort mit / statt \\ schreiben, weil der " +
+                    "Backslash in .properties-Dateien eine Escape-Sequenz einleitet."
+            }
+
+            create("release") {
+                storeFile = store
+                storePassword = properties.getProperty("storePassword")
+                keyAlias = properties.getProperty("keyAlias")
+                keyPassword = properties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             optimization {
                 enable = false
             }
+            // Ist keine keystore.properties da, gibt es auch keine Signatur-Konfiguration.
+            // assembleRelease baut dann eine unsignierte APK, die sich nicht installieren laesst.
+            signingConfig = signingConfigs.findByName("release")
         }
     }
     compileOptions {

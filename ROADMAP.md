@@ -129,15 +129,23 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   greift aber nur auf API 24/25 — erzeugen ließe sie sich mit dem Image Asset Studio
 - [x] Erledigte Aufgaben durch Wischen nach rechts löschen — offene Aufgaben lassen sich bewusst
   nicht wischen, siehe [ADR 0016](docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md)
-- [ ] Optional: Dark Mode prüfen — der Fensterhintergrund folgt dem Dunkelmodus bereits
-  (`res/values-night/themes.xml`), offen ist die Durchsicht der Compose-Oberfläche auf dem Gerät
+- [x] Dark Mode prüfen — der Fensterhintergrund folgt dem Dunkelmodus über
+  `res/values-night/themes.xml`, das Compose-Farbschema über `BrownieDoTheme`; auf dem Gerät
+  durchgesehen, keine Beanstandung
 
 ### Phase 7 – Test & Verteilung an euch zwei
-- [ ] Auf beiden Galaxy-Phones testen
-- [ ] Signierte APK / App Bundle bauen (Keystore NICHT committen!)
-- [ ] **SHA-1 des Release-Keystores in der Firebase Console hinterlegen** — sonst schlägt der
-  Google-Login in der signierten APK fehl (`google-services.json` danach neu herunterladen)
-- [ ] Direkt auf beide Geräte installieren (Sideload)
+- [-] Auf beiden Galaxy-Phones testen — auf dem ersten Gerät (SM-S928B) erfolgreich getestet:
+  signierte APK installiert, Google-Login durchgespielt. Das zweite Handy fehlt noch
+- [x] Signierte APK bauen (Keystore NICHT committen!) — `signingConfig` liest die Zugangsdaten aus
+  einer nicht eingecheckten `keystore.properties`, siehe
+  [ADR 0017](docs/decisions/0017-signatur-zugangsdaten-aus-keystore-properties.md). Kein App
+  Bundle: Ein AAB lässt sich ohne `bundletool` nicht per Sideload installieren. Keystore erzeugen
+  und `keystore.properties` ausfüllen bleibt Handarbeit, Anleitung in `AGENTS.md`
+- [x] **SHA-1 des Release-Keystores in der Firebase Console hinterlegen** — erledigt und auf dem
+  Gerät bestätigt: `google-services.json` trägt jetzt beide Fingerabdrücke (Debug und Release),
+  der Google-Login in der signierten APK funktioniert
+- [-] Direkt auf beide Geräte installieren (Sideload) — auf dem ersten Gerät erledigt, das zweite
+  Handy fehlt noch
 
 ### Phase 8 – Mehrere Listen (geteilt & privat)
 > Die Datenstruktur dafür steht bereits seit Phase 3, es fehlt nur die Bedienung.

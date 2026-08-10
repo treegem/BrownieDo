@@ -13,3 +13,8 @@ local.properties
 google-services.json
 *.jks
 *.keystore
+*.p12
+*.bks
+# Pfad und Passwoerter des Release-Keystores. Die Vorlage mit leeren Werten
+# (keystore.properties.example) ist dagegen eingecheckt.
+keystore.properties
