@@ -9,7 +9,25 @@
     <string name="todo_list_shared_list">Geteilte Liste</string>
     <string name="todo_list_private_list">Private Liste</string>
     <string name="todo_list_no_list_headline">Noch keine Liste</string>
-    <string name="todo_list_no_list_hint">Lege eine Liste in der Firebase Console an, dann taucht sie hier auf.</string>
+    <string name="todo_list_no_list_hint">Tippe oben auf den Titel und lege eine an.</string>
+    <string name="todo_list_new_list">Neue Liste …</string>
+    <string name="todo_list_new_list_headline">Neue Liste</string>
+    <string name="todo_list_list_name_label">Name</string>
+    <string name="todo_list_keep_private">Nur für mich</string>
+    <string name="todo_list_share_with">Geteilt mit %1$s</string>
+    <string name="todo_list_share_impossible">Zum Teilen fehlt der Partner in der users-Collection.</string>
+    <string name="todo_list_create">Anlegen</string>
+    <string name="todo_list_rename_list">Liste umbenennen</string>
+    <string name="todo_list_delete_list">Liste löschen</string>
+    <string name="todo_list_delete_list_headline">Liste löschen?</string>
+    <plurals name="todo_list_delete_list_question">
+        <item quantity="one">„%1$s“ und die enthaltene Aufgabe endgültig löschen? Auch beim Partner.</item>
+        <item quantity="other">„%1$s“ und die %2$d enthaltenen Aufgaben endgültig löschen? Auch beim Partner.</item>
+    </plurals>
+    <string name="todo_list_delete_list_question_empty">„%1$s“ endgültig löschen? Die Liste ist leer.</string>
+    <string name="todo_list_error_list_add_failed">Die Liste konnte nicht angelegt werden.</string>
+    <string name="todo_list_error_list_update_failed">Die Liste konnte nicht umbenannt werden.</string>
+    <string name="todo_list_error_list_delete_failed">Die Liste konnte nicht gelöscht werden.</string>
     <string name="todo_list_loading">Liste wird geladen</string>
     <string name="todo_list_empty_headline">Noch keine Aufgaben</string>
     <string name="todo_list_empty_hint">Tipp unten die erste ein.</string>

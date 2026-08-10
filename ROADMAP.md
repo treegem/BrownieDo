@@ -179,13 +179,30 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 
 #### Phase 8b – Listen anlegen, umbenennen, löschen
 > Die Reihenfolge ist hier nicht beliebig: Ohne die Regeländerung scheitert jeder Schreibvorgang.
-- [ ] Security Rules auf das Anlegen und Ändern von Listen erweitern — `firestore.rules` verbietet
-  das heute mit `write: if false` — und **von Hand in der Firebase Console veröffentlichen**
-- [ ] Liste anlegen (privat = nur eigene uid, geteilt = beide uids) und umbenennen
-- [ ] Liste löschen inklusive ihrer `todos`-Sub-Collection — Firestore löscht nicht kaskadierend,
-  die App muss selbst aufräumen
-- [ ] Verhalten festlegen, wenn die gerade geöffnete Liste verschwindet, weil der Partner sie
-  gelöscht hat
+- [x] Security Rules auf das Anlegen und Ändern von Listen erweitern — `create`/`update`/`delete`
+  statt `write: if false`, wobei `members` unveränderlich bleibt, siehe
+  [ADR 0019](docs/decisions/0019-schreibrechte-auf-listen-dokumente.md)
+- [ ] **Die neuen Rules von Hand in der Firebase Console veröffentlichen** — vorher scheitert jeder
+  Schreibvorgang mit `PERMISSION_DENIED`
+- [ ] **Die zwei Dokumente `users/{uid}` mit `displayName` in der Console anlegen** — ohne sie lässt
+  sich keine geteilte Liste anlegen, siehe
+  [ADR 0020](docs/decisions/0020-partner-aus-users-collection.md). Die uids stehen unter
+  Authentication → Users
+- [x] Liste anlegen (privat = nur eigene uid, geteilt = beide uids) und umbenennen — die Partner-uid
+  kommt aus `users` und verlässt die Datenschicht nicht
+- [x] Liste löschen inklusive ihrer `todos`-Sub-Collection — alles in einem `WriteBatch`, damit die
+  Regel das Listen-Dokument beim Löschen der Aufgaben noch findet (ADR 0019)
+- [x] Verhalten festlegen, wenn die gerade geöffnete Liste verschwindet — der Rückfall aus 8a greift;
+  war es die letzte Liste, wird ein hängender Ladefehler jetzt aufgeräumt, damit er nicht den
+  Hinweis „Noch keine Liste" verdrängt
+- [x] Auf dem Gerät prüfen — belegt auf einem SM-S928B: geteilte Liste angelegt (erscheint mit
+  Gruppen-Symbol, die Partner-uid wurde also mitgeschrieben) · umbenannt und zurückbenannt · eine
+  Liste **mit zwei Aufgaben** gelöscht, ohne Fehler, danach Rückfall auf die erste verbleibende
+  Liste. Der Anlegen-Dialog zeigt „Geteilt mit <Name>" aus der `users`-Collection, die
+  `exists()`-Leseregel greift also
+- [ ] Noch offen: eine **private** Liste aus der App heraus anlegen — auf dem Gerät nicht geprüft,
+  nur durch Unit-Tests gedeckt. Der Pfad unterscheidet sich allein darin, dass `members` eine uid
+  statt zwei enthält
 
 ### Querlaufend – Werkzeuge & Doku
 > Läuft neben den Phasen und gehört zu keiner.

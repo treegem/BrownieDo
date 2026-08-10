@@ -8,6 +8,7 @@ import eu.sweetgeorgie.browniedo.domain.list.SelectedListRepository
 import eu.sweetgeorgie.browniedo.domain.list.TodoList
 import eu.sweetgeorgie.browniedo.domain.todo.Todo
 import eu.sweetgeorgie.browniedo.domain.todo.TodoRepository
+import eu.sweetgeorgie.browniedo.domain.user.PartnerRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +24,7 @@ class TodoListViewModel(
     private val todoRepository: TodoRepository,
     private val listRepository: ListRepository,
     private val selectedListRepository: SelectedListRepository,
+    private val partnerRepository: PartnerRepository,
     private val authRepository: AuthRepository
 ) : ViewModel() {
 
@@ -38,6 +40,15 @@ class TodoListViewModel(
     init {
         observeLists()
         observeTodos()
+        observePartner()
+    }
+
+    private fun observePartner() {
+        viewModelScope.launch {
+            partnerRepository.partner.collect { partner ->
+                mutableUiState.update { it.copy(partner = partner) }
+            }
+        }
     }
 
     /**
@@ -59,10 +70,20 @@ class TodoListViewModel(
                             val selected = lists.firstOrNull { it.id == rememberedId }
                                 ?: lists.firstOrNull()
                             selectedListId.value = selected?.id
-                            // Der Fehlerzustand wird hier bewusst nicht angefasst: Er gehört den
-                            // Aufgaben, und ein erfolgreicher Listen-Snapshot sagt darüber nichts.
                             mutableUiState.update {
-                                it.copy(lists = lists, selectedList = selected)
+                                it.copy(
+                                    lists = lists,
+                                    selectedList = selected,
+                                    // Gibt es gar keine Liste mehr, ist ein hängendes LOAD_FAILED
+                                    // eine veraltete Aussage: Wir wissen jetzt positiv, dass nichts
+                                    // zu laden war. Sonst verdrängte der Fehler den Hinweis „Noch
+                                    // keine Liste" — genau das passiert, wenn der Partner die
+                                    // letzte Liste löscht und der Todo-Listener zuerst feuert.
+                                    // Bei vorhandenen Listen bleibt der Fehler unangetastet: Er
+                                    // gehört den Aufgaben, und ein Listen-Snapshot sagt darüber
+                                    // nichts.
+                                    error = if (lists.isEmpty()) null else it.error
+                                )
                             }
                         },
                         onFailure = {
@@ -96,7 +117,17 @@ class TodoListViewModel(
                     // observeLists gerade gesetzt hat.
                     if (listId != null) {
                         mutableUiState.update {
-                            it.copy(todos = emptyList(), isLoading = true, error = null)
+                            // Offene Dialoge gehören der alten Liste. Blieben sie stehen, schriebe
+                            // das Bestätigen gegen die neue — sie lesen die Liste erst dann.
+                            it.copy(
+                                todos = emptyList(),
+                                isLoading = true,
+                                error = null,
+                                editedTodo = null,
+                                newList = null,
+                                renamedList = null,
+                                listPendingDeletion = null
+                            )
                         }
                     }
                 }
@@ -128,6 +159,91 @@ class TodoListViewModel(
 
     fun onListSelected(list: TodoList) {
         viewModelScope.launch { selectedListRepository.select(list.id) }
+    }
+
+    // --- Liste anlegen ---
+
+    fun onNewListClick() = mutableUiState.update { it.copy(newList = NewList(), error = null) }
+
+    fun onNewListNameChange(name: String) = mutableUiState.update {
+        it.copy(newList = it.newList?.copy(name = name))
+    }
+
+    /** Ohne hinterlegten Partner gibt es keine geteilte Liste — die UI bietet sie dann nicht an. */
+    fun onNewListSharedChange(shared: Boolean) = mutableUiState.update {
+        if (shared && it.partner == null) it else it.copy(newList = it.newList?.copy(shared = shared))
+    }
+
+    fun onNewListDismiss() = mutableUiState.update { it.copy(newList = null) }
+
+    fun onNewListConfirm() {
+        val newList = mutableUiState.value.newList ?: return
+        val name = newList.name.trim()
+        if (name.isEmpty()) return
+        viewModelScope.launch {
+            listRepository.createList(name = name, shared = newList.shared).fold(
+                // Die neue Liste wird nicht selbst ausgewählt: Sie taucht über den Listen-Snapshot
+                // auf, und wer sie sofort öffnen will, tippt sie im Menü an.
+                onSuccess = { mutableUiState.update { it.copy(newList = null, error = null) } },
+                // Der Dialog bleibt offen, damit der eingetippte Name nicht verloren geht.
+                onFailure = {
+                    mutableUiState.update { it.copy(error = TodoListError.LIST_ADD_FAILED) }
+                }
+            )
+        }
+    }
+
+    // --- Liste umbenennen ---
+
+    fun onRenameListClick() = mutableUiState.update { state ->
+        val selected = state.selectedList ?: return@update state
+        state.copy(
+            renamedList = RenamedList(listId = selected.id, name = selected.name),
+            error = null
+        )
+    }
+
+    fun onRenamedListNameChange(name: String) = mutableUiState.update {
+        it.copy(renamedList = it.renamedList?.copy(name = name))
+    }
+
+    fun onRenameListDismiss() = mutableUiState.update { it.copy(renamedList = null) }
+
+    fun onRenameListConfirm() {
+        val renamedList = mutableUiState.value.renamedList ?: return
+        val name = renamedList.name.trim()
+        if (name.isEmpty()) return
+        // Die Id kommt aus dem Dialog, nicht aus der aktuellen Auswahl: Sonst landete die Änderung
+        // in der falschen Liste, wenn zwischenzeitlich gewechselt wurde.
+        listRepository.renameList(renamedList.listId, name).fold(
+            onSuccess = { mutableUiState.update { it.copy(renamedList = null, error = null) } },
+            onFailure = {
+                mutableUiState.update { it.copy(error = TodoListError.LIST_UPDATE_FAILED) }
+            }
+        )
+    }
+
+    // --- Liste löschen ---
+
+    fun onDeleteListClick() = mutableUiState.update {
+        it.copy(listPendingDeletion = it.selectedList, error = null)
+    }
+
+    fun onDeleteListDismiss() = mutableUiState.update { it.copy(listPendingDeletion = null) }
+
+    fun onDeleteListConfirm() {
+        val list = mutableUiState.value.listPendingDeletion ?: return
+        viewModelScope.launch {
+            listRepository.deleteList(list.id).fold(
+                // Welche Liste danach offen ist, entscheidet der Rückfall in observeLists.
+                onSuccess = {
+                    mutableUiState.update { it.copy(listPendingDeletion = null, error = null) }
+                },
+                onFailure = {
+                    mutableUiState.update { it.copy(error = TodoListError.LIST_DELETE_FAILED) }
+                }
+            )
+        }
     }
 
     fun onNewTodoTitleChange(title: String) =

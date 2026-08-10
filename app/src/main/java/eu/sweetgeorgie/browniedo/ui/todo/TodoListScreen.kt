@@ -26,6 +26,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -33,6 +34,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -53,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -65,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import eu.sweetgeorgie.browniedo.R
 import eu.sweetgeorgie.browniedo.domain.list.TodoList
 import eu.sweetgeorgie.browniedo.domain.todo.Todo
+import eu.sweetgeorgie.browniedo.domain.user.Partner
 import eu.sweetgeorgie.browniedo.ui.theme.BrownieDoTheme
 import java.time.Instant
 
@@ -72,6 +76,18 @@ import java.time.Instant
 fun TodoListScreen(
     uiState: TodoListUiState,
     onListSelected: (TodoList) -> Unit,
+    onNewListClick: () -> Unit,
+    onNewListNameChange: (String) -> Unit,
+    onNewListSharedChange: (Boolean) -> Unit,
+    onNewListConfirm: () -> Unit,
+    onNewListDismiss: () -> Unit,
+    onRenameListClick: () -> Unit,
+    onRenamedListNameChange: (String) -> Unit,
+    onRenameListConfirm: () -> Unit,
+    onRenameListDismiss: () -> Unit,
+    onDeleteListClick: () -> Unit,
+    onDeleteListConfirm: () -> Unit,
+    onDeleteListDismiss: () -> Unit,
     onNewTodoTitleChange: (String) -> Unit,
     onAddTodoClick: () -> Unit,
     onTodoDoneChange: (Todo, Boolean) -> Unit,
@@ -108,6 +124,9 @@ fun TodoListScreen(
                 lists = uiState.lists,
                 selectedList = uiState.selectedList,
                 onListSelected = onListSelected,
+                onNewListClick = onNewListClick,
+                onRenameListClick = onRenameListClick,
+                onDeleteListClick = onDeleteListClick,
                 onSignOutClick = onSignOutClick
             )
         },
@@ -162,6 +181,35 @@ fun TodoListScreen(
         }
     }
 
+    uiState.newList?.let { newList ->
+        NewListDialog(
+            newList = newList,
+            partner = uiState.partner,
+            onNameChange = onNewListNameChange,
+            onSharedChange = onNewListSharedChange,
+            onConfirm = onNewListConfirm,
+            onDismiss = onNewListDismiss
+        )
+    }
+
+    uiState.renamedList?.let { renamedList ->
+        RenameListDialog(
+            name = renamedList.name,
+            onNameChange = onRenamedListNameChange,
+            onConfirm = onRenameListConfirm,
+            onDismiss = onRenameListDismiss
+        )
+    }
+
+    uiState.listPendingDeletion?.let { list ->
+        DeleteListDialog(
+            list = list,
+            todoCount = uiState.todos.size,
+            onConfirm = onDeleteListConfirm,
+            onDismiss = onDeleteListDismiss
+        )
+    }
+
     uiState.editedTodo?.let { editedTodo ->
         EditTodoDialog(
             title = editedTodo.title,
@@ -188,6 +236,9 @@ private fun TodoListError.messageResId() = when (this) {
     TodoListError.ADD_FAILED -> R.string.todo_list_error_add_failed
     TodoListError.UPDATE_FAILED -> R.string.todo_list_error_update_failed
     TodoListError.DELETE_FAILED -> R.string.todo_list_error_delete_failed
+    TodoListError.LIST_ADD_FAILED -> R.string.todo_list_error_list_add_failed
+    TodoListError.LIST_UPDATE_FAILED -> R.string.todo_list_error_list_update_failed
+    TodoListError.LIST_DELETE_FAILED -> R.string.todo_list_error_list_delete_failed
 }
 
 // TopAppBar selbst ist stabil, aber seine Vorgabewerte stammen aus der noch experimentellen
@@ -198,6 +249,9 @@ private fun TodoListTopBar(
     lists: List<TodoList>,
     selectedList: TodoList?,
     onListSelected: (TodoList) -> Unit,
+    onNewListClick: () -> Unit,
+    onRenameListClick: () -> Unit,
+    onDeleteListClick: () -> Unit,
     onSignOutClick: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -209,19 +263,16 @@ private fun TodoListTopBar(
             // Primäraktionen gehören deshalb in die TopAppBar — siehe ADR 0013.
             Box {
                 Row(
-                    modifier = Modifier.clickable(
-                        enabled = lists.isNotEmpty(),
-                        onClick = { listMenuExpanded = true }
-                    ),
+                    // Auch ohne Liste antippbar: „Neue Liste" steckt in diesem Menü, sonst käme man
+                    // an die erste Liste nie heran.
+                    modifier = Modifier.clickable { listMenuExpanded = true },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(text = selectedList?.name ?: stringResource(R.string.app_name))
-                    if (lists.isNotEmpty()) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_arrow_drop_down),
-                            contentDescription = stringResource(R.string.todo_list_choose_list)
-                        )
-                    }
+                    Icon(
+                        painter = painterResource(R.drawable.ic_arrow_drop_down),
+                        contentDescription = stringResource(R.string.todo_list_choose_list)
+                    )
                 }
                 DropdownMenu(
                     expanded = listMenuExpanded,
@@ -237,6 +288,20 @@ private fun TodoListTopBar(
                             }
                         )
                     }
+                    if (lists.isNotEmpty()) HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text(text = stringResource(R.string.todo_list_new_list)) },
+                        onClick = {
+                            listMenuExpanded = false
+                            onNewListClick()
+                        },
+                        leadingIcon = {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_add),
+                                contentDescription = null
+                            )
+                        }
+                    )
                 }
             }
         },
@@ -248,6 +313,30 @@ private fun TodoListTopBar(
                 )
             }
             DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                // Umbenennen und Löschen beziehen sich immer auf die offene Liste — ohne eine gibt
+                // es nichts zu tun.
+                if (selectedList != null) {
+                    DropdownMenuItem(
+                        text = { Text(text = stringResource(R.string.todo_list_rename_list)) },
+                        onClick = {
+                            menuExpanded = false
+                            onRenameListClick()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = stringResource(R.string.todo_list_delete_list),
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onDeleteListClick()
+                        }
+                    )
+                    HorizontalDivider()
+                }
                 DropdownMenuItem(
                     text = { Text(text = stringResource(R.string.todo_list_sign_out)) },
                     onClick = {
@@ -475,6 +564,158 @@ private fun TodoRow(
 }
 
 @Composable
+private fun NewListDialog(
+    newList: NewList,
+    partner: Partner?,
+    onNameChange: (String) -> Unit,
+    onSharedChange: (Boolean) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = stringResource(R.string.todo_list_new_list_headline)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = newList.name,
+                    onValueChange = onNameChange,
+                    label = { Text(text = stringResource(R.string.todo_list_list_name_label)) },
+                    singleLine = true
+                )
+                ListKindOption(
+                    label = stringResource(R.string.todo_list_keep_private),
+                    selected = !newList.shared,
+                    onClick = { onSharedChange(false) }
+                )
+                ListKindOption(
+                    // Der Name macht greifbar, mit wem geteilt wird — „Geteilt" allein sagt es nicht.
+                    label = partner?.let {
+                        stringResource(R.string.todo_list_share_with, it.displayName)
+                    } ?: stringResource(R.string.todo_list_share_impossible),
+                    selected = newList.shared,
+                    enabled = partner != null,
+                    onClick = { onSharedChange(true) }
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = newList.name.isNotBlank()) {
+                Text(text = stringResource(R.string.todo_list_create))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(R.string.todo_list_cancel))
+            }
+        }
+    )
+}
+
+@Composable
+private fun ListKindOption(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    enabled: Boolean = true
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(selected = selected, onClick = onClick, enabled = enabled)
+        Text(
+            text = label,
+            color = if (enabled) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+private fun RenameListDialog(
+    name: String,
+    onNameChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = stringResource(R.string.todo_list_rename_list)) },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = onNameChange,
+                label = { Text(text = stringResource(R.string.todo_list_list_name_label)) },
+                singleLine = true
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = name.isNotBlank()) {
+                Text(text = stringResource(R.string.todo_list_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(R.string.todo_list_cancel))
+            }
+        }
+    )
+}
+
+/**
+ * Eigener Bestätigungsschritt, anders als beim Löschen einer Aufgabe: Hier gehen alle Einträge mit,
+ * auch auf dem Gerät des Partners, und es gibt kein Zurück. Die Anzahl steht bewusst im Text —
+ * sie ist die Information, die die Folge greifbar macht.
+ */
+@Composable
+private fun DeleteListDialog(
+    list: TodoList,
+    todoCount: Int,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = stringResource(R.string.todo_list_delete_list_headline)) },
+        text = {
+            Text(
+                text = if (todoCount == 0) {
+                    stringResource(R.string.todo_list_delete_list_question_empty, list.name)
+                } else {
+                    pluralStringResource(
+                        R.plurals.todo_list_delete_list_question,
+                        todoCount,
+                        list.name,
+                        todoCount
+                    )
+                }
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(
+                    text = stringResource(R.string.todo_list_delete),
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(R.string.todo_list_cancel))
+            }
+        }
+    )
+}
+
+@Composable
 private fun EditTodoDialog(
     title: String,
     onTitleChange: (String) -> Unit,
@@ -530,6 +771,18 @@ private fun TodoListScreenPreview() {
                 isLoading = false
             ),
             onListSelected = {},
+            onNewListClick = {},
+            onNewListNameChange = {},
+            onNewListSharedChange = {},
+            onNewListConfirm = {},
+            onNewListDismiss = {},
+            onRenameListClick = {},
+            onRenamedListNameChange = {},
+            onRenameListConfirm = {},
+            onRenameListDismiss = {},
+            onDeleteListClick = {},
+            onDeleteListConfirm = {},
+            onDeleteListDismiss = {},
             onNewTodoTitleChange = {},
             onAddTodoClick = {},
             onTodoDoneChange = { _, _ -> },
@@ -558,6 +811,18 @@ private fun TodoListScreenEmptyPreview() {
                 isLoading = false
             ),
             onListSelected = {},
+            onNewListClick = {},
+            onNewListNameChange = {},
+            onNewListSharedChange = {},
+            onNewListConfirm = {},
+            onNewListDismiss = {},
+            onRenameListClick = {},
+            onRenamedListNameChange = {},
+            onRenameListConfirm = {},
+            onRenameListDismiss = {},
+            onDeleteListClick = {},
+            onDeleteListConfirm = {},
+            onDeleteListDismiss = {},
             onNewTodoTitleChange = {},
             onAddTodoClick = {},
             onTodoDoneChange = { _, _ -> },

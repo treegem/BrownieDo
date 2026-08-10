@@ -8,3 +8,6 @@ package eu.sweetgeorgie.browniedo.data
 internal const val LISTS_COLLECTION = "lists"
 
 internal const val TODOS_COLLECTION = "todos"
+
+/** The two people using the app, see docs/decisions/0020-partner-aus-users-collection.md. */
+internal const val USERS_COLLECTION = "users"

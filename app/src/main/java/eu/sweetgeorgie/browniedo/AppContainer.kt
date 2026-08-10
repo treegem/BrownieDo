@@ -12,10 +12,12 @@ import eu.sweetgeorgie.browniedo.data.list.DataStoreSelectedListRepository
 import eu.sweetgeorgie.browniedo.data.list.FirestoreListRepository
 import eu.sweetgeorgie.browniedo.data.list.selectedListDataStoreOf
 import eu.sweetgeorgie.browniedo.data.todo.FirestoreTodoRepository
+import eu.sweetgeorgie.browniedo.data.user.FirestorePartnerRepository
 import eu.sweetgeorgie.browniedo.domain.auth.AuthRepository
 import eu.sweetgeorgie.browniedo.domain.list.ListRepository
 import eu.sweetgeorgie.browniedo.domain.list.SelectedListRepository
 import eu.sweetgeorgie.browniedo.domain.todo.TodoRepository
+import eu.sweetgeorgie.browniedo.domain.user.PartnerRepository
 import eu.sweetgeorgie.browniedo.ui.auth.GoogleIdTokenRequester
 import eu.sweetgeorgie.browniedo.ui.auth.LoginViewModel
 import eu.sweetgeorgie.browniedo.ui.todo.TodoListViewModel
@@ -28,8 +30,14 @@ class AppContainer(applicationContext: Context) {
     private val todoRepository: TodoRepository =
         FirestoreTodoRepository(FirebaseFirestore.getInstance())
 
-    private val listRepository: ListRepository =
-        FirestoreListRepository(FirebaseFirestore.getInstance(), authRepository)
+    private val partnerRepository: PartnerRepository =
+        FirestorePartnerRepository(FirebaseFirestore.getInstance(), authRepository)
+
+    private val listRepository: ListRepository = FirestoreListRepository(
+        firestore = FirebaseFirestore.getInstance(),
+        authRepository = authRepository,
+        partnerRepository = partnerRepository
+    )
 
     private val selectedListRepository: SelectedListRepository =
         DataStoreSelectedListRepository(selectedListDataStoreOf(applicationContext))
@@ -43,6 +51,7 @@ class AppContainer(applicationContext: Context) {
                 todoRepository = todoRepository,
                 listRepository = listRepository,
                 selectedListRepository = selectedListRepository,
+                partnerRepository = partnerRepository,
                 authRepository = authRepository
             )
         }

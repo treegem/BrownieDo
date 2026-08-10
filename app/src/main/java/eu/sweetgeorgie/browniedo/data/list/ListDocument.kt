@@ -19,9 +19,10 @@ data class ListDocument(
 )
 
 /**
- * Field names as stored in Firestore. [MEMBERS] is needed literally for the query filter, which
- * cannot go through [ListDocument].
+ * Field names as stored in Firestore. [MEMBERS] is needed literally for the query filter and [NAME]
+ * for renaming, neither of which can go through [ListDocument].
  */
 internal object ListField {
+    const val NAME = "name"
     const val MEMBERS = "members"
 }

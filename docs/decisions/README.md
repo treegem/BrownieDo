@@ -44,3 +44,5 @@ der den alten als „abgelöst" markiert.
 | [0016](0016-wischen-loescht-nur-erledigte-aufgaben.md) | Wischen löscht nur erledigte Aufgaben | akzeptiert |
 | [0017](0017-signatur-zugangsdaten-aus-keystore-properties.md) | Signatur-Zugangsdaten aus `keystore.properties` | akzeptiert |
 | [0018](0018-datastore-fuer-die-zuletzt-gewaehlte-liste.md) | DataStore für die zuletzt gewählte Liste | akzeptiert |
+| [0019](0019-schreibrechte-auf-listen-dokumente.md) | Schreibrechte auf Listen-Dokumente | akzeptiert |
+| [0020](0020-partner-aus-users-collection.md) | Partner aus einer handgepflegten `users`-Collection | akzeptiert |

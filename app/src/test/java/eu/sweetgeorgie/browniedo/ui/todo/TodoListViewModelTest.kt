@@ -7,6 +7,8 @@ import eu.sweetgeorgie.browniedo.domain.list.SelectedListRepository
 import eu.sweetgeorgie.browniedo.domain.list.TodoList
 import eu.sweetgeorgie.browniedo.domain.todo.Todo
 import eu.sweetgeorgie.browniedo.domain.todo.TodoRepository
+import eu.sweetgeorgie.browniedo.domain.user.Partner
+import eu.sweetgeorgie.browniedo.domain.user.PartnerRepository
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -32,6 +34,7 @@ class TodoListViewModelTest {
     private val todoRepository = FakeTodoRepository()
     private val listRepository = FakeListRepository()
     private val selectedListRepository = FakeSelectedListRepository()
+    private val partnerRepository = FakePartnerRepository()
     private val authRepository = FakeAuthRepository(SIGNED_IN_USER)
     private lateinit var viewModel: TodoListViewModel
 
@@ -49,6 +52,7 @@ class TodoListViewModelTest {
             todoRepository = todoRepository,
             listRepository = listRepository,
             selectedListRepository = selectedListRepository,
+            partnerRepository = partnerRepository,
             authRepository = authRepository
         )
     }
@@ -134,6 +138,151 @@ class TodoListViewModelTest {
 
         assertEquals(TodoListError.LOAD_FAILED, viewModel.uiState.value.error)
         assertFalse(viewModel.uiState.value.isLoading)
+    }
+
+    // --- Listen anlegen, umbenennen, löschen ---
+
+    @Test
+    fun `a private list is created`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+
+        viewModel.onNewListClick()
+        viewModel.onNewListNameChange("  Garten  ")
+        viewModel.onNewListConfirm()
+        advanceUntilIdle()
+
+        assertEquals(CreateListCall("Garten", shared = false), listRepository.lastCreateCall)
+        assertNull(viewModel.uiState.value.newList)
+    }
+
+    @Test
+    fun `a shared list is created`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+
+        viewModel.onNewListClick()
+        viewModel.onNewListNameChange("Garten")
+        viewModel.onNewListSharedChange(true)
+        viewModel.onNewListConfirm()
+        advanceUntilIdle()
+
+        assertEquals(CreateListCall("Garten", shared = true), listRepository.lastCreateCall)
+    }
+
+    @Test
+    fun `sharing stays off while no partner is on file`() = runTest(testDispatcher) {
+        partnerRepository.emit(null)
+        advanceUntilIdle()
+
+        viewModel.onNewListClick()
+        viewModel.onNewListSharedChange(true)
+
+        assertFalse(viewModel.uiState.value.newList!!.shared)
+    }
+
+    @Test
+    fun `a blank list name is not written`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+
+        viewModel.onNewListClick()
+        viewModel.onNewListNameChange("   ")
+        viewModel.onNewListConfirm()
+        advanceUntilIdle()
+
+        assertNull(listRepository.lastCreateCall)
+    }
+
+    @Test
+    fun `a failing create keeps the dialog open and reports its own error`() =
+        runTest(testDispatcher) {
+            advanceUntilIdle()
+            listRepository.createResult = Result.failure(IllegalStateException("no permission"))
+
+            viewModel.onNewListClick()
+            viewModel.onNewListNameChange("Garten")
+            viewModel.onNewListConfirm()
+            advanceUntilIdle()
+
+            assertEquals(TodoListError.LIST_ADD_FAILED, viewModel.uiState.value.error)
+            assertEquals("Garten", viewModel.uiState.value.newList?.name)
+        }
+
+    @Test
+    fun `renaming writes against the list the dialog was opened for`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+
+        viewModel.onRenameListClick()
+        viewModel.onRenamedListNameChange("  Wocheneinkauf  ")
+        viewModel.onRenameListConfirm()
+
+        assertEquals(RenameListCall(LIST_A.id, "Wocheneinkauf"), listRepository.lastRenameCall)
+        assertNull(viewModel.uiState.value.renamedList)
+    }
+
+    @Test
+    fun `a failing rename reports its own error`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+        listRepository.renameResult = Result.failure(IllegalStateException("no permission"))
+
+        viewModel.onRenameListClick()
+        viewModel.onRenamedListNameChange("Wocheneinkauf")
+        viewModel.onRenameListConfirm()
+
+        assertEquals(TodoListError.LIST_UPDATE_FAILED, viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `deleting removes the selected list`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+
+        viewModel.onDeleteListClick()
+        assertEquals(LIST_A, viewModel.uiState.value.listPendingDeletion)
+
+        viewModel.onDeleteListConfirm()
+        advanceUntilIdle()
+
+        assertEquals(LIST_A.id, listRepository.deletedListId)
+        assertNull(viewModel.uiState.value.listPendingDeletion)
+    }
+
+    @Test
+    fun `a failing delete reports its own error`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+        listRepository.deleteResult = Result.failure(IllegalStateException("no permission"))
+
+        viewModel.onDeleteListClick()
+        viewModel.onDeleteListConfirm()
+        advanceUntilIdle()
+
+        assertEquals(TodoListError.LIST_DELETE_FAILED, viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `switching lists closes every open dialog`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onRenameListClick()
+
+        viewModel.onListSelected(LIST_B)
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.editedTodo)
+        assertNull(viewModel.uiState.value.renamedList)
+        assertNull(viewModel.uiState.value.listPendingDeletion)
+    }
+
+    @Test
+    fun `losing the last list clears a sticky load error`() = runTest(testDispatcher) {
+        todoRepository.emit(LIST_A.id, Result.failure(IllegalStateException("no permission")))
+        advanceUntilIdle()
+        assertEquals(TodoListError.LOAD_FAILED, viewModel.uiState.value.error)
+
+        // Der Partner löscht die letzte Liste: Ohne das Aufräumen verdrängte der Fehler den
+        // Hinweis „Noch keine Liste".
+        listRepository.emit(Result.success(emptyList()))
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.error)
+        assertNull(viewModel.uiState.value.selectedList)
     }
 
     // --- Aufgaben ---
@@ -405,6 +554,8 @@ class TodoListViewModelTest {
 
 private val SIGNED_IN_USER = SignedInUser(uid = "uid-1", displayName = "Georg", email = null)
 
+private val PARTNER = Partner(uid = "uid-2", displayName = "Anna")
+
 private val LIST_A = TodoList(id = "list-a", name = "Einkauf", isShared = true)
 
 private val LIST_B = TodoList(id = "list-b", name = "Zuhause", isShared = false)
@@ -493,7 +644,21 @@ private class FakeTodoRepository : TodoRepository {
     }
 }
 
+private data class CreateListCall(val name: String, val shared: Boolean)
+
+private data class RenameListCall(val listId: String, val name: String)
+
 private class FakeListRepository : ListRepository {
+    var createResult: Result<Unit> = Result.success(Unit)
+    var renameResult: Result<Unit> = Result.success(Unit)
+    var deleteResult: Result<Unit> = Result.success(Unit)
+    var lastCreateCall: CreateListCall? = null
+        private set
+    var lastRenameCall: RenameListCall? = null
+        private set
+    var deletedListId: String? = null
+        private set
+
     private val emitted =
         MutableStateFlow<Result<List<TodoList>>>(Result.success(listOf(LIST_A, LIST_B)))
 
@@ -501,6 +666,31 @@ private class FakeListRepository : ListRepository {
 
     fun emit(result: Result<List<TodoList>>) {
         emitted.value = result
+    }
+
+    override suspend fun createList(name: String, shared: Boolean): Result<Unit> {
+        lastCreateCall = CreateListCall(name, shared)
+        return createResult
+    }
+
+    override fun renameList(listId: String, name: String): Result<Unit> {
+        lastRenameCall = RenameListCall(listId, name)
+        return renameResult
+    }
+
+    override suspend fun deleteList(listId: String): Result<Unit> {
+        deletedListId = listId
+        return deleteResult
+    }
+}
+
+private class FakePartnerRepository(partner: Partner? = PARTNER) : PartnerRepository {
+    private val emitted = MutableStateFlow(partner)
+
+    override val partner: Flow<Partner?> = emitted
+
+    fun emit(partner: Partner?) {
+        emitted.value = partner
     }
 }
 

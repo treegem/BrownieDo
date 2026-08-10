@@ -4,6 +4,7 @@ rules_version = '2';
 // Firebase Console -> Firestore Database -> Rules -> Publish.
 //
 // Structure and reasoning: docs/decisions/0009-listen-dokument-mit-todo-subcollection.md
+// Write access to list documents: docs/decisions/0019-schreibrechte-auf-listen-dokumente.md
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -13,12 +14,38 @@ service cloud.firestore {
         && request.auth.uid in get(/databases/$(database)/documents/lists/$(listId)).data.members;
     }
 
+    // The two people using the app. Maintained by hand in the console, same as the list documents
+    // were before phase 8b — see docs/decisions/0020-partner-aus-users-collection.md.
+    match /users/{userId} {
+      // Reading is limited to whoever is listed here themselves. The Google provider lets *any*
+      // Google account authenticate; strangers see no lists because they are in no members array,
+      // but without this condition they could read both display names.
+      allow read: if request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+
+      allow write: if false;
+    }
+
     match /lists/{listId} {
       allow read: if request.auth != null && request.auth.uid in resource.data.members;
 
-      // List documents are created by hand in the console, so nobody can add themselves to a
-      // list they are not part of. Lifted once the app manages lists itself (roadmap phase 8).
-      allow write: if false;
+      // On create the document does not exist yet, so membership has to come from the incoming
+      // data. The size cap is the product decision "an app for exactly two people" written down;
+      // the name check keeps out lists that the client would drop as unusable and that would then
+      // sit invisibly in Firestore.
+      allow create: if request.auth != null
+        && request.auth.uid in request.resource.data.members
+        && request.resource.data.members.size() <= 2
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0;
+
+      // Renaming yes, changing who is on the list no. That keeps what `write: if false` used to
+      // guarantee: nobody can add themselves to a list or push the partner out of one.
+      allow update: if request.auth != null
+        && request.auth.uid in resource.data.members
+        && request.resource.data.members == resource.data.members;
+
+      allow delete: if request.auth != null && request.auth.uid in resource.data.members;
 
       match /todos/{todoId} {
         allow read, write: if isListMember(listId);
