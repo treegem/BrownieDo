@@ -48,6 +48,7 @@ class MainActivity : ComponentActivity() {
                         onNewTodoTitleChange = todoListViewModel::onNewTodoTitleChange,
                         onAddTodoClick = todoListViewModel::addTodo,
                         onTodoDoneChange = todoListViewModel::onTodoDoneChange,
+                        onTodoSwipedAway = todoListViewModel::onTodoSwipedAway,
                         onEditTodoClick = todoListViewModel::onEditTodoClick,
                         onEditedTitleChange = todoListViewModel::onEditedTitleChange,
                         onEditConfirm = todoListViewModel::onEditConfirm,

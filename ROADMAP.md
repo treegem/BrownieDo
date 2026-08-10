@@ -127,6 +127,8 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   einfarbige Variante für die themenbezogenen Icons ab Android 13; der Name stand bereits auf
   „BrownieDo". Offen bleiben die Raster-Icons in `mipmap-*dpi`: dort liegt noch die Vorlage, sie
   greift aber nur auf API 24/25 — erzeugen ließe sie sich mit dem Image Asset Studio
+- [x] Erledigte Aufgaben durch Wischen nach rechts löschen — offene Aufgaben lassen sich bewusst
+  nicht wischen, siehe [ADR 0016](docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md)
 - [ ] Optional: Dark Mode prüfen — der Fensterhintergrund folgt dem Dunkelmodus bereits
   (`res/values-night/themes.xml`), offen ist die Durchsicht der Compose-Oberfläche auf dem Gerät
 

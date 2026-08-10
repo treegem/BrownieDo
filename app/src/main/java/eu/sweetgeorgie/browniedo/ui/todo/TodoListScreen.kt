@@ -1,6 +1,7 @@
 package eu.sweetgeorgie.browniedo.ui.todo
 
 import android.content.res.Configuration.UI_MODE_NIGHT_YES
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,9 +36,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -68,6 +72,7 @@ fun TodoListScreen(
     onNewTodoTitleChange: (String) -> Unit,
     onAddTodoClick: () -> Unit,
     onTodoDoneChange: (Todo, Boolean) -> Unit,
+    onTodoSwipedAway: (Todo) -> Unit,
     onEditTodoClick: (Todo) -> Unit,
     onEditedTitleChange: (String) -> Unit,
     onEditConfirm: () -> Unit,
@@ -127,10 +132,12 @@ fun TodoListScreen(
                     }
                 }
                 items(items = uiState.todos, key = Todo::id) { todo ->
-                    TodoRow(
+                    SwipeableTodoRow(
                         todo = todo,
+                        deleteFailed = uiState.error == TodoListError.DELETE_FAILED,
                         onDoneChange = { isDone -> onTodoDoneChange(todo, isDone) },
                         onClick = { onEditTodoClick(todo) },
+                        onSwipedAway = { onTodoSwipedAway(todo) },
                         // Abgehakte Einträge sinken sofort nach unten. Ohne Bewegung sähe das
                         // aus, als wäre die Liste gesprungen — die Animation zeigt, wohin.
                         modifier = Modifier.animateItem()
@@ -153,6 +160,13 @@ fun TodoListScreen(
 
 /** Der Ladefehler ist kein Todo und braucht daher einen eigenen, kollisionsfreien Item-Key. */
 private const val LOAD_ERROR_KEY = "load-error"
+
+/**
+ * Anteil der Zeilenbreite, über den eine erledigte Aufgabe gezogen werden muss, damit sie gelöscht
+ * wird. Bewusst weit über dem Material-Standard von 50 %: Gelöscht ist endgültig, und ein Streifen
+ * im Vorbeiscrollen soll nichts auslösen.
+ */
+private const val DELETE_SWIPE_FRACTION = 0.85f
 
 private fun TodoListError.messageResId() = when (this) {
     TodoListError.LOAD_FAILED -> R.string.todo_list_error_load_failed
@@ -231,6 +245,66 @@ private fun NewTodoBar(title: String, onTitleChange: (String) -> Unit, onAddClic
                 )
             }
         }
+    }
+}
+
+/**
+ * Umschließt eine Zeile mit der Wischgeste. Gelöscht wird nur, was schon erledigt ist, und nur
+ * nach rechts — siehe docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md.
+ */
+@Composable
+private fun SwipeableTodoRow(
+    todo: Todo,
+    deleteFailed: Boolean,
+    onDoneChange: (Boolean) -> Unit,
+    onClick: () -> Unit,
+    onSwipedAway: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val swipeState = rememberSwipeToDismissBoxState(
+        positionalThreshold = { totalDistance -> totalDistance * DELETE_SWIPE_FRACTION }
+    )
+
+    // Schlägt das Löschen fehl, bleibt der Eintrag in der Liste — dann muss die weggewischte
+    // Zeile zurück an ihren Platz, sonst klafft dort eine leere Fläche.
+    LaunchedEffect(deleteFailed) {
+        if (deleteFailed && swipeState.currentValue != SwipeToDismissBoxValue.Settled) {
+            swipeState.reset()
+        }
+    }
+
+    SwipeToDismissBox(
+        state = swipeState,
+        backgroundContent = { DeleteBackground() },
+        modifier = modifier,
+        // Nach links wird nie gelöscht, und offene Aufgaben lassen sich gar nicht erst bewegen:
+        // Was sich ziehen lässt, ist erledigt.
+        enableDismissFromEndToStart = false,
+        gesturesEnabled = todo.isDone,
+        onDismiss = { direction ->
+            if (direction == SwipeToDismissBoxValue.StartToEnd) onSwipedAway()
+        }
+    ) {
+        TodoRow(todo = todo, onDoneChange = onDoneChange, onClick = onClick)
+    }
+}
+
+@Composable
+private fun DeleteBackground() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.errorContainer)
+            .padding(horizontal = 24.dp),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_delete),
+            // Rein dekorativ: Der Hintergrund taucht nur während einer Geste auf, die sich mit
+            // TalkBack ohnehin nicht ausführen lässt. Dort führt der Bearbeiten-Dialog zum Löschen.
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onErrorContainer
+        )
     }
 }
 
@@ -349,6 +423,7 @@ private fun TodoListScreenPreview() {
             onNewTodoTitleChange = {},
             onAddTodoClick = {},
             onTodoDoneChange = { _, _ -> },
+            onTodoSwipedAway = {},
             onEditTodoClick = {},
             onEditedTitleChange = {},
             onEditConfirm = {},
@@ -371,6 +446,7 @@ private fun TodoListScreenEmptyPreview() {
             onNewTodoTitleChange = {},
             onAddTodoClick = {},
             onTodoDoneChange = { _, _ -> },
+            onTodoSwipedAway = {},
             onEditTodoClick = {},
             onEditedTitleChange = {},
             onEditConfirm = {},

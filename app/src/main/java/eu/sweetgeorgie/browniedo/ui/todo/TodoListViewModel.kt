@@ -94,4 +94,18 @@ class TodoListViewModel(
             onFailure = { mutableUiState.update { it.copy(error = TodoListError.DELETE_FAILED) } }
         )
     }
+
+    /**
+     * Wischen löscht ohne Dialog — es gibt also keinen zu schließen.
+     *
+     * Die Prüfung auf [Todo.isDone] ist die eigentliche Regel und steht bewusst hier statt nur in
+     * der Oberfläche: So ist sie ohne Gerät prüfbar und übersteht eine Unachtsamkeit im Bildschirm,
+     * siehe docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md.
+     */
+    fun onTodoSwipedAway(todo: Todo) {
+        if (!todo.isDone) return
+        todoRepository.deleteTodo(todo.id).onFailure {
+            mutableUiState.update { it.copy(error = TodoListError.DELETE_FAILED) }
+        }
+    }
 }

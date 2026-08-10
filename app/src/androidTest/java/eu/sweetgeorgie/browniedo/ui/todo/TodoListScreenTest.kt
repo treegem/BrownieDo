@@ -5,18 +5,23 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeRight
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import eu.sweetgeorgie.browniedo.R
+import eu.sweetgeorgie.browniedo.domain.todo.Todo
 import eu.sweetgeorgie.browniedo.ui.theme.BrownieDoTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.time.Instant
 
 /**
- * Prüft, was [TodoListScreen] anstelle der Liste anzeigt: die zweigeteilte Fehleranzeige sowie den
- * Lade- und den Leerzustand. Der Bildschirm ist zustandslos, der Test kommt daher ohne Firebase und
- * ohne Anmeldung aus.
+ * Prüft, was [TodoListScreen] anstelle der Liste anzeigt (Fehler, Laden, Leerzustand) und dass die
+ * Wischgeste nur erledigte Aufgaben löscht. Der Bildschirm ist zustandslos, der Test kommt daher
+ * ohne Firebase und ohne Anmeldung aus.
  */
 @RunWith(AndroidJUnit4::class)
 class TodoListScreenTest {
@@ -28,8 +33,9 @@ class TodoListScreenTest {
     fun aWriteErrorIsShownInASnackbarAndClearedAfterwards() {
         var errorShownCount = 0
         setScreenContent(
-            TodoListUiState(isLoading = false, error = TodoListError.ADD_FAILED)
-        ) { errorShownCount++ }
+            uiState = TodoListUiState(isLoading = false, error = TodoListError.ADD_FAILED),
+            onErrorShown = { errorShownCount++ }
+        )
 
         val message = composeTestRule.activity.getString(R.string.todo_list_error_add_failed)
         composeTestRule.onNodeWithText(message).assertIsDisplayed()
@@ -42,8 +48,9 @@ class TodoListScreenTest {
     fun aLoadErrorStaysVisibleAndIsNotCleared() {
         var errorShownCount = 0
         setScreenContent(
-            TodoListUiState(isLoading = false, error = TodoListError.LOAD_FAILED)
-        ) { errorShownCount++ }
+            uiState = TodoListUiState(isLoading = false, error = TodoListError.LOAD_FAILED),
+            onErrorShown = { errorShownCount++ }
+        )
 
         val message = composeTestRule.activity.getString(R.string.todo_list_error_load_failed)
         composeTestRule.onNodeWithText(message).assertIsDisplayed()
@@ -54,7 +61,7 @@ class TodoListScreenTest {
 
     @Test
     fun theProgressIndicatorIsShownWhileTheListIsLoading() {
-        setScreenContent(TodoListUiState(isLoading = true))
+        setScreenContent(uiState = TodoListUiState(isLoading = true))
 
         val label = composeTestRule.activity.getString(R.string.todo_list_loading)
         composeTestRule.onNodeWithContentDescription(label).assertIsDisplayed()
@@ -62,7 +69,7 @@ class TodoListScreenTest {
 
     @Test
     fun anEmptyListInvitesTheUserToAddTheFirstEntry() {
-        setScreenContent(TodoListUiState(isLoading = false))
+        setScreenContent(uiState = TodoListUiState(isLoading = false))
 
         val headline = composeTestRule.activity.getString(R.string.todo_list_empty_headline)
         val hint = composeTestRule.activity.getString(R.string.todo_list_empty_hint)
@@ -72,7 +79,9 @@ class TodoListScreenTest {
 
     @Test
     fun aLoadErrorIsShownInsteadOfTheEmptyState() {
-        setScreenContent(TodoListUiState(isLoading = false, error = TodoListError.LOAD_FAILED))
+        setScreenContent(
+            uiState = TodoListUiState(isLoading = false, error = TodoListError.LOAD_FAILED)
+        )
 
         val message = composeTestRule.activity.getString(R.string.todo_list_error_load_failed)
         val headline = composeTestRule.activity.getString(R.string.todo_list_empty_headline)
@@ -80,7 +89,41 @@ class TodoListScreenTest {
         composeTestRule.onNodeWithText(headline).assertDoesNotExist()
     }
 
-    private fun setScreenContent(uiState: TodoListUiState, onErrorShown: () -> Unit = {}) {
+    @Test
+    fun aFinishedEntrySwipedToTheRightIsDeleted() {
+        var swipedAway: Todo? = null
+        setScreenContent(
+            uiState = TodoListUiState(isLoading = false, todos = TODOS),
+            onTodoSwipedAway = { swipedAway = it }
+        )
+
+        composeTestRule.onNodeWithText(FINISHED_TODO.title).performTouchInput { swipeRight() }
+        composeTestRule.waitForIdle()
+
+        assertEquals(FINISHED_TODO.id, swipedAway?.id)
+    }
+
+    @Test
+    fun anEntryThatIsStillOpenCannotBeSwipedAway() {
+        var swipedAway: Todo? = null
+        setScreenContent(
+            uiState = TodoListUiState(isLoading = false, todos = TODOS),
+            onTodoSwipedAway = { swipedAway = it }
+        )
+
+        composeTestRule.onNodeWithText(OPEN_TODO.title).performTouchInput { swipeRight() }
+        composeTestRule.waitForIdle()
+
+        assertNull(swipedAway)
+        // Die Zeile muss stehen bleiben, nicht nur den Rückruf unterlassen.
+        composeTestRule.onNodeWithText(OPEN_TODO.title).assertIsDisplayed()
+    }
+
+    private fun setScreenContent(
+        uiState: TodoListUiState,
+        onErrorShown: () -> Unit = {},
+        onTodoSwipedAway: (Todo) -> Unit = {}
+    ) {
         composeTestRule.setContent {
             BrownieDoTheme(dynamicColor = false) {
                 TodoListScreen(
@@ -88,6 +131,7 @@ class TodoListScreenTest {
                     onNewTodoTitleChange = {},
                     onAddTodoClick = {},
                     onTodoDoneChange = { _, _ -> },
+                    onTodoSwipedAway = onTodoSwipedAway,
                     onEditTodoClick = {},
                     onEditedTitleChange = {},
                     onEditConfirm = {},
@@ -102,5 +146,25 @@ class TodoListScreenTest {
 
     private companion object {
         const val DISMISS_TIMEOUT_MILLIS = 10_000L
+
+        val TIMESTAMP: Instant = Instant.parse("2026-08-07T20:00:00Z")
+
+        val OPEN_TODO = Todo(
+            id = "todo-open",
+            title = "Milch kaufen",
+            isDone = false,
+            createdAt = TIMESTAMP,
+            updatedAt = TIMESTAMP,
+            completedBy = null
+        )
+
+        val FINISHED_TODO = OPEN_TODO.copy(
+            id = "todo-finished",
+            title = "Kaffee kaufen",
+            isDone = true,
+            completedBy = "uid-1"
+        )
+
+        val TODOS = listOf(OPEN_TODO, FINISHED_TODO)
     }
 }

@@ -218,6 +218,31 @@ class TodoListViewModelTest {
     }
 
     @Test
+    fun `swiping a finished entry away deletes it`() = runTest(testDispatcher) {
+        viewModel.onTodoSwipedAway(FINISHED_TODO_ENTRY)
+
+        assertEquals(FINISHED_TODO_ENTRY.id, todoRepository.deletedTodoId)
+        assertNull(viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `swiping does not delete an entry that is still open`() = runTest(testDispatcher) {
+        viewModel.onTodoSwipedAway(TODO_ENTRY)
+
+        assertNull(todoRepository.deletedTodoId)
+        assertNull(viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `a failing swipe delete reports a delete error`() = runTest(testDispatcher) {
+        todoRepository.deleteResult = Result.failure(IllegalStateException("no permission"))
+
+        viewModel.onTodoSwipedAway(FINISHED_TODO_ENTRY)
+
+        assertEquals(TodoListError.DELETE_FAILED, viewModel.uiState.value.error)
+    }
+
+    @Test
     fun `a shown write error is cleared`() = runTest(testDispatcher) {
         todoRepository.addResult = Result.failure(IllegalStateException("offline"))
         viewModel.onNewTodoTitleChange("Milch kaufen")
@@ -250,6 +275,8 @@ class TodoListViewModelTest {
             updatedAt = Instant.parse("2026-08-07T20:00:00Z"),
             completedBy = null
         )
+
+        val FINISHED_TODO_ENTRY = TODO_ENTRY.copy(isDone = true, completedBy = "uid-1")
     }
 }
 
