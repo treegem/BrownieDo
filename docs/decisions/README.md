@@ -5,11 +5,7 @@ also das, was aus dem fertigen Code nicht mehr ablesbar ist.
 
 ## Abgrenzung zu den anderen Dokumenten
 
-| Dokument | Inhalt |
-|---|---|
-| `ROADMAP.md` | Vision, gewählter Stack, Fortschritt — das **Was** |
-| `.github/instructions/` | Verbindliche Coding-, Architektur- und Naming-Regeln — das **Wie** |
-| `docs/decisions/` | Warum eine Option gewonnen hat und was das kostet — das **Warum** |
+Welches Dokument was enthält, steht in [`AGENTS.md`](../../AGENTS.md).
 
 Eine Entscheidung wird hier genau einmal beschrieben. Wiederhole sie nicht in `ROADMAP.md`,
 sondern verlinke sie.
@@ -43,3 +39,5 @@ der den alten als „abgelöst" markiert.
 | [0011](0011-schreibvorgaenge-nicht-abwarten.md) | Schreibvorgänge nicht auf den Server warten lassen | akzeptiert |
 | [0012](0012-scaffold-pro-bildschirm.md) | Scaffold pro Bildschirm statt app-weit | akzeptiert |
 | [0013](0013-eingabefeld-in-der-bottombar-statt-fab.md) | Eingabefeld in der `bottomBar` statt FAB mit Dialog | akzeptiert |
+| [0014](0014-regeldateien-always-on.md) | Regeldateien always-on statt pfad-gebunden | akzeptiert |
+| [0015](0015-agents-md-als-gemeinsamer-einstieg.md) | `AGENTS.md` als gemeinsamer Agenten-Einstieg | akzeptiert |

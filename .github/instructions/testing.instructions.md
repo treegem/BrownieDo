@@ -1,5 +1,5 @@
 ---
-applyTo: "**/test/**, **/androidTest/**"
+applyTo: "**"
 ---
 
 # Android Testing Conventions

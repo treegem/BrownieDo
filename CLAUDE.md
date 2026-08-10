@@ -1,55 +1,39 @@
-# BrownieDo – Einstieg für Claude Code
+# BrownieDo – Kontext für Claude Code
 
-BrownieDo ist eine private, geteilte ToDo-Liste für genau zwei Personen (Android, Kotlin, Jetpack
-Compose, Firebase). Diese Datei ist nur ein Wegweiser — sie enthält selbst keine Regeln.
+Diese Datei enthält bewusst keine Inhalte, sondern nur Importe. Der Projekt-Einstieg steht in
+[`AGENTS.md`](AGENTS.md), die Regeln in [`.github/instructions/`](.github/instructions/) — beide
+werden von allen Werkzeugen geteilt. Hier steht nur, was Claude Code davon lädt.
 
-## Vor der Arbeit lesen
+**Nichts hierher kopieren.** Wächst eine Regel, wächst sie in ihrer Datei; hier kommt höchstens eine
+Importzeile dazu. Warum die Aufteilung so aussieht, steht in
+[ADR 0015](docs/decisions/0015-agents-md-als-gemeinsamer-einstieg.md).
 
-| Wo | Was |
-|---|---|
-| [`ROADMAP.md`](ROADMAP.md) | Vision, Stack, Fortschritt — das **Was** und **Warum überhaupt** |
-| [`.github/instructions/`](.github/instructions/) | Verbindliche Coding-, Architektur- und Naming-Regeln — das **Wie** |
-| [`docs/decisions/`](docs/decisions/README.md) | ADRs: warum eine Option gewonnen hat — das **Warum so** |
+## Projekt-Einstieg
 
-**Die Regeldateien werden nicht automatisch geladen.** GitHub Copilot zieht sie über die
-`applyTo`-Globs in ihrem Frontmatter (beschrieben in
-[`.github/copilot-instructions.md`](.github/copilot-instructions.md)); Claude Code tut das nicht.
-Lies deshalb zu Beginn einer Aufgabe **alle** Dateien in `.github/instructions/`. Das Frontmatter
-jeder Datei sagt, worauf sie zutrifft; die meisten gelten für jede Datei im Repo.
+@./AGENTS.md
 
-Die Regeln tragen Schweregrade (`MUST FIX`, `SHOULD FIX`, `CONSIDER`) — die sind ernst gemeint.
+## Verbindliche Regeln
 
-## Erwartungen an eine Änderung
+@./.github/instructions/standards.instructions.md
+@./.github/instructions/architecture.instructions.md
+@./.github/instructions/conventions.instructions.md
+@./.github/instructions/naming.instructions.md
+@./.github/instructions/testing.instructions.md
+@./.github/instructions/roadmap.instructions.md
+@./.github/instructions/avoid-duplicate-definitions.instructions.md
+@./.github/instructions/avoid-unnecessary-wrappers.instructions.md
+@./.github/instructions/consistent-domain-terminology.instructions.md
+@./.github/instructions/mark-nullable-fields.instructions.md
+@./.github/instructions/prefer-static-imports.instructions.md
+@./.github/instructions/remove-redundant-conditionals.instructions.md
+@./.github/instructions/remove-unused-code.instructions.md
+@./.github/instructions/reuse-shared-constants.instructions.md
+@./.github/instructions/use-descriptive-names.instructions.md
 
-- Passenden Punkt in `ROADMAP.md` nachziehen (`[ ]` offen · `[~]` in Arbeit · `[x]` erledigt ·
-  `[-]` zurückgestellt). Steht die Arbeit noch nicht drin, einen Punkt ergänzen.
-- Entscheidungen, die schwer rückgängig zu machen sind oder eine ernsthafte Alternative verwerfen,
-  bekommen einen neuen ADR in `docs/decisions/` plus eine Zeile in dessen Übersichtstabelle.
-- Jede Entscheidung wird genau einmal beschrieben und sonst verlinkt — nicht wiederholen.
+## Produktstand und Entscheidungen
 
-## Sprache
+@./ROADMAP.md
+@./docs/decisions/README.md
 
-Code, Bezeichner und Commit-Nachrichten auf Englisch. Kommentare, Dokumentation, ADRs und alle
-Strings in `res/values/strings.xml` auf Deutsch.
-
-## Bauen und testen
-
-```bash
-./gradlew.bat :app:testDebugUnitTest
-```
-
-```bash
-./gradlew.bat :app:assembleDebug :app:lintDebug
-```
-
-Instrumentierte Tests brauchen ein Gerät oder einen laufenden Emulator:
-
-```bash
-./gradlew.bat :app:connectedDebugAndroidTest
-```
-
-## Niemals ins Repo
-
-`app/google-services.json` und der Release-Keystore. Beide stehen in `.gitignore` — nicht
-umgehen. `firestore.rules` im Repo-Root ist die Quelle der Wahrheit für die Security Rules;
-veröffentlicht wird von Hand über die Firebase Console.
+Die einzelnen ADRs werden **nicht** importiert — die importierte Übersicht in
+`docs/decisions/README.md` sagt, welche es gibt; den passenden bei Bedarf gezielt öffnen.

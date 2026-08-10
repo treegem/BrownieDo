@@ -39,7 +39,7 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 |---|---|---|
 | Sprache | **Kotlin** | Entwickler kann serverseitig bereits sehr gut Kotlin. |
 | UI | **Jetpack Compose** (Material 3) | Offizieller Android-Standard, deklarativ, ideal für Listen. |
-| IDE | **Android Studio** + GitHub Copilot | Volles Android-Tooling out-of-the-box. |
+| IDE | **Android Studio** + GitHub Copilot, dazu Claude Code | Volles Android-Tooling out-of-the-box. |
 | Backend | **Firebase Firestore** | Realtime-Sync + Offline-Persistenz eingebaut, kein eigener Server. |
 | Auth | **Firebase Auth** | Regelt, dass nur die beiden Accounts Zugriff haben. |
 | Architektur | UI (Compose) ⇄ ViewModel ⇄ Repository ⇄ Firestore | Saubere Trennung, testbar, KMP-fähig. |
@@ -83,7 +83,9 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 - [x] Login-Zustand in der App halten (angemeldet / nicht angemeldet)
 
 ### Phase 3 – Datenmodell & Firestore-Struktur
-- [x] Datenmodell definieren: `Todo` (id, titel, erledigt, erstelltAm, updatedAt, ggf. erledigtVon)
+- [x] Datenmodell definieren: `Todo` (`id`, `title`, `isDone`, `createdAt`, `updatedAt`,
+  `completedBy`) — `id` ist die Dokument-id und kein gespeichertes Feld; wie die Felder in Firestore
+  heißen, steht in [ADR 0009](docs/decisions/0009-listen-dokument-mit-todo-subcollection.md)
 - [x] Firestore-Struktur festlegen: `lists/{listId}` mit `members`-Array und Sub-Collection
   `lists/{listId}/todos` — trägt geteilte und private Listen, siehe
   [ADR 0009](docs/decisions/0009-listen-dokument-mit-todo-subcollection.md)
@@ -137,6 +139,16 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 - [ ] Liste löschen inklusive ihrer `todos`-Sub-Collection (Firestore löscht nicht kaskadierend)
 - [ ] Security Rules auf das Anlegen/Ändern von Listen durch die App erweitern
 
+### Querlaufend – Werkzeuge & Doku
+> Läuft neben den Phasen und gehört zu keiner.
+- [x] `AGENTS.md` als gemeinsamen Einstieg für alle Coding-Agents anlegen; `CLAUDE.md` auf die
+  Regel-Importe reduzieren ([ADR 0015](docs/decisions/0015-agents-md-als-gemeinsamer-einstieg.md))
+- [x] Alle Regeldateien auf always-on umstellen, nachdem gemessen wurde, dass das
+  JetBrains-Copilot-Plugin `applyTo` nicht auswertet
+  ([ADR 0014](docs/decisions/0014-regeldateien-always-on.md))
+- [~] Prüfen, dass die `@`-Importe in `CLAUDE.md` und die Regeln in Android Studio tatsächlich laden
+  (Canary-Methode, siehe ADR 0014)
+
 ---
 
 ## 4. Optionale / spätere Erweiterungen (nice to have)
@@ -150,7 +162,8 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 ## 5. Projektspezifische Vorgaben
 
 Die allgemeinen Coding-, Architektur- und Naming-Regeln stehen in `.github/instructions/`
-und werden vom Coding-Agent automatisch geladen. Die Begründungen hinter den technischen
+und werden von allen Coding-Agents geladen — der gemeinsame Einstieg dazu steht in
+[`AGENTS.md`](AGENTS.md). Die Begründungen hinter den technischen
 Entscheidungen stehen als ADRs in [`docs/decisions/`](docs/decisions/README.md).
 Hier stehen nur die Entscheidungen, die speziell für BrownieDo gelten:
 
