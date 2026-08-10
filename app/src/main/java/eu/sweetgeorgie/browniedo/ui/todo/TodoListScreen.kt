@@ -130,7 +130,10 @@ fun TodoListScreen(
                     TodoRow(
                         todo = todo,
                         onDoneChange = { isDone -> onTodoDoneChange(todo, isDone) },
-                        onClick = { onEditTodoClick(todo) }
+                        onClick = { onEditTodoClick(todo) },
+                        // Abgehakte Einträge sinken sofort nach unten. Ohne Bewegung sähe das
+                        // aus, als wäre die Liste gesprungen — die Animation zeigt, wohin.
+                        modifier = Modifier.animateItem()
                     )
                 }
             }
@@ -266,7 +269,12 @@ private fun EmptyState(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun TodoRow(todo: Todo, onDoneChange: (Boolean) -> Unit, onClick: () -> Unit) {
+private fun TodoRow(
+    todo: Todo,
+    onDoneChange: (Boolean) -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     ListItem(
         headlineContent = {
             Text(
@@ -274,7 +282,7 @@ private fun TodoRow(todo: Todo, onDoneChange: (Boolean) -> Unit, onClick: () -> 
                 textDecoration = if (todo.isDone) TextDecoration.LineThrough else null
             )
         },
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = modifier.clickable(onClick = onClick),
         leadingContent = { Checkbox(checked = todo.isDone, onCheckedChange = onDoneChange) },
         // Die Farbe gehört an die Slot-Dekoration von ListItem, nicht an den inneren Text —
         // ListItem setzt die Textfarbe selbst und würde eine Farbe am Text überschreiben.

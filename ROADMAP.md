@@ -120,8 +120,13 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   ([ADR 0012](docs/decisions/0012-scaffold-pro-bildschirm.md))
 - [x] Leerer Zustand („noch keine Aufgaben") & Ladezustand — ein Ladefehler verdrängt den
   Leerzustand, statt beides gleichzeitig zu zeigen
-- [ ] Optional: Aufgaben sortieren (offen oben, erledigt unten)
-- [ ] Optional: App-Icon & Name anpassen
+- [x] Aufgaben sortieren (offen oben, erledigt unten, je die neuesten zuerst) — im Repository wie
+  in [ADR 0010](docs/decisions/0010-sortierung-im-client-statt-orderby.md) vorgesehen; abgehakte
+  Einträge sinken sofort und animiert nach unten
+- [x] App-Icon & Name anpassen — eigenes adaptives Icon (Häufchen mit grünem Haken) plus
+  einfarbige Variante für die themenbezogenen Icons ab Android 13; der Name stand bereits auf
+  „BrownieDo". Offen bleiben die Raster-Icons in `mipmap-*dpi`: dort liegt noch die Vorlage, sie
+  greift aber nur auf API 24/25 — erzeugen ließe sie sich mit dem Image Asset Studio
 - [ ] Optional: Dark Mode prüfen — der Fensterhintergrund folgt dem Dunkelmodus bereits
   (`res/values-night/themes.xml`), offen ist die Durchsicht der Compose-Oberfläche auf dem Gerät
 

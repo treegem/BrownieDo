@@ -89,6 +89,15 @@ class FirestoreTodoRepository(
 }
 
 /**
+ * Open entries first, and within both groups the newest on top. Ticking an entry off therefore
+ * moves it out of the way immediately, which is what the list is walked down for while shopping.
+ *
+ * Kept apart from [toTodos] so it can be tested without a [QuerySnapshot].
+ */
+internal val TODO_ORDER: Comparator<Todo> =
+    compareBy(Todo::isDone).thenByDescending(Todo::createdAt)
+
+/**
  * Documents that cannot be mapped are dropped instead of reported: they were not written by this
  * app, so neither of the two users can cause or fix that.
  *
@@ -98,4 +107,4 @@ class FirestoreTodoRepository(
 private fun QuerySnapshot.toTodos(): List<Todo> =
     documents.mapNotNull { document ->
         document.toObject(TodoDocument::class.java, ESTIMATE)?.toTodo(document.id)
-    }.sortedByDescending(Todo::createdAt)
+    }.sortedWith(TODO_ORDER)

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Einfarbige Silhouette für die themenbezogenen Icons ab Android 13. Das System färbt sie
+     selbst ein, deshalb zählt hier nur die Form: das Häufchen ohne Augen und ohne Haken, die
+     einfarbig ohnehin verschwinden würden. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#000000"
+        android:pathData="M30,80 C26,71 34,62 54,62 C74,62 82,71 78,80 C62,82.5 46,82.5 30,80 Z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M37,64 C34,56 40,48.5 54,48.5 C68,48.5 74,56 71,64 C60,66 48,66 37,64 Z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M44,51 C42,43 45,35 54,32 C63,35 66,43 64,51 C57,52.5 51,52.5 44,51 Z" />
+</vector>
