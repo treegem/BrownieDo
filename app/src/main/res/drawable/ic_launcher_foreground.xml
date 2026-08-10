@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Das Häufchen mit grünem Haken. Alles liegt innerhalb der zentralen 72x72-Sicherheitszone der
-     108x108-Leinwand, damit keine Launcher-Maske etwas abschneidet. Das Häufchen ist heller als
-     der Hintergrund aus ic_launcher_background.xml — gleiches Braun auf Braun wäre unsichtbar.
-     Der Haken bekommt eine cremefarbene Kontur, damit er sich auch dort abhebt, wo er über dem
-     Häufchen liegt. -->
+<!-- Das Häufchen mit grünem Haken-Badge.
+     Alles bleibt innerhalb eines Kreises mit Radius 36 um die Mitte (54,54): Die äußeren 18 dp der
+     108x108-Leinwand darf jede Launcher-Maske abschneiden, und runde Masken nehmen zusätzlich die
+     Ecken. Deshalb sitzt das Badge unten rechts am Rand dieser sicheren Zone und nicht in der Ecke
+     der Leinwand — dort wäre es auf manchen Geräten halb weg.
+     Das Häufchen ist deutlich dunkler als das Pastellrosa aus ic_launcher_background.xml: Auf hellem
+     Grund braucht die Silhouette Tiefe, sonst verschwimmt sie bei 48 dp. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -12,28 +14,50 @@
 
     <!-- Drei Windungen von unten nach oben, die unterste am breitesten. -->
     <path
-        android:fillColor="#C89A6B"
-        android:pathData="M30,80 C26,71 34,62 54,62 C74,62 82,71 78,80 C62,82.5 46,82.5 30,80 Z" />
+        android:fillColor="#A9744B"
+        android:pathData="M26,73 C26,63 35,59 54,59 C73,59 82,63 82,73 C82,82 71,86 54,86 C37,86 26,82 26,73 Z" />
     <path
-        android:fillColor="#C89A6B"
-        android:pathData="M37,64 C34,56 40,48.5 54,48.5 C68,48.5 74,56 71,64 C60,66 48,66 37,64 Z" />
+        android:fillColor="#A9744B"
+        android:pathData="M35,62 C35,53 42,47 54,47 C66,47 73,53 73,62 C73,66 66,68 54,68 C42,68 35,66 35,62 Z" />
     <path
-        android:fillColor="#C89A6B"
-        android:pathData="M44,51 C42,43 45,35 54,32 C63,35 66,43 64,51 C57,52.5 51,52.5 44,51 Z" />
+        android:fillColor="#A9744B"
+        android:pathData="M43,50 C41,40 45,29 54,25 C63,29 67,40 65,50 C65,53 60,54 54,54 C48,54 43,53 43,50 Z" />
 
-    <!-- Augen. -->
+    <!-- Augen: hohe Ovale mit je zwei Glanzlichtern, das große oben links. -->
     <path
-        android:fillColor="#F5E6D3"
-        android:pathData="M46,43 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0 Z" />
+        android:fillColor="#2B1A10"
+        android:pathData="M43.5,41 a4.5,6 0 1,0 9,0 a4.5,6 0 1,0 -9,0 Z" />
     <path
-        android:fillColor="#F5E6D3"
-        android:pathData="M57,43 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0 Z" />
+        android:fillColor="#2B1A10"
+        android:pathData="M55.5,41 a4.5,6 0 1,0 9,0 a4.5,6 0 1,0 -9,0 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44.4,38.5 a1.9,1.9 0 1,0 3.8,0 a1.9,1.9 0 1,0 -3.8,0 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M48.6,43.6 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M56.4,38.5 a1.9,1.9 0 1,0 3.8,0 a1.9,1.9 0 1,0 -3.8,0 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M60.6,43.6 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0 Z" />
 
-    <!-- Der Haken. -->
+    <!-- Mund. -->
     <path
-        android:fillColor="#7CB342"
-        android:pathData="M40,60 L35,65 L49,78 L75,50 L70,45 L49,68 Z"
-        android:strokeColor="#F5E6D3"
-        android:strokeLineJoin="round"
-        android:strokeWidth="3" />
+        android:pathData="M49,49 C50.8,52 57.2,52 59,49"
+        android:strokeColor="#2B1A10"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.2" />
+
+    <!-- Badge unten rechts: grünes Quadrat mit runden Ecken, darin ein weißer Haken. Die Kontur in
+         der Hintergrundfarbe setzt es sauber vom Häufchen ab. -->
+    <path
+        android:fillColor="#4CAF50"
+        android:pathData="M64,59 L74,59 A5,5 0 0 1 79,64 L79,74 A5,5 0 0 1 74,79 L64,79 A5,5 0 0 1 59,74 L59,64 A5,5 0 0 1 64,59 Z"
+        android:strokeColor="#F7C9D9"
+        android:strokeWidth="2.5" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M64.2,68.3 L62.6,69.9 L67.2,74.5 L75.6,65.6 L73.9,64 L67.1,71.2 Z" />
 </vector>
