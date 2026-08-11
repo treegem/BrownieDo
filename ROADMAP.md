@@ -336,8 +336,10 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   `<queries>`-Eintrag im Manifest `null`, obwohl die Kalender-App da ist. Scheitert auch der zweite
   Versuch, kommt eine Snackbar — neuer Wert in `TodoListError`
 - [ ] Bedienung im Bearbeiten-Dialog, wie Verschieben
-  ([ADR 0022](docs/decisions/0022-verschieben-im-bearbeiten-dialog.md)). Damit macht der Dialog fünf
-  Dinge und der Entzerrungs-Punkt unter „Querlaufend" wird fällig — er wartet dann nicht länger
+  ([ADR 0022](docs/decisions/0022-verschieben-im-bearbeiten-dialog.md)). Der Dialog macht damit fünf
+  Dinge — die Entzerrung ist dafür vorgezogen und erledigt, der Rückruf ist also ein Eintrag in
+  `TodoEditActions` plus eine Zeile in `MainActivity`, siehe
+  [ADR 0028](docs/decisions/0028-rueckrufe-in-actions-haltern.md)
 - [ ] Unit-Test auf den Intent-Bau (Action, Data-Uri, Titel-Extra), ohne Gerät
 - [ ] Auf dem Gerät prüfen — Termin aus einer Aufgabe anlegen und im Gmail-Kalender wiederfinden ·
   nachsehen, in **welchem** Kalenderkonto er gelandet ist (der eigentliche Fallstrick) · zurück in
@@ -407,14 +409,20 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 - [ ] `ExampleUnitTest` und `ExampleInstrumentedTest` löschen — unveränderte Projektvorlagen, die
   `2 + 2 == 4` und den Package-Namen prüfen. `remove-unused-code` ist MUST FIX, und sie zählen bei
   jedem „alle Tests grün" mit, ohne etwas abzusichern
-- [ ] `TodoListScreen` und den Bearbeiten-Dialog entzerren — der Bildschirm nimmt inzwischen 27
-  Lambdas entgegen, und der Dialog erledigt vier Dinge (Titel, Priorität, Liste, Löschen).
-  [ADR 0022](docs/decisions/0022-verschieben-im-bearbeiten-dialog.md) hat genau darauf gezeigt:
-  „Wird er dadurch unübersichtlich, ist das der nächste Anlass, ihn zu überarbeiten." Naheliegend
-  wäre, die Rückrufe des Dialogs in einem eigenen Halter zu bündeln, statt sie einzeln
-  durchzureichen. Kein Blocker, aber es wächst weiter mit jedem Feature — Phase 11 legt den Termin
-  dazu und Phase 12 die Notiz, dann sind es sechs Dinge. **Spätestens vor Phase 12 fällig**, siehe
-  [ADR 0027](docs/decisions/0027-termine-per-kalender-intent.md)
+- [x] `TodoListScreen` und den Bearbeiten-Dialog entzerren — am 2026-08-12 erledigt, vor Phase 11
+  statt erst vor Phase 12. **27 Parameter → 8**, eine Datei mit 1067 Zeilen → fünf. Die Rückrufe
+  reisen jetzt in vier `@Immutable data class`-Haltern, gruppiert nach ihrem Ort in der Oberfläche,
+  siehe [ADR 0028](docs/decisions/0028-rueckrufe-in-actions-haltern.md). Damit kostet ein neues Feld
+  am Dialog einen Eintrag im Halter statt drei Stellen — genau das, worauf
+  [ADR 0022](docs/decisions/0022-verschieben-im-bearbeiten-dialog.md) und
+  [ADR 0027](docs/decisions/0027-termine-per-kalender-intent.md) gezeigt haben.
+  **Beim Anfassen zu beachten:** `@Immutable` und das `remember` in `MainActivity` sind kein Beiwerk.
+  Vorher war der Bildschirm überspringbar, weil Methodenreferenzen sich strukturell vergleichen; ein
+  Halter ohne `equals` hätte ihn bei jeder Rekomposition neu gezeichnet, ohne dass ein Test rot wird
+  (Begründung im ADR). Standardwerte auf den Haltern gibt es aus demselben Grund nicht.
+  Reiner Umbau: **97 Unit-Tests und 16 instrumentierte grün, ohne eine einzige angepasste
+  Zusicherung**, dazu die Canary-Gegenprobe. `TodoListViewModel` und `TodoListUiState` blieben
+  unangetastet
 
 ---
 

@@ -5,12 +5,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import eu.sweetgeorgie.browniedo.ui.auth.LoginScreen
 import eu.sweetgeorgie.browniedo.ui.auth.LoginViewModel
 import eu.sweetgeorgie.browniedo.ui.theme.BrownieDoTheme
+import eu.sweetgeorgie.browniedo.ui.todo.ListDialogActions
+import eu.sweetgeorgie.browniedo.ui.todo.TodoActions
+import eu.sweetgeorgie.browniedo.ui.todo.TodoEditActions
 import eu.sweetgeorgie.browniedo.ui.todo.TodoListScreen
+import eu.sweetgeorgie.browniedo.ui.todo.TodoListTopBarActions
 import eu.sweetgeorgie.browniedo.ui.todo.TodoListViewModel
 
 class MainActivity : ComponentActivity() {
@@ -43,35 +48,61 @@ class MainActivity : ComponentActivity() {
                         viewModel(factory = appContainer.viewModelFactory)
                     val todoListUiState by todoListViewModel.uiState
                         .collectAsStateWithLifecycle()
+                    // Die vier Halter werden gemerkt, statt bei jeder Rekomposition neu zu
+                    // entstehen: onSignOutClick ist ein Lambda-Literal, das appContainer einfängt,
+                    // und wäre sonst jedes Mal ein anderes Objekt. Zusammen mit @Immutable und der
+                    // strukturellen equals der data class bleibt der Bildschirm damit
+                    // überspringbar, siehe ADR 0028.
+                    val topBarActions = remember(todoListViewModel) {
+                        TodoListTopBarActions(
+                            onListSelected = todoListViewModel::onListSelected,
+                            onNewListClick = todoListViewModel::onNewListClick,
+                            onRenameListClick = todoListViewModel::onRenameListClick,
+                            onDeleteListClick = todoListViewModel::onDeleteListClick,
+                            onSignOutClick = { appContainer.authRepository.signOut() }
+                        )
+                    }
+                    val listDialogActions = remember(todoListViewModel) {
+                        ListDialogActions(
+                            onNewListNameChange = todoListViewModel::onNewListNameChange,
+                            onNewListSharedChange = todoListViewModel::onNewListSharedChange,
+                            onNewListConfirm = todoListViewModel::onNewListConfirm,
+                            onNewListDismiss = todoListViewModel::onNewListDismiss,
+                            onRenamedListNameChange = todoListViewModel::onRenamedListNameChange,
+                            onRenameListConfirm = todoListViewModel::onRenameListConfirm,
+                            onRenameListDismiss = todoListViewModel::onRenameListDismiss,
+                            onDeleteListConfirm = todoListViewModel::onDeleteListConfirm,
+                            onDeleteListDismiss = todoListViewModel::onDeleteListDismiss
+                        )
+                    }
+                    val todoActions = remember(todoListViewModel) {
+                        TodoActions(
+                            onNewTodoTitleChange = todoListViewModel::onNewTodoTitleChange,
+                            onAddTodoClick = todoListViewModel::addTodo,
+                            onTodoDoneChange = todoListViewModel::onTodoDoneChange,
+                            onTodoSwipedAway = todoListViewModel::onTodoSwipedAway,
+                            onEditTodoClick = todoListViewModel::onEditTodoClick
+                        )
+                    }
+                    val editActions = remember(todoListViewModel) {
+                        TodoEditActions(
+                            onTitleChange = todoListViewModel::onEditedTitleChange,
+                            onPriorityChange = todoListViewModel::onEditedPriorityChange,
+                            onTargetListChange = todoListViewModel::onEditedTargetListChange,
+                            onConfirm = todoListViewModel::onEditConfirm,
+                            onDelete = todoListViewModel::onDeleteTodoClick,
+                            onDismiss = todoListViewModel::onEditDismiss
+                        )
+                    }
+
                     TodoListScreen(
                         uiState = todoListUiState,
-                        onListSelected = todoListViewModel::onListSelected,
-                        onNewListClick = todoListViewModel::onNewListClick,
-                        onNewListNameChange = todoListViewModel::onNewListNameChange,
-                        onNewListSharedChange = todoListViewModel::onNewListSharedChange,
-                        onNewListConfirm = todoListViewModel::onNewListConfirm,
-                        onNewListDismiss = todoListViewModel::onNewListDismiss,
-                        onRenameListClick = todoListViewModel::onRenameListClick,
-                        onRenamedListNameChange = todoListViewModel::onRenamedListNameChange,
-                        onRenameListConfirm = todoListViewModel::onRenameListConfirm,
-                        onRenameListDismiss = todoListViewModel::onRenameListDismiss,
-                        onDeleteListClick = todoListViewModel::onDeleteListClick,
-                        onDeleteListConfirm = todoListViewModel::onDeleteListConfirm,
-                        onDeleteListDismiss = todoListViewModel::onDeleteListDismiss,
-                        onNewTodoTitleChange = todoListViewModel::onNewTodoTitleChange,
-                        onAddTodoClick = todoListViewModel::addTodo,
-                        onTodoDoneChange = todoListViewModel::onTodoDoneChange,
-                        onTodoSwipedAway = todoListViewModel::onTodoSwipedAway,
-                        onEditTodoClick = todoListViewModel::onEditTodoClick,
-                        onEditedTitleChange = todoListViewModel::onEditedTitleChange,
-                        onEditedPriorityChange = todoListViewModel::onEditedPriorityChange,
-                        onEditedTargetListChange = todoListViewModel::onEditedTargetListChange,
-                        onEditConfirm = todoListViewModel::onEditConfirm,
-                        onDeleteTodoClick = todoListViewModel::onDeleteTodoClick,
-                        onEditDismiss = todoListViewModel::onEditDismiss,
+                        topBarActions = topBarActions,
+                        listDialogActions = listDialogActions,
+                        todoActions = todoActions,
+                        editActions = editActions,
                         onErrorShown = todoListViewModel::onErrorShown,
-                        onMovedMessageShown = todoListViewModel::onMovedMessageShown,
-                        onSignOutClick = { appContainer.authRepository.signOut() }
+                        onMovedMessageShown = todoListViewModel::onMovedMessageShown
                     )
                 }
             }

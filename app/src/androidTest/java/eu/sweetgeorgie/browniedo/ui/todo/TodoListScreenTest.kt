@@ -112,7 +112,7 @@ class TodoListScreenTest {
         var swipedAway: Todo? = null
         setScreenContent(
             uiState = TodoListUiState(selectedList = LIST, isLoading = false, todos = TODOS),
-            onTodoSwipedAway = { swipedAway = it }
+            todoActions = NO_TODO_ACTIONS.copy(onTodoSwipedAway = { swipedAway = it })
         )
 
         composeTestRule.onNodeWithText(FINISHED_TODO.title).performTouchInput { swipeRight() }
@@ -126,7 +126,7 @@ class TodoListScreenTest {
         var swipedAway: Todo? = null
         setScreenContent(
             uiState = TodoListUiState(selectedList = LIST, isLoading = false, todos = TODOS),
-            onTodoSwipedAway = { swipedAway = it }
+            todoActions = NO_TODO_ACTIONS.copy(onTodoSwipedAway = { swipedAway = it })
         )
 
         composeTestRule.onNodeWithText(OPEN_TODO.title).performTouchInput { swipeRight() }
@@ -201,7 +201,7 @@ class TodoListScreenTest {
                     targetListId = LIST.id
                 )
             ),
-            onEditedPriorityChange = { picked = it }
+            editActions = NO_EDIT_ACTIONS.copy(onPriorityChange = { picked = it })
         )
 
         val label = composeTestRule.activity.getString(R.string.todo_list_priority_low)
@@ -226,7 +226,7 @@ class TodoListScreenTest {
         var picked: TodoList? = null
         setScreenContent(
             uiState = editingIn(LIST, lists = listOf(LIST, OTHER_LIST)),
-            onEditedTargetListChange = { picked = it }
+            editActions = NO_EDIT_ACTIONS.copy(onTargetListChange = { picked = it })
         )
 
         val chooseLabel = composeTestRule.activity.getString(R.string.todo_list_choose_target_list)
@@ -289,45 +289,28 @@ class TodoListScreenTest {
             composeTestRule.activity.getString(labelResId)
         )
 
+    /**
+     * Der Bildschirm nimmt die Rückrufe gebündelt (ADR 0028). Wer einen davon beobachten will,
+     * übergibt `NO_TODO_ACTIONS.copy(…)` bzw. `NO_EDIT_ACTIONS.copy(…)` — dafür sind die Halter
+     * `data class`.
+     */
     private fun setScreenContent(
         uiState: TodoListUiState,
         onErrorShown: () -> Unit = {},
-        onTodoSwipedAway: (Todo) -> Unit = {},
-        onEditedPriorityChange: (TodoPriority) -> Unit = {},
-        onEditedTargetListChange: (TodoList) -> Unit = {},
+        todoActions: TodoActions = NO_TODO_ACTIONS,
+        editActions: TodoEditActions = NO_EDIT_ACTIONS,
         onMovedMessageShown: () -> Unit = {}
     ) {
         composeTestRule.setContent {
             BrownieDoTheme {
                 TodoListScreen(
                     uiState = uiState,
-                    onListSelected = {},
-                    onNewListClick = {},
-                    onNewListNameChange = {},
-                    onNewListSharedChange = {},
-                    onNewListConfirm = {},
-                    onNewListDismiss = {},
-                    onRenameListClick = {},
-                    onRenamedListNameChange = {},
-                    onRenameListConfirm = {},
-                    onRenameListDismiss = {},
-                    onDeleteListClick = {},
-                    onDeleteListConfirm = {},
-                    onDeleteListDismiss = {},
-                    onNewTodoTitleChange = {},
-                    onAddTodoClick = {},
-                    onTodoDoneChange = { _, _ -> },
-                    onTodoSwipedAway = onTodoSwipedAway,
-                    onEditTodoClick = {},
-                    onEditedTitleChange = {},
-                    onEditedPriorityChange = onEditedPriorityChange,
-                    onEditedTargetListChange = onEditedTargetListChange,
-                    onEditConfirm = {},
-                    onDeleteTodoClick = {},
-                    onEditDismiss = {},
+                    topBarActions = NO_TOP_BAR_ACTIONS,
+                    listDialogActions = NO_LIST_DIALOG_ACTIONS,
+                    todoActions = todoActions,
+                    editActions = editActions,
                     onErrorShown = onErrorShown,
-                    onMovedMessageShown = onMovedMessageShown,
-                    onSignOutClick = {}
+                    onMovedMessageShown = onMovedMessageShown
                 )
             }
         }
@@ -335,6 +318,50 @@ class TodoListScreenTest {
 
     private companion object {
         const val DISMISS_TIMEOUT_MILLIS = 10_000L
+
+        /*
+         * Halter, die nichts tun — die Vorgabe für jeden Test, der den jeweiligen Bereich nicht
+         * beobachtet. Die Halter selbst tragen bewusst keine Standardwerte, damit ein in
+         * MainActivity vergessener Rückruf auffällt statt still nichts zu tun (ADR 0028); für den
+         * Test ist „tut nichts" dagegen genau richtig.
+         */
+
+        val NO_TOP_BAR_ACTIONS = TodoListTopBarActions(
+            onListSelected = {},
+            onNewListClick = {},
+            onRenameListClick = {},
+            onDeleteListClick = {},
+            onSignOutClick = {}
+        )
+
+        val NO_LIST_DIALOG_ACTIONS = ListDialogActions(
+            onNewListNameChange = {},
+            onNewListSharedChange = {},
+            onNewListConfirm = {},
+            onNewListDismiss = {},
+            onRenamedListNameChange = {},
+            onRenameListConfirm = {},
+            onRenameListDismiss = {},
+            onDeleteListConfirm = {},
+            onDeleteListDismiss = {}
+        )
+
+        val NO_TODO_ACTIONS = TodoActions(
+            onNewTodoTitleChange = {},
+            onAddTodoClick = {},
+            onTodoDoneChange = { _, _ -> },
+            onTodoSwipedAway = {},
+            onEditTodoClick = {}
+        )
+
+        val NO_EDIT_ACTIONS = TodoEditActions(
+            onTitleChange = {},
+            onPriorityChange = {},
+            onTargetListChange = {},
+            onConfirm = {},
+            onDelete = {},
+            onDismiss = {}
+        )
 
         val LIST = TodoList(id = "list-1", name = "Einkauf", isShared = true)
 

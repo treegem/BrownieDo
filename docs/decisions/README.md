@@ -53,3 +53,4 @@ der den alten als „abgelöst" markiert.
 | [0025](0025-titel-und-prioritaet-in-einem-schreibvorgang.md) | Titel und Priorität in einem Schreibvorgang | akzeptiert |
 | [0026](0026-verschieben-schreibt-createdat-selbst.md) | Verschieben schreibt `createdAt` selbst und gibt die Feldebene auf | akzeptiert |
 | [0027](0027-termine-per-kalender-intent.md) | Termine per Kalender-Intent statt Calendar API | akzeptiert |
+| [0028](0028-rueckrufe-in-actions-haltern.md) | Rückrufe des Aufgaben-Bildschirms in Actions-Haltern bündeln | akzeptiert |

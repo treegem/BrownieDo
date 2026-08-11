@@ -1,8 +1,6 @@
 package eu.sweetgeorgie.browniedo.ui.todo
 
 import android.content.res.Configuration.UI_MODE_NIGHT_YES
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,93 +17,54 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import eu.sweetgeorgie.browniedo.R
 import eu.sweetgeorgie.browniedo.domain.list.TodoList
 import eu.sweetgeorgie.browniedo.domain.todo.Todo
 import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
-import eu.sweetgeorgie.browniedo.domain.user.Partner
 import eu.sweetgeorgie.browniedo.ui.theme.BrownieDoTheme
 import java.time.Instant
 
+/**
+ * Der Aufgaben-Bildschirm. Die Rückrufe kommen gebündelt statt einzeln, siehe
+ * docs/decisions/0028-rueckrufe-in-actions-haltern.md — vorher waren es 27 Parameter, und jedes neue
+ * Feld am Bearbeiten-Dialog kostete drei Stellen.
+ *
+ * [onErrorShown] und [onMovedMessageShown] stehen absichtlich einzeln: Sie gehören dem
+ * [SnackbarHostState] dieses Scaffolds und keinem der vier Bereiche.
+ */
 @Composable
 fun TodoListScreen(
     uiState: TodoListUiState,
-    onListSelected: (TodoList) -> Unit,
-    onNewListClick: () -> Unit,
-    onNewListNameChange: (String) -> Unit,
-    onNewListSharedChange: (Boolean) -> Unit,
-    onNewListConfirm: () -> Unit,
-    onNewListDismiss: () -> Unit,
-    onRenameListClick: () -> Unit,
-    onRenamedListNameChange: (String) -> Unit,
-    onRenameListConfirm: () -> Unit,
-    onRenameListDismiss: () -> Unit,
-    onDeleteListClick: () -> Unit,
-    onDeleteListConfirm: () -> Unit,
-    onDeleteListDismiss: () -> Unit,
-    onNewTodoTitleChange: (String) -> Unit,
-    onAddTodoClick: () -> Unit,
-    onTodoDoneChange: (Todo, Boolean) -> Unit,
-    onTodoSwipedAway: (Todo) -> Unit,
-    onEditTodoClick: (Todo) -> Unit,
-    onEditedTitleChange: (String) -> Unit,
-    onEditedPriorityChange: (TodoPriority) -> Unit,
-    onEditedTargetListChange: (TodoList) -> Unit,
-    onEditConfirm: () -> Unit,
-    onDeleteTodoClick: () -> Unit,
-    onEditDismiss: () -> Unit,
+    topBarActions: TodoListTopBarActions,
+    listDialogActions: ListDialogActions,
+    todoActions: TodoActions,
+    editActions: TodoEditActions,
     onErrorShown: () -> Unit,
     onMovedMessageShown: () -> Unit,
-    onSignOutClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -143,18 +102,14 @@ fun TodoListScreen(
             TodoListTopBar(
                 lists = uiState.lists,
                 selectedList = uiState.selectedList,
-                onListSelected = onListSelected,
-                onNewListClick = onNewListClick,
-                onRenameListClick = onRenameListClick,
-                onDeleteListClick = onDeleteListClick,
-                onSignOutClick = onSignOutClick
+                actions = topBarActions
             )
         },
         bottomBar = {
             NewTodoBar(
                 title = uiState.newTodoTitle,
-                onTitleChange = onNewTodoTitleChange,
-                onAddClick = onAddTodoClick
+                onTitleChange = todoActions.onNewTodoTitleChange,
+                onAddClick = todoActions.onAddTodoClick
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
@@ -189,9 +144,9 @@ fun TodoListScreen(
                     SwipeableTodoRow(
                         todo = todo,
                         deleteFailed = uiState.error == TodoListError.DELETE_FAILED,
-                        onDoneChange = { isDone -> onTodoDoneChange(todo, isDone) },
-                        onClick = { onEditTodoClick(todo) },
-                        onSwipedAway = { onTodoSwipedAway(todo) },
+                        onDoneChange = { isDone -> todoActions.onTodoDoneChange(todo, isDone) },
+                        onClick = { todoActions.onEditTodoClick(todo) },
+                        onSwipedAway = { todoActions.onTodoSwipedAway(todo) },
                         // Abgehakte Einträge sinken sofort nach unten. Ohne Bewegung sähe das
                         // aus, als wäre die Liste gesprungen — die Animation zeigt, wohin.
                         modifier = Modifier.animateItem()
@@ -205,19 +160,19 @@ fun TodoListScreen(
         NewListDialog(
             newList = newList,
             partner = uiState.partner,
-            onNameChange = onNewListNameChange,
-            onSharedChange = onNewListSharedChange,
-            onConfirm = onNewListConfirm,
-            onDismiss = onNewListDismiss
+            onNameChange = listDialogActions.onNewListNameChange,
+            onSharedChange = listDialogActions.onNewListSharedChange,
+            onConfirm = listDialogActions.onNewListConfirm,
+            onDismiss = listDialogActions.onNewListDismiss
         )
     }
 
     uiState.renamedList?.let { renamedList ->
         RenameListDialog(
             name = renamedList.name,
-            onNameChange = onRenamedListNameChange,
-            onConfirm = onRenameListConfirm,
-            onDismiss = onRenameListDismiss
+            onNameChange = listDialogActions.onRenamedListNameChange,
+            onConfirm = listDialogActions.onRenameListConfirm,
+            onDismiss = listDialogActions.onRenameListDismiss
         )
     }
 
@@ -225,8 +180,8 @@ fun TodoListScreen(
         DeleteListDialog(
             list = list,
             todoCount = uiState.todos.size,
-            onConfirm = onDeleteListConfirm,
-            onDismiss = onDeleteListDismiss
+            onConfirm = listDialogActions.onDeleteListConfirm,
+            onDismiss = listDialogActions.onDeleteListDismiss
         )
     }
 
@@ -236,25 +191,13 @@ fun TodoListScreen(
             priority = editedTodo.priority,
             lists = uiState.lists,
             targetListId = editedTodo.targetListId,
-            onTitleChange = onEditedTitleChange,
-            onPriorityChange = onEditedPriorityChange,
-            onTargetListChange = onEditedTargetListChange,
-            onConfirm = onEditConfirm,
-            onDelete = onDeleteTodoClick,
-            onDismiss = onEditDismiss
+            actions = editActions
         )
     }
 }
 
 /** Der Ladefehler ist kein Todo und braucht daher einen eigenen, kollisionsfreien Item-Key. */
 private const val LOAD_ERROR_KEY = "load-error"
-
-/**
- * Anteil der Zeilenbreite, über den eine erledigte Aufgabe gezogen werden muss, damit sie gelöscht
- * wird. Bewusst weit über dem Material-Standard von 50 %: Gelöscht ist endgültig, und ein Streifen
- * im Vorbeiscrollen soll nichts auslösen.
- */
-private const val DELETE_SWIPE_FRACTION = 0.85f
 
 private fun TodoListError.messageResId() = when (this) {
     TodoListError.LOAD_FAILED -> R.string.todo_list_error_load_failed
@@ -265,148 +208,6 @@ private fun TodoListError.messageResId() = when (this) {
     TodoListError.LIST_ADD_FAILED -> R.string.todo_list_error_list_add_failed
     TodoListError.LIST_UPDATE_FAILED -> R.string.todo_list_error_list_update_failed
     TodoListError.LIST_DELETE_FAILED -> R.string.todo_list_error_list_delete_failed
-}
-
-// TopAppBar selbst ist stabil, aber seine Vorgabewerte stammen aus der noch experimentellen
-// TopAppBarDefaults-API.
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TodoListTopBar(
-    lists: List<TodoList>,
-    selectedList: TodoList?,
-    onListSelected: (TodoList) -> Unit,
-    onNewListClick: () -> Unit,
-    onRenameListClick: () -> Unit,
-    onDeleteListClick: () -> Unit,
-    onSignOutClick: () -> Unit
-) {
-    var menuExpanded by remember { mutableStateOf(false) }
-    var listMenuExpanded by remember { mutableStateOf(false) }
-
-    TopAppBar(
-        title = {
-            // Der Titel ist die Listen-Auswahl: Unten rechts ist durch die Eingabeleiste belegt,
-            // Primäraktionen gehören deshalb in die TopAppBar — siehe ADR 0013.
-            Box {
-                Row(
-                    // Auch ohne Liste antippbar: „Neue Liste" steckt in diesem Menü, sonst käme man
-                    // an die erste Liste nie heran.
-                    modifier = Modifier.clickable { listMenuExpanded = true },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = selectedList?.name ?: stringResource(R.string.app_name))
-                    Icon(
-                        painter = painterResource(R.drawable.ic_arrow_drop_down),
-                        contentDescription = stringResource(R.string.todo_list_choose_list)
-                    )
-                }
-                DropdownMenu(
-                    expanded = listMenuExpanded,
-                    onDismissRequest = { listMenuExpanded = false }
-                ) {
-                    lists.forEach { list ->
-                        ListMenuItem(
-                            list = list,
-                            isSelected = list.id == selectedList?.id,
-                            onClick = {
-                                listMenuExpanded = false
-                                onListSelected(list)
-                            }
-                        )
-                    }
-                    if (lists.isNotEmpty()) HorizontalDivider()
-                    DropdownMenuItem(
-                        text = { Text(text = stringResource(R.string.todo_list_new_list)) },
-                        onClick = {
-                            listMenuExpanded = false
-                            onNewListClick()
-                        },
-                        leadingIcon = {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_add),
-                                contentDescription = null
-                            )
-                        }
-                    )
-                }
-            }
-        },
-        actions = {
-            IconButton(onClick = { menuExpanded = true }) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_more_vert),
-                    contentDescription = stringResource(R.string.todo_list_more_actions)
-                )
-            }
-            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                // Umbenennen und Löschen beziehen sich immer auf die offene Liste — ohne eine gibt
-                // es nichts zu tun.
-                if (selectedList != null) {
-                    DropdownMenuItem(
-                        text = { Text(text = stringResource(R.string.todo_list_rename_list)) },
-                        onClick = {
-                            menuExpanded = false
-                            onRenameListClick()
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = stringResource(R.string.todo_list_delete_list),
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        },
-                        onClick = {
-                            menuExpanded = false
-                            onDeleteListClick()
-                        }
-                    )
-                    HorizontalDivider()
-                }
-                DropdownMenuItem(
-                    text = { Text(text = stringResource(R.string.todo_list_sign_out)) },
-                    onClick = {
-                        menuExpanded = false
-                        onSignOutClick()
-                    }
-                )
-            }
-        }
-    )
-}
-
-@Composable
-private fun ListMenuItem(list: TodoList, isSelected: Boolean, onClick: () -> Unit) {
-    val kindLabel = stringResource(
-        if (list.isShared) R.string.todo_list_shared_list else R.string.todo_list_private_list
-    )
-
-    DropdownMenuItem(
-        text = { Text(text = list.name) },
-        onClick = onClick,
-        leadingIcon = {
-            Icon(
-                painter = painterResource(
-                    if (list.isShared) R.drawable.ic_group else R.drawable.ic_person
-                ),
-                contentDescription = kindLabel
-            )
-        },
-        // Die aktuelle Liste hebt sich über die Farbe ab statt über ein zweites Symbol — rechts
-        // steht sonst nichts, und ein Häkchen neben dem Listen-Symbol wäre eine Reihe zu viel.
-        colors = MenuDefaults.itemColors(
-            textColor = if (isSelected) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
-            leadingIconColor = if (isSelected) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            }
-        )
-    )
 }
 
 @Composable
@@ -450,66 +251,6 @@ private fun NewTodoBar(title: String, onTitleChange: (String) -> Unit, onAddClic
                 )
             }
         }
-    }
-}
-
-/**
- * Umschließt eine Zeile mit der Wischgeste. Gelöscht wird nur, was schon erledigt ist, und nur
- * nach rechts — siehe docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md.
- */
-@Composable
-private fun SwipeableTodoRow(
-    todo: Todo,
-    deleteFailed: Boolean,
-    onDoneChange: (Boolean) -> Unit,
-    onClick: () -> Unit,
-    onSwipedAway: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val swipeState = rememberSwipeToDismissBoxState(
-        positionalThreshold = { totalDistance -> totalDistance * DELETE_SWIPE_FRACTION }
-    )
-
-    // Schlägt das Löschen fehl, bleibt der Eintrag in der Liste — dann muss die weggewischte
-    // Zeile zurück an ihren Platz, sonst klafft dort eine leere Fläche.
-    LaunchedEffect(deleteFailed) {
-        if (deleteFailed && swipeState.currentValue != SwipeToDismissBoxValue.Settled) {
-            swipeState.reset()
-        }
-    }
-
-    SwipeToDismissBox(
-        state = swipeState,
-        backgroundContent = { DeleteBackground() },
-        modifier = modifier,
-        // Nach links wird nie gelöscht, und offene Aufgaben lassen sich gar nicht erst bewegen:
-        // Was sich ziehen lässt, ist erledigt.
-        enableDismissFromEndToStart = false,
-        gesturesEnabled = todo.isDone,
-        onDismiss = { direction ->
-            if (direction == SwipeToDismissBoxValue.StartToEnd) onSwipedAway()
-        }
-    ) {
-        TodoRow(todo = todo, onDoneChange = onDoneChange, onClick = onClick)
-    }
-}
-
-@Composable
-private fun DeleteBackground() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.errorContainer)
-            .padding(horizontal = 24.dp),
-        contentAlignment = Alignment.CenterStart
-    ) {
-        Icon(
-            painter = painterResource(R.drawable.ic_delete),
-            // Rein dekorativ: Der Hintergrund taucht nur während einer Geste auf, die sich mit
-            // TalkBack ohnehin nicht ausführen lässt. Dort führt der Bearbeiten-Dialog zum Löschen.
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onErrorContainer
-        )
     }
 }
 
@@ -561,370 +302,6 @@ private fun CenteredMessage(headline: String, hint: String, modifier: Modifier =
     }
 }
 
-@Composable
-private fun TodoRow(
-    todo: Todo,
-    onDoneChange: (Boolean) -> Unit,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val markerIconResId = todo.priority.markerIconResId()
-
-    ListItem(
-        headlineContent = {
-            Text(
-                text = todo.title,
-                textDecoration = if (todo.isDone) TextDecoration.LineThrough else null
-            )
-        },
-        modifier = modifier.clickable(onClick = onClick),
-        leadingContent = { Checkbox(checked = todo.isDone, onCheckedChange = onDoneChange) },
-        trailingContent = if (markerIconResId == null) {
-            null
-        } else {
-            {
-                Icon(
-                    painter = painterResource(markerIconResId),
-                    // Die Stufe steckt sonst allein in der Form des Pfeils — für TalkBack ist das
-                    // nichts.
-                    contentDescription = stringResource(
-                        R.string.todo_list_priority_content_description,
-                        stringResource(todo.priority.labelResId())
-                    ),
-                    // Rot nur, solange die Aufgabe offen ist: Auf einer durchgestrichenen Zeile
-                    // wäre es Lärm, und „niedrig" ist ohnehin kein Alarm.
-                    tint = if (todo.isDone || todo.priority == TodoPriority.LOW) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.error
-                    }
-                )
-            }
-        },
-        // Die Farbe gehört an die Slot-Dekoration von ListItem, nicht an den inneren Text —
-        // ListItem setzt die Textfarbe selbst und würde eine Farbe am Text überschreiben.
-        colors = ListItemDefaults.colors(
-            headlineColor = if (todo.isDone) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                Color.Unspecified
-            }
-        )
-    )
-}
-
-private fun TodoPriority.labelResId(): Int = when (this) {
-    TodoPriority.LOW -> R.string.todo_list_priority_low
-    TodoPriority.MEDIUM -> R.string.todo_list_priority_medium
-    TodoPriority.HIGH -> R.string.todo_list_priority_high
-}
-
-/**
- * Nur Abweichungen bekommen ein Symbol: „mittel" ist der Normalfall und stünde sonst in jeder
- * Zeile, ohne etwas auszusagen. Die beiden Pfeile unterscheiden sich in der Form, nicht nur in der
- * Farbe — das verlangt docs/decisions/0021-eigene-farbpalette-statt-dynamic-color.md.
- */
-private fun TodoPriority.markerIconResId(): Int? = when (this) {
-    TodoPriority.HIGH -> R.drawable.ic_arrow_upward
-    TodoPriority.MEDIUM -> null
-    TodoPriority.LOW -> R.drawable.ic_arrow_downward
-}
-
-@Composable
-private fun NewListDialog(
-    newList: NewList,
-    partner: Partner?,
-    onNameChange: (String) -> Unit,
-    onSharedChange: (Boolean) -> Unit,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(text = stringResource(R.string.todo_list_new_list_headline)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = newList.name,
-                    onValueChange = onNameChange,
-                    label = { Text(text = stringResource(R.string.todo_list_list_name_label)) },
-                    singleLine = true
-                )
-                ListKindOption(
-                    label = stringResource(R.string.todo_list_keep_private),
-                    selected = !newList.shared,
-                    onClick = { onSharedChange(false) }
-                )
-                ListKindOption(
-                    // Der Name macht greifbar, mit wem geteilt wird — „Geteilt" allein sagt es nicht.
-                    label = partner?.let {
-                        stringResource(R.string.todo_list_share_with, it.displayName)
-                    } ?: stringResource(R.string.todo_list_share_impossible),
-                    selected = newList.shared,
-                    enabled = partner != null,
-                    onClick = { onSharedChange(true) }
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm, enabled = newList.name.isNotBlank()) {
-                Text(text = stringResource(R.string.todo_list_create))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(text = stringResource(R.string.todo_list_cancel))
-            }
-        }
-    )
-}
-
-@Composable
-private fun ListKindOption(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    enabled: Boolean = true
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        RadioButton(selected = selected, onClick = onClick, enabled = enabled)
-        Text(
-            text = label,
-            color = if (enabled) {
-                MaterialTheme.colorScheme.onSurface
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            style = MaterialTheme.typography.bodyMedium
-        )
-    }
-}
-
-@Composable
-private fun RenameListDialog(
-    name: String,
-    onNameChange: (String) -> Unit,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(text = stringResource(R.string.todo_list_rename_list)) },
-        text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = onNameChange,
-                label = { Text(text = stringResource(R.string.todo_list_list_name_label)) },
-                singleLine = true
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm, enabled = name.isNotBlank()) {
-                Text(text = stringResource(R.string.todo_list_save))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(text = stringResource(R.string.todo_list_cancel))
-            }
-        }
-    )
-}
-
-/**
- * Eigener Bestätigungsschritt, anders als beim Löschen einer Aufgabe: Hier gehen alle Einträge mit,
- * auch auf dem Gerät des Partners, und es gibt kein Zurück. Die Anzahl steht bewusst im Text —
- * sie ist die Information, die die Folge greifbar macht.
- */
-@Composable
-private fun DeleteListDialog(
-    list: TodoList,
-    todoCount: Int,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(text = stringResource(R.string.todo_list_delete_list_headline)) },
-        text = {
-            Text(
-                text = if (todoCount == 0) {
-                    stringResource(R.string.todo_list_delete_list_question_empty, list.name)
-                } else {
-                    pluralStringResource(
-                        R.plurals.todo_list_delete_list_question,
-                        todoCount,
-                        list.name,
-                        todoCount
-                    )
-                }
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(
-                    text = stringResource(R.string.todo_list_delete),
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(text = stringResource(R.string.todo_list_cancel))
-            }
-        }
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun EditTodoDialog(
-    title: String,
-    priority: TodoPriority,
-    lists: List<TodoList>,
-    targetListId: String,
-    onTitleChange: (String) -> Unit,
-    onPriorityChange: (TodoPriority) -> Unit,
-    onTargetListChange: (TodoList) -> Unit,
-    onConfirm: () -> Unit,
-    onDelete: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(text = stringResource(R.string.todo_list_edit_headline)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = onTitleChange,
-                    label = { Text(text = stringResource(R.string.todo_list_title_label)) },
-                    singleLine = true
-                )
-                Text(
-                    text = stringResource(R.string.todo_list_priority_label),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                // Drei feste Stufen, genau eine gewählt — dafür ist die Segment-Auswahl gemacht.
-                // Radio-Zeilen wie in NewListDialog bräuchten hier drei volle Zeilen.
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    TodoPriority.entries.forEachIndexed { index, entry ->
-                        SegmentedButton(
-                            selected = entry == priority,
-                            onClick = { onPriorityChange(entry) },
-                            shape = SegmentedButtonDefaults.itemShape(
-                                index = index,
-                                count = TodoPriority.entries.size
-                            ),
-                            label = { Text(text = stringResource(entry.labelResId())) }
-                        )
-                    }
-                }
-                TargetListField(
-                    lists = lists,
-                    targetListId = targetListId,
-                    onTargetListChange = onTargetListChange
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm, enabled = title.isNotBlank()) {
-                Text(text = stringResource(R.string.todo_list_save))
-            }
-        },
-        dismissButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onDelete) {
-                    Text(
-                        text = stringResource(R.string.todo_list_delete),
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-                TextButton(onClick = onDismiss) {
-                    Text(text = stringResource(R.string.todo_list_cancel))
-                }
-            }
-        }
-    )
-}
-
-/**
- * Die Zielliste ist ein Feld wie Titel und Priorität, kein eigener Auslöser: Erst „Speichern" führt
- * aus, was hier gewählt wurde, siehe docs/decisions/0022-verschieben-im-bearbeiten-dialog.md.
- *
- * Die aktuelle Liste steht mit im Menü und ist vorausgewählt — sonst gäbe es nach einem Fehlgriff
- * keinen Weg zurück zu „bleibt, wo sie ist", außer den Dialog abzubrechen.
- */
-@Composable
-private fun TargetListField(
-    lists: List<TodoList>,
-    targetListId: String,
-    onTargetListChange: (TodoList) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    // Mit nur einer Liste gibt es kein Ziel. Das Feld bleibt trotzdem stehen, statt zu
-    // verschwinden: Ein Dialog, der je nach Anzahl der Listen anders aussieht, ist schwerer zu
-    // lernen als einer mit einem abgeblendeten Feld.
-    val enabled = lists.size > 1
-    val target = lists.firstOrNull { it.id == targetListId }
-
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = stringResource(R.string.todo_list_target_list_label),
-            style = MaterialTheme.typography.bodyMedium
-        )
-        Box {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    // enabled = false nimmt auch die Klick-Semantik weg, TalkBack bietet die
-                    // Aktion dann gar nicht erst an.
-                    .clickable(enabled = enabled) { expanded = true }
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = target?.name.orEmpty(),
-                    color = if (enabled) {
-                        MaterialTheme.colorScheme.onSurface
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                )
-                Icon(
-                    painter = painterResource(R.drawable.ic_arrow_drop_down),
-                    contentDescription = stringResource(R.string.todo_list_choose_target_list),
-                    tint = if (enabled) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.outline
-                    }
-                )
-            }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                lists.forEach { list ->
-                    ListMenuItem(
-                        list = list,
-                        // Hier heißt „ausgewählt": da landet sie beim Speichern.
-                        isSelected = list.id == targetListId,
-                        onClick = {
-                            expanded = false
-                            onTargetListChange(list)
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-
 // Die Vorschau rendert ohne Systemleisten und Tastatur — sie prüft Zeilenlayout, Leisten und
 // Farben, nicht das Inset-Verhalten. Das muss aufs Gerät.
 @Preview(showBackground = true)
@@ -940,33 +317,12 @@ private fun TodoListScreenPreview() {
                 todos = PREVIEW_TODOS,
                 isLoading = false
             ),
-            onListSelected = {},
-            onNewListClick = {},
-            onNewListNameChange = {},
-            onNewListSharedChange = {},
-            onNewListConfirm = {},
-            onNewListDismiss = {},
-            onRenameListClick = {},
-            onRenamedListNameChange = {},
-            onRenameListConfirm = {},
-            onRenameListDismiss = {},
-            onDeleteListClick = {},
-            onDeleteListConfirm = {},
-            onDeleteListDismiss = {},
-            onNewTodoTitleChange = {},
-            onAddTodoClick = {},
-            onTodoDoneChange = { _, _ -> },
-            onTodoSwipedAway = {},
-            onEditTodoClick = {},
-            onEditedTitleChange = {},
-            onEditedPriorityChange = {},
-            onEditedTargetListChange = {},
-            onEditConfirm = {},
-            onDeleteTodoClick = {},
-            onEditDismiss = {},
+            topBarActions = PREVIEW_TOP_BAR_ACTIONS,
+            listDialogActions = PREVIEW_LIST_DIALOG_ACTIONS,
+            todoActions = PREVIEW_TODO_ACTIONS,
+            editActions = PREVIEW_EDIT_ACTIONS,
             onErrorShown = {},
-            onMovedMessageShown = {},
-            onSignOutClick = {}
+            onMovedMessageShown = {}
         )
     }
 }
@@ -983,36 +339,58 @@ private fun TodoListScreenEmptyPreview() {
                 selectedList = PREVIEW_LISTS.first(),
                 isLoading = false
             ),
-            onListSelected = {},
-            onNewListClick = {},
-            onNewListNameChange = {},
-            onNewListSharedChange = {},
-            onNewListConfirm = {},
-            onNewListDismiss = {},
-            onRenameListClick = {},
-            onRenamedListNameChange = {},
-            onRenameListConfirm = {},
-            onRenameListDismiss = {},
-            onDeleteListClick = {},
-            onDeleteListConfirm = {},
-            onDeleteListDismiss = {},
-            onNewTodoTitleChange = {},
-            onAddTodoClick = {},
-            onTodoDoneChange = { _, _ -> },
-            onTodoSwipedAway = {},
-            onEditTodoClick = {},
-            onEditedTitleChange = {},
-            onEditedPriorityChange = {},
-            onEditedTargetListChange = {},
-            onEditConfirm = {},
-            onDeleteTodoClick = {},
-            onEditDismiss = {},
+            topBarActions = PREVIEW_TOP_BAR_ACTIONS,
+            listDialogActions = PREVIEW_LIST_DIALOG_ACTIONS,
+            todoActions = PREVIEW_TODO_ACTIONS,
+            editActions = PREVIEW_EDIT_ACTIONS,
             onErrorShown = {},
-            onMovedMessageShown = {},
-            onSignOutClick = {}
+            onMovedMessageShown = {}
         )
     }
 }
+
+/*
+ * Die Halter für die Vorschauen, einmal für beide. Die Rückrufe tun nichts — eine Vorschau ist ein
+ * Bild, sie klickt nichts an. Die Halter selbst tragen bewusst keine Standardwerte, siehe
+ * TodoListActions.kt.
+ */
+
+private val PREVIEW_TOP_BAR_ACTIONS = TodoListTopBarActions(
+    onListSelected = {},
+    onNewListClick = {},
+    onRenameListClick = {},
+    onDeleteListClick = {},
+    onSignOutClick = {}
+)
+
+private val PREVIEW_LIST_DIALOG_ACTIONS = ListDialogActions(
+    onNewListNameChange = {},
+    onNewListSharedChange = {},
+    onNewListConfirm = {},
+    onNewListDismiss = {},
+    onRenamedListNameChange = {},
+    onRenameListConfirm = {},
+    onRenameListDismiss = {},
+    onDeleteListConfirm = {},
+    onDeleteListDismiss = {}
+)
+
+private val PREVIEW_TODO_ACTIONS = TodoActions(
+    onNewTodoTitleChange = {},
+    onAddTodoClick = {},
+    onTodoDoneChange = { _, _ -> },
+    onTodoSwipedAway = {},
+    onEditTodoClick = {}
+)
+
+private val PREVIEW_EDIT_ACTIONS = TodoEditActions(
+    onTitleChange = {},
+    onPriorityChange = {},
+    onTargetListChange = {},
+    onConfirm = {},
+    onDelete = {},
+    onDismiss = {}
+)
 
 private val PREVIEW_TIMESTAMP: Instant = Instant.parse("2026-08-07T20:00:00Z")
 

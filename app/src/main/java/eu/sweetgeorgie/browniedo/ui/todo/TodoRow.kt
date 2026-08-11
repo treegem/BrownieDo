@@ -1,0 +1,147 @@
+package eu.sweetgeorgie.browniedo.ui.todo
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.dp
+import eu.sweetgeorgie.browniedo.R
+import eu.sweetgeorgie.browniedo.domain.todo.Todo
+import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
+
+/**
+ * Anteil der Zeilenbreite, über den eine erledigte Aufgabe gezogen werden muss, damit sie gelöscht
+ * wird. Bewusst weit über dem Material-Standard von 50 %: Gelöscht ist endgültig, und ein Streifen
+ * im Vorbeiscrollen soll nichts auslösen.
+ */
+private const val DELETE_SWIPE_FRACTION = 0.85f
+
+/**
+ * Umschließt eine Zeile mit der Wischgeste. Gelöscht wird nur, was schon erledigt ist, und nur
+ * nach rechts — siehe docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md.
+ */
+@Composable
+internal fun SwipeableTodoRow(
+    todo: Todo,
+    deleteFailed: Boolean,
+    onDoneChange: (Boolean) -> Unit,
+    onClick: () -> Unit,
+    onSwipedAway: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val swipeState = rememberSwipeToDismissBoxState(
+        positionalThreshold = { totalDistance -> totalDistance * DELETE_SWIPE_FRACTION }
+    )
+
+    // Schlägt das Löschen fehl, bleibt der Eintrag in der Liste — dann muss die weggewischte
+    // Zeile zurück an ihren Platz, sonst klafft dort eine leere Fläche.
+    LaunchedEffect(deleteFailed) {
+        if (deleteFailed && swipeState.currentValue != SwipeToDismissBoxValue.Settled) {
+            swipeState.reset()
+        }
+    }
+
+    SwipeToDismissBox(
+        state = swipeState,
+        backgroundContent = { DeleteBackground() },
+        modifier = modifier,
+        // Nach links wird nie gelöscht, und offene Aufgaben lassen sich gar nicht erst bewegen:
+        // Was sich ziehen lässt, ist erledigt.
+        enableDismissFromEndToStart = false,
+        gesturesEnabled = todo.isDone,
+        onDismiss = { direction ->
+            if (direction == SwipeToDismissBoxValue.StartToEnd) onSwipedAway()
+        }
+    ) {
+        TodoRow(todo = todo, onDoneChange = onDoneChange, onClick = onClick)
+    }
+}
+
+@Composable
+private fun DeleteBackground() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.errorContainer)
+            .padding(horizontal = 24.dp),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_delete),
+            // Rein dekorativ: Der Hintergrund taucht nur während einer Geste auf, die sich mit
+            // TalkBack ohnehin nicht ausführen lässt. Dort führt der Bearbeiten-Dialog zum Löschen.
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onErrorContainer
+        )
+    }
+}
+
+@Composable
+private fun TodoRow(
+    todo: Todo,
+    onDoneChange: (Boolean) -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val markerIconResId = todo.priority.markerIconResId()
+
+    ListItem(
+        headlineContent = {
+            Text(
+                text = todo.title,
+                textDecoration = if (todo.isDone) TextDecoration.LineThrough else null
+            )
+        },
+        modifier = modifier.clickable(onClick = onClick),
+        leadingContent = { Checkbox(checked = todo.isDone, onCheckedChange = onDoneChange) },
+        trailingContent = if (markerIconResId == null) {
+            null
+        } else {
+            {
+                Icon(
+                    painter = painterResource(markerIconResId),
+                    // Die Stufe steckt sonst allein in der Form des Pfeils — für TalkBack ist das
+                    // nichts.
+                    contentDescription = stringResource(
+                        R.string.todo_list_priority_content_description,
+                        stringResource(todo.priority.labelResId())
+                    ),
+                    // Rot nur, solange die Aufgabe offen ist: Auf einer durchgestrichenen Zeile
+                    // wäre es Lärm, und „niedrig" ist ohnehin kein Alarm.
+                    tint = if (todo.isDone || todo.priority == TodoPriority.LOW) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    }
+                )
+            }
+        },
+        // Die Farbe gehört an die Slot-Dekoration von ListItem, nicht an den inneren Text —
+        // ListItem setzt die Textfarbe selbst und würde eine Farbe am Text überschreiben.
+        colors = ListItemDefaults.colors(
+            headlineColor = if (todo.isDone) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                Color.Unspecified
+            }
+        )
+    )
+}
