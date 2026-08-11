@@ -30,6 +30,19 @@ import java.time.Instant
 @RunWith(AndroidJUnit4::class)
 class TodoListScreenTest {
 
+    /**
+     * Die Verfallswarnung verweist auf `androidx.compose.ui.test.junit4.v2` — und genau dieser
+     * Import hat hier schon einmal **alle** Tests reproduzierbar an „No compose hierarchies found"
+     * scheitern lassen, ohne dass es jemandem auffiel. `v2` tauscht nicht nur den Dispatcher,
+     * sondern die ganze `AndroidComposeUiTestEnvironment`: Die Komposition wird eingereiht statt
+     * sofort ausgeführt, Tests müssen danach von sich aus synchronisieren.
+     *
+     * Der Wechsel ist deshalb kein Import-Austausch, sondern eine Verhaltensänderung, die sich nur
+     * **auf einem Gerät** belegen lässt — und der Fehlschlag sieht aus wie ein grüner Build. Bis
+     * ein Gerät dafür da ist, bleibt die alte Fassung stehen und die Warnung unterdrückt; der
+     * Punkt steht in `ROADMAP.md` unter „Querlaufend".
+     */
+    @Suppress("DEPRECATION")
     @get:Rule
     val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 

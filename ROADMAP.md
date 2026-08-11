@@ -318,6 +318,14 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   per Kabel testen oder in den Entwickleroptionen „Aktiv lassen" einschalten.
 - [~] Prüfen, dass die `@`-Importe in `CLAUDE.md` und die Regeln in Android Studio tatsächlich laden
   (Canary-Methode, siehe ADR 0014)
+- [-] `createAndroidComposeRule` auf `androidx.compose.ui.test.junit4.v2` umstellen —
+  zurückgestellt, bis ein Gerät da ist. Die alte Fassung ist verfallen und die Warnung in
+  `TodoListScreenTest` deshalb unterdrückt. Der Wechsel ist **kein** Import-Austausch: `v2` tauscht
+  die ganze `AndroidComposeUiTestEnvironment`, die Komposition wird eingereiht statt sofort
+  ausgeführt, Tests müssen danach von sich aus synchronisieren (vermutlich ein `waitForIdle()` nach
+  `setContent`). Genau dieser Import hat hier schon einmal alle Tests an „No compose hierarchies
+  found" scheitern lassen, siehe den Punkt oben — und der Fehlschlag sieht aus wie ein grüner
+  Build. Erst umstellen, wenn der Lauf danach auf einem Gerät grün ist
 - [ ] `TodoListScreen` und den Bearbeiten-Dialog entzerren — der Bildschirm nimmt inzwischen 27
   Lambdas entgegen, und der Dialog erledigt vier Dinge (Titel, Priorität, Liste, Löschen).
   [ADR 0022](docs/decisions/0022-verschieben-im-bearbeiten-dialog.md) hat genau darauf gezeigt:
