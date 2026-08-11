@@ -48,5 +48,25 @@ interface TodoRepository {
         priority: TodoPriority
     ): Result<Unit>
 
+    /**
+     * Moves an entry from [fromListId] to [toListId]. Firestore has no move: the document is
+     * created anew in the target list and removed from the source, both in one batch so the entry
+     * never exists twice and never not at all.
+     *
+     * [todo] travels whole — every field describing the entry survives, only the document id and
+     * `updatedAt` are new, see docs/decisions/0024-verschieben-behaelt-zustand.md. The caller
+     * passes title and priority in the state the edit dialog holds: moving and editing are one
+     * write, see docs/decisions/0025-titel-und-prioritaet-in-einem-schreibvorgang.md.
+     *
+     * Taking a whole [Todo] rather than the fields is the exception on this interface, and it
+     * follows from ADR 0024: what gets written is the entry itself, not a change to one of its
+     * fields.
+     *
+     * Unlike `ListRepository.deleteList` this does not wait for the server — there is nothing to
+     * look up first, so docs/decisions/0011-schreibvorgaenge-nicht-abwarten.md applies unchanged
+     * and moving works offline.
+     */
+    fun moveTodo(fromListId: String, toListId: String, todo: Todo): Result<Unit>
+
     fun deleteTodo(listId: String, todoId: String): Result<Unit>
 }

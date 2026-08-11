@@ -162,7 +162,8 @@ class TodoListScreenTest {
                 editedTodo = TodoEdit(
                     todoId = URGENT_TODO.id,
                     title = URGENT_TODO.title,
-                    priority = TodoPriority.HIGH
+                    priority = TodoPriority.HIGH,
+                    targetListId = LIST.id
                 )
             )
         )
@@ -182,7 +183,8 @@ class TodoListScreenTest {
                 editedTodo = TodoEdit(
                     todoId = OPEN_TODO.id,
                     title = OPEN_TODO.title,
-                    priority = TodoPriority.MEDIUM
+                    priority = TodoPriority.MEDIUM,
+                    targetListId = LIST.id
                 )
             ),
             onEditedPriorityChange = { picked = it }
@@ -194,6 +196,75 @@ class TodoListScreenTest {
         assertEquals(TodoPriority.LOW, picked)
     }
 
+    @Test
+    fun theEditDialogShowsTheListTheEntryIsIn() {
+        setScreenContent(uiState = editingIn(LIST, lists = listOf(LIST, OTHER_LIST)))
+
+        composeTestRule.onNodeWithText(LIST.name).assertIsDisplayed()
+    }
+
+    @Test
+    fun pickingAnotherListInTheEditDialogReportsIt() {
+        var picked: TodoList? = null
+        setScreenContent(
+            uiState = editingIn(LIST, lists = listOf(LIST, OTHER_LIST)),
+            onEditedTargetListChange = { picked = it }
+        )
+
+        val chooseLabel = composeTestRule.activity.getString(R.string.todo_list_choose_target_list)
+        composeTestRule.onNodeWithContentDescription(chooseLabel).performClick()
+        // Gegen den Namen der *anderen* Liste prüfen: Der Name der aktuellen steht bei offenem
+        // Menü zweimal auf dem Bildschirm — im Feld und im Menü — und wäre mehrdeutig.
+        composeTestRule.onNodeWithText(OTHER_LIST.name).performClick()
+
+        assertEquals(OTHER_LIST, picked)
+    }
+
+    @Test
+    fun theListCannotBePickedWhileItIsTheOnlyOne() {
+        setScreenContent(uiState = editingIn(LIST, lists = listOf(LIST)))
+
+        val chooseLabel = composeTestRule.activity.getString(R.string.todo_list_choose_target_list)
+        composeTestRule.onNodeWithContentDescription(chooseLabel).performClick()
+
+        // Das Menü bleibt zu: Das Symbol für die geteilte Liste gibt es nur im Menüeintrag.
+        val sharedLabel = composeTestRule.activity.getString(R.string.todo_list_shared_list)
+        composeTestRule.onNodeWithContentDescription(sharedLabel).assertDoesNotExist()
+    }
+
+    @Test
+    fun aSuccessfulMoveIsConfirmedInASnackbar() {
+        var shownCount = 0
+        setScreenContent(
+            uiState = TodoListUiState(
+                lists = listOf(LIST, OTHER_LIST),
+                selectedList = LIST,
+                isLoading = false,
+                movedToListName = OTHER_LIST.name
+            ),
+            onMovedMessageShown = { shownCount++ }
+        )
+
+        val message = composeTestRule.activity
+            .getString(R.string.todo_list_moved_to, OTHER_LIST.name)
+        composeTestRule.onNodeWithText(message).assertIsDisplayed()
+
+        composeTestRule.waitUntil(timeoutMillis = DISMISS_TIMEOUT_MILLIS) { shownCount == 1 }
+    }
+
+    private fun editingIn(list: TodoList, lists: List<TodoList>) = TodoListUiState(
+        lists = lists,
+        selectedList = list,
+        isLoading = false,
+        todos = listOf(OPEN_TODO),
+        editedTodo = TodoEdit(
+            todoId = OPEN_TODO.id,
+            title = OPEN_TODO.title,
+            priority = TodoPriority.MEDIUM,
+            targetListId = list.id
+        )
+    )
+
     private fun priorityDescription(labelResId: Int): String =
         composeTestRule.activity.getString(
             R.string.todo_list_priority_content_description,
@@ -204,7 +275,9 @@ class TodoListScreenTest {
         uiState: TodoListUiState,
         onErrorShown: () -> Unit = {},
         onTodoSwipedAway: (Todo) -> Unit = {},
-        onEditedPriorityChange: (TodoPriority) -> Unit = {}
+        onEditedPriorityChange: (TodoPriority) -> Unit = {},
+        onEditedTargetListChange: (TodoList) -> Unit = {},
+        onMovedMessageShown: () -> Unit = {}
     ) {
         composeTestRule.setContent {
             BrownieDoTheme {
@@ -230,10 +303,12 @@ class TodoListScreenTest {
                     onEditTodoClick = {},
                     onEditedTitleChange = {},
                     onEditedPriorityChange = onEditedPriorityChange,
+                    onEditedTargetListChange = onEditedTargetListChange,
                     onEditConfirm = {},
                     onDeleteTodoClick = {},
                     onEditDismiss = {},
                     onErrorShown = onErrorShown,
+                    onMovedMessageShown = onMovedMessageShown,
                     onSignOutClick = {}
                 )
             }
@@ -244,6 +319,8 @@ class TodoListScreenTest {
         const val DISMISS_TIMEOUT_MILLIS = 10_000L
 
         val LIST = TodoList(id = "list-1", name = "Einkauf", isShared = true)
+
+        val OTHER_LIST = TodoList(id = "list-2", name = "Zuhause", isShared = false)
 
         val TIMESTAMP: Instant = Instant.parse("2026-08-07T20:00:00Z")
 

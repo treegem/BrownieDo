@@ -251,27 +251,53 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 ### Phase 10 – Aufgaben zwischen Listen verschieben
 > Ziel darf jede Liste sein, in deren `members` die eigene uid steht — geteilte wie private. Das
 > sind genau die Listen, die die Auswahl aus 8a ohnehin schon lädt.
-- [ ] `TodoRepository` um das Verschieben erweitern (Quell- und Ziel-`listId` explizit, wie alle
-  anderen Methoden auch)
-- [ ] Als `WriteBatch` umsetzen — Firestore kennt kein Verschieben: Dokument in der Ziel-Sub-Collection
+- [x] `TodoRepository` um das Verschieben erweitern — `moveTodo` nimmt Quell- und Ziel-`listId`
+  explizit und dazu die ganze Aufgabe. **Nicht suspend:** Anders als `deleteList` gibt es nichts
+  nachzuschlagen, die Ziel-id vergibt `document()` lokal. Damit bleibt das Verschieben bei
+  [ADR 0011](docs/decisions/0011-schreibvorgaenge-nicht-abwarten.md) und funktioniert offline
+- [x] Als `WriteBatch` umsetzen — Firestore kennt kein Verschieben: Dokument in der Ziel-Sub-Collection
   anlegen und das alte löschen. Ein Batch, damit die Aufgabe nie doppelt oder gar nicht existiert
   (dasselbe Muster wie beim Löschen einer Liste,
-  [ADR 0019](docs/decisions/0019-schreibrechte-auf-listen-dokumente.md))
-- [ ] Alle fachlichen Felder wandern unverändert mit — `createdAt`, der Erledigt-Zustand,
+  [ADR 0019](docs/decisions/0019-schreibrechte-auf-listen-dokumente.md)) — anders als dort hängt
+  hier aber nichts an der Reihenfolge, beide Listen-Dokumente überstehen den Batch unberührt
+- [x] Alle fachlichen Felder wandern unverändert mit — `createdAt`, der Erledigt-Zustand,
   `completedBy`, `priority` und `completedAt`; nur `updatedAt` und die Dokument-id entstehen neu,
-  siehe [ADR 0024](docs/decisions/0024-verschieben-behaelt-zustand.md)
-- [ ] Security Rules gegenprüfen — ein Batch über zwei Listen. `isListMember` wird pro Dokument
-  ausgewertet, die Regel sollte also unverändert tragen; falls doch nicht, muss die Änderung vor
-  dem Gerätetest von Hand veröffentlicht werden
-- [ ] Bedienung im Bearbeiten-Dialog — Titel ändern, Liste ändern, löschen an einer Stelle. Zur
-  Auswahl stehen die geladenen Listen ohne die aktuelle, siehe
+  siehe [ADR 0024](docs/decisions/0024-verschieben-behaelt-zustand.md). Trägt die erste
+  Domäne→Dokument-Abbildung des Projekts, abgesichert über einen Hin-und-zurück-Test
+- [x] Security Rules gegenprüfen — **keine Änderung nötig, kein Konsolen-Schritt.** `allow read,
+  write: if isListMember(listId)` wird pro Operation mit der `listId` aus dem jeweiligen Pfad
+  ausgewertet; beide Listen-Dokumente bleiben unberührt und existieren beim `get()` noch.
+  Mitgliedschaft in beiden ist bauartbedingt gegeben, weil die Auswahl nur Listen aus der
+  `whereArrayContains`-Query zeigt
+- [x] Bedienung im Bearbeiten-Dialog — Titel ändern, Liste ändern, löschen an einer Stelle. Die
+  Zielliste ist ein **Feld** wie Titel und Priorität: „Speichern" schreibt entweder an Ort und
+  Stelle oder verschiebt, in einem Schreibvorgang. Gewählt wird über ein Aufklappmenü, das
+  vorhandene `ListMenuItem` aus der TopAppBar wird wiederverwendet, siehe
   [ADR 0022](docs/decisions/0022-verschieben-im-bearbeiten-dialog.md)
+- [x] Die **aktuelle Liste steht mit im Menü und ist vorausgewählt** — hier stand vorher „ohne die
+  aktuelle". Das war für das ältere Bild geschrieben, in dem Verschieben eine eigene Aktion war;
+  als Feld gäbe es sonst nach einem Fehlgriff keinen Weg zurück zu „bleibt, wo sie ist", außer den
+  Dialog abzubrechen
+- [x] Rückmeldung nach dem Verschieben — Snackbar „Nach <Liste> verschoben". Ohne sie verschwindet
+  der Eintrag einfach und sähe wie ein Löschen aus. Zweiter Meldungskanal im UiState neben dem
+  Fehler; zwei Effekte am selben `SnackbarHostState` reihen sich an, statt sich zu verdrängen
 - [-] Verschieben per Wischgeste — zurückgestellt, bis der Alltag zeigt, ob es häufig genug
   vorkommt; dann nach links für jede Aufgabe (ADR 0022)
-- [ ] Ist die aktuelle Liste die einzige, ist „Verschieben" im Dialog sichtbar, aber deaktiviert
-  (Standardmuster für einen Menüpunkt ohne gültiges Ziel, statt ihn ganz auszublenden)
-- [ ] Unit-Tests und Gerätetest: je einmal in eine geteilte und in eine private Liste verschieben und
-  auf beiden Geräten nachsehen
+- [x] Ist die aktuelle Liste die einzige, ist das Listen-Feld im Dialog sichtbar, aber deaktiviert
+  (Standardmuster statt es ganz auszublenden). `clickable(enabled = false)` nimmt auch die
+  Klick-Semantik weg, TalkBack bietet die Aktion also gar nicht erst an
+- [x] Unit-Tests — 97 grün. Mapper in beide Richtungen inklusive Hin-und-zurück-Vergleich, der
+  ViewModel-Zweig für Verschieben gegen Ändern, und die Fälle, in denen Eintrag oder Zielliste
+  während des offenen Dialogs verschwinden. Die vier neuen instrumentierten Tests übersetzen,
+  gelaufen sind sie mangels Gerät noch nicht
+- [ ] Auf dem Gerät prüfen — in eine geteilte und in eine private Liste verschieben, auf beiden
+  Geräten nachsehen · eine **erledigte** Aufgabe verschieben (muss abgehakt ankommen, mit
+  `completedBy` und `completedAt`, an derselben Stelle im erledigten Block) · eine alte Aufgabe
+  verschieben und prüfen, dass sie in der Zielliste **nicht** nach oben springt · der Fall „nur eine
+  Liste" · Snackbar-Text, hell und dunkel · offline verschieben und wieder verbinden.
+  **Besonders hinsehen:** Das Aufklappmenü ist ein `Popup` in einem `Dialog`-Fenster — eine
+  Kombination, mit der Compose historisch Schwierigkeiten hatte. Klappt es nicht sauber auf, ist
+  `ExposedDropdownMenuBox` der erste Ausweg
 
 ### Querlaufend – Werkzeuge & Doku
 > Läuft neben den Phasen und gehört zu keiner.
@@ -292,6 +318,12 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   per Kabel testen oder in den Entwickleroptionen „Aktiv lassen" einschalten.
 - [~] Prüfen, dass die `@`-Importe in `CLAUDE.md` und die Regeln in Android Studio tatsächlich laden
   (Canary-Methode, siehe ADR 0014)
+- [ ] `TodoListScreen` und den Bearbeiten-Dialog entzerren — der Bildschirm nimmt inzwischen 27
+  Lambdas entgegen, und der Dialog erledigt vier Dinge (Titel, Priorität, Liste, Löschen).
+  [ADR 0022](docs/decisions/0022-verschieben-im-bearbeiten-dialog.md) hat genau darauf gezeigt:
+  „Wird er dadurch unübersichtlich, ist das der nächste Anlass, ihn zu überarbeiten." Naheliegend
+  wäre, die Rückrufe des Dialogs in einem eigenen Halter zu bündeln, statt sie einzeln
+  durchzureichen. Kein Blocker, aber es wächst weiter mit jedem Feature
 
 ---
 

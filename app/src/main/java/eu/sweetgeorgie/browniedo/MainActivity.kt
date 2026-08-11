@@ -65,10 +65,12 @@ class MainActivity : ComponentActivity() {
                         onEditTodoClick = todoListViewModel::onEditTodoClick,
                         onEditedTitleChange = todoListViewModel::onEditedTitleChange,
                         onEditedPriorityChange = todoListViewModel::onEditedPriorityChange,
+                        onEditedTargetListChange = todoListViewModel::onEditedTargetListChange,
                         onEditConfirm = todoListViewModel::onEditConfirm,
                         onDeleteTodoClick = todoListViewModel::onDeleteTodoClick,
                         onEditDismiss = todoListViewModel::onEditDismiss,
                         onErrorShown = todoListViewModel::onErrorShown,
+                        onMovedMessageShown = todoListViewModel::onMovedMessageShown,
                         onSignOutClick = { appContainer.authRepository.signOut() }
                     )
                 }

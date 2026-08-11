@@ -99,10 +99,12 @@ fun TodoListScreen(
     onEditTodoClick: (Todo) -> Unit,
     onEditedTitleChange: (String) -> Unit,
     onEditedPriorityChange: (TodoPriority) -> Unit,
+    onEditedTargetListChange: (TodoList) -> Unit,
     onEditConfirm: () -> Unit,
     onDeleteTodoClick: () -> Unit,
     onEditDismiss: () -> Unit,
     onErrorShown: () -> Unit,
+    onMovedMessageShown: () -> Unit,
     onSignOutClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -119,6 +121,19 @@ fun TodoListScreen(
             // löschen, sonst kippt der Key auf null und die Snackbar verschwindet sofort.
             snackbarHostState.showSnackbar(writeErrorMessage)
             onErrorShown()
+        }
+    }
+
+    // Der zweite Kanal, aus demselben Grund auf die aufgelöste Meldung gekeyt. Zwei Effekte am
+    // selben SnackbarHostState streiten sich nicht: showSnackbar nimmt einen fairen Mutex, die
+    // Meldungen reihen sich also an, statt einander zu verdrängen.
+    val moveConfirmation = uiState.movedToListName
+        ?.let { stringResource(R.string.todo_list_moved_to, it) }
+
+    LaunchedEffect(moveConfirmation) {
+        if (moveConfirmation != null) {
+            snackbarHostState.showSnackbar(moveConfirmation)
+            onMovedMessageShown()
         }
     }
 
@@ -219,8 +234,11 @@ fun TodoListScreen(
         EditTodoDialog(
             title = editedTodo.title,
             priority = editedTodo.priority,
+            lists = uiState.lists,
+            targetListId = editedTodo.targetListId,
             onTitleChange = onEditedTitleChange,
             onPriorityChange = onEditedPriorityChange,
+            onTargetListChange = onEditedTargetListChange,
             onConfirm = onEditConfirm,
             onDelete = onDeleteTodoClick,
             onDismiss = onEditDismiss
@@ -243,6 +261,7 @@ private fun TodoListError.messageResId() = when (this) {
     TodoListError.ADD_FAILED -> R.string.todo_list_error_add_failed
     TodoListError.UPDATE_FAILED -> R.string.todo_list_error_update_failed
     TodoListError.DELETE_FAILED -> R.string.todo_list_error_delete_failed
+    TodoListError.MOVE_FAILED -> R.string.todo_list_error_move_failed
     TodoListError.LIST_ADD_FAILED -> R.string.todo_list_error_list_add_failed
     TodoListError.LIST_UPDATE_FAILED -> R.string.todo_list_error_list_update_failed
     TodoListError.LIST_DELETE_FAILED -> R.string.todo_list_error_list_delete_failed
@@ -768,8 +787,11 @@ private fun DeleteListDialog(
 private fun EditTodoDialog(
     title: String,
     priority: TodoPriority,
+    lists: List<TodoList>,
+    targetListId: String,
     onTitleChange: (String) -> Unit,
     onPriorityChange: (TodoPriority) -> Unit,
+    onTargetListChange: (TodoList) -> Unit,
     onConfirm: () -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit
@@ -804,6 +826,11 @@ private fun EditTodoDialog(
                         )
                     }
                 }
+                TargetListField(
+                    lists = lists,
+                    targetListId = targetListId,
+                    onTargetListChange = onTargetListChange
+                )
             }
         },
         confirmButton = {
@@ -825,6 +852,77 @@ private fun EditTodoDialog(
             }
         }
     )
+}
+
+/**
+ * Die Zielliste ist ein Feld wie Titel und Priorität, kein eigener Auslöser: Erst „Speichern" führt
+ * aus, was hier gewählt wurde, siehe docs/decisions/0022-verschieben-im-bearbeiten-dialog.md.
+ *
+ * Die aktuelle Liste steht mit im Menü und ist vorausgewählt — sonst gäbe es nach einem Fehlgriff
+ * keinen Weg zurück zu „bleibt, wo sie ist", außer den Dialog abzubrechen.
+ */
+@Composable
+private fun TargetListField(
+    lists: List<TodoList>,
+    targetListId: String,
+    onTargetListChange: (TodoList) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    // Mit nur einer Liste gibt es kein Ziel. Das Feld bleibt trotzdem stehen, statt zu
+    // verschwinden: Ein Dialog, der je nach Anzahl der Listen anders aussieht, ist schwerer zu
+    // lernen als einer mit einem abgeblendeten Feld.
+    val enabled = lists.size > 1
+    val target = lists.firstOrNull { it.id == targetListId }
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = stringResource(R.string.todo_list_target_list_label),
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Box {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // enabled = false nimmt auch die Klick-Semantik weg, TalkBack bietet die
+                    // Aktion dann gar nicht erst an.
+                    .clickable(enabled = enabled) { expanded = true }
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = target?.name.orEmpty(),
+                    color = if (enabled) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+                Icon(
+                    painter = painterResource(R.drawable.ic_arrow_drop_down),
+                    contentDescription = stringResource(R.string.todo_list_choose_target_list),
+                    tint = if (enabled) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.outline
+                    }
+                )
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                lists.forEach { list ->
+                    ListMenuItem(
+                        list = list,
+                        // Hier heißt „ausgewählt": da landet sie beim Speichern.
+                        isSelected = list.id == targetListId,
+                        onClick = {
+                            expanded = false
+                            onTargetListChange(list)
+                        }
+                    )
+                }
+            }
+        }
+    }
 }
 
 // Die Vorschau rendert ohne Systemleisten und Tastatur — sie prüft Zeilenlayout, Leisten und
@@ -862,10 +960,12 @@ private fun TodoListScreenPreview() {
             onEditTodoClick = {},
             onEditedTitleChange = {},
             onEditedPriorityChange = {},
+            onEditedTargetListChange = {},
             onEditConfirm = {},
             onDeleteTodoClick = {},
             onEditDismiss = {},
             onErrorShown = {},
+            onMovedMessageShown = {},
             onSignOutClick = {}
         )
     }
@@ -903,10 +1003,12 @@ private fun TodoListScreenEmptyPreview() {
             onEditTodoClick = {},
             onEditedTitleChange = {},
             onEditedPriorityChange = {},
+            onEditedTargetListChange = {},
             onEditConfirm = {},
             onDeleteTodoClick = {},
             onEditDismiss = {},
             onErrorShown = {},
+            onMovedMessageShown = {},
             onSignOutClick = {}
         )
     }

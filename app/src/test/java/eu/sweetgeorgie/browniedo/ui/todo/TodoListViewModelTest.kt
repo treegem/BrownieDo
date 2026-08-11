@@ -16,6 +16,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -23,6 +24,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -402,8 +404,9 @@ class TodoListViewModelTest {
     }
 
     @Test
-    fun `opening the edit dialog shows the current title and priority`() =
+    fun `opening the edit dialog shows the current title, priority and list`() =
         runTest(testDispatcher) {
+            advanceUntilIdle()
             val urgentEntry = TODO_ENTRY.copy(priority = TodoPriority.HIGH)
 
             viewModel.onEditTodoClick(urgentEntry)
@@ -412,7 +415,10 @@ class TodoListViewModelTest {
                 TodoEdit(
                     todoId = urgentEntry.id,
                     title = urgentEntry.title,
-                    priority = TodoPriority.HIGH
+                    priority = TodoPriority.HIGH,
+                    // Die Zielliste startet auf der Liste, in der die Aufgabe steht: „Speichern"
+                    // schreibt dann an Ort und Stelle.
+                    targetListId = LIST_A.id
                 ),
                 viewModel.uiState.value.editedTodo
             )
@@ -499,6 +505,145 @@ class TodoListViewModelTest {
 
         assertNull(todoRepository.lastUpdateTodoCall)
         assertNull(viewModel.uiState.value.editedTodo)
+    }
+
+    // --- Verschieben ---
+
+    @Test
+    fun `saving without changing the list writes in place`() = runTest(testDispatcher) {
+        seedEntryInFirstList()
+
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onEditConfirm()
+
+        assertNotNull(todoRepository.lastUpdateTodoCall)
+        assertNull(todoRepository.lastMoveTodoCall)
+    }
+
+    @Test
+    fun `saving after picking another list moves the entry`() = runTest(testDispatcher) {
+        seedEntryInFirstList()
+
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onEditedTargetListChange(LIST_B)
+        viewModel.onEditConfirm()
+
+        assertEquals(
+            MoveTodoCall(LIST_A.id, LIST_B.id, TODO_ENTRY),
+            todoRepository.lastMoveTodoCall
+        )
+        // Ein Speichern ist ein Schreibvorgang — verschoben *oder* an Ort und Stelle geschrieben.
+        assertNull(todoRepository.lastUpdateTodoCall)
+        assertNull(viewModel.uiState.value.editedTodo)
+    }
+
+    @Test
+    fun `a move carries the edited title and priority`() = runTest(testDispatcher) {
+        seedEntryInFirstList()
+
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onEditedTitleChange("  Brot kaufen  ")
+        viewModel.onEditedPriorityChange(TodoPriority.HIGH)
+        viewModel.onEditedTargetListChange(LIST_B)
+        viewModel.onEditConfirm()
+
+        val moved = todoRepository.lastMoveTodoCall?.todo
+        assertEquals("Brot kaufen", moved?.title)
+        assertEquals(TodoPriority.HIGH, moved?.priority)
+    }
+
+    @Test
+    fun `a move leaves every other field untouched`() = runTest(testDispatcher) {
+        seedEntryInFirstList(FINISHED_TODO_ENTRY)
+
+        viewModel.onEditTodoClick(FINISHED_TODO_ENTRY)
+        viewModel.onEditedTargetListChange(LIST_B)
+        viewModel.onEditConfirm()
+
+        // Verschieben ist reine Organisation, siehe
+        // docs/decisions/0024-verschieben-behaelt-zustand.md.
+        val moved = todoRepository.lastMoveTodoCall?.todo
+        assertEquals(FINISHED_TODO_ENTRY.createdAt, moved?.createdAt)
+        assertEquals(FINISHED_TODO_ENTRY.isDone, moved?.isDone)
+        assertEquals(FINISHED_TODO_ENTRY.completedBy, moved?.completedBy)
+        assertEquals(FINISHED_TODO_ENTRY.completedAt, moved?.completedAt)
+    }
+
+    @Test
+    fun `a move reports the target list for the confirmation`() = runTest(testDispatcher) {
+        seedEntryInFirstList()
+
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onEditedTargetListChange(LIST_B)
+        viewModel.onEditConfirm()
+
+        assertEquals(LIST_B.name, viewModel.uiState.value.movedToListName)
+    }
+
+    @Test
+    fun `a shown move confirmation is cleared`() = runTest(testDispatcher) {
+        seedEntryInFirstList()
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onEditedTargetListChange(LIST_B)
+        viewModel.onEditConfirm()
+
+        viewModel.onMovedMessageShown()
+
+        assertNull(viewModel.uiState.value.movedToListName)
+    }
+
+    @Test
+    fun `a failing move keeps the dialog open and reports a move error`() =
+        runTest(testDispatcher) {
+            seedEntryInFirstList()
+            todoRepository.moveTodoResult = Result.failure(IllegalStateException("no permission"))
+
+            viewModel.onEditTodoClick(TODO_ENTRY)
+            viewModel.onEditedTargetListChange(LIST_B)
+            viewModel.onEditConfirm()
+
+            assertEquals(TodoListError.MOVE_FAILED, viewModel.uiState.value.error)
+            assertNotNull(viewModel.uiState.value.editedTodo)
+            assertNull(viewModel.uiState.value.movedToListName)
+        }
+
+    @Test
+    fun `an entry that vanished while the dialog was open is not moved`() =
+        runTest(testDispatcher) {
+            seedEntryInFirstList()
+            viewModel.onEditTodoClick(TODO_ENTRY)
+            viewModel.onEditedTargetListChange(LIST_B)
+
+            // Der Partner hat den Eintrag gelöscht, während der Dialog offen stand.
+            todoRepository.emit(LIST_A.id, Result.success(emptyList()))
+            advanceUntilIdle()
+            viewModel.onEditConfirm()
+
+            // Verschieben würde ihn in der Zielliste wieder auferstehen lassen.
+            assertNull(todoRepository.lastMoveTodoCall)
+            assertEquals(TodoListError.MOVE_FAILED, viewModel.uiState.value.error)
+        }
+
+    @Test
+    fun `a move with a blank title is not written`() = runTest(testDispatcher) {
+        seedEntryInFirstList()
+
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onEditedTitleChange("   ")
+        viewModel.onEditedTargetListChange(LIST_B)
+        viewModel.onEditConfirm()
+
+        assertNull(todoRepository.lastMoveTodoCall)
+    }
+
+    /**
+     * Die Verschiebe-Tests brauchen den Eintrag wirklich im angezeigten Stand: Das ViewModel holt
+     * die Aufgabe von dort, nicht aus dem Dialog.
+     */
+    private fun TestScope.seedEntryInFirstList(entry: Todo = TODO_ENTRY) {
+        advanceUntilIdle()
+        todoRepository.emit(LIST_A.id, Result.success(listOf(entry)))
+        advanceUntilIdle()
     }
 
     @Test
@@ -630,12 +775,15 @@ private data class UpdateTodoCall(
     val priority: TodoPriority
 )
 
+private data class MoveTodoCall(val fromListId: String, val toListId: String, val todo: Todo)
+
 private data class DeleteCall(val listId: String, val todoId: String)
 
 private class FakeTodoRepository : TodoRepository {
     var addResult: Result<Unit> = Result.success(Unit)
     var setDoneResult: Result<Unit> = Result.success(Unit)
     var updateTodoResult: Result<Unit> = Result.success(Unit)
+    var moveTodoResult: Result<Unit> = Result.success(Unit)
     var deleteResult: Result<Unit> = Result.success(Unit)
     var addCallCount = 0
         private set
@@ -644,6 +792,8 @@ private class FakeTodoRepository : TodoRepository {
     var lastSetDoneCall: SetDoneCall? = null
         private set
     var lastUpdateTodoCall: UpdateTodoCall? = null
+        private set
+    var lastMoveTodoCall: MoveTodoCall? = null
         private set
     var lastDeleteCall: DeleteCall? = null
         private set
@@ -689,6 +839,11 @@ private class FakeTodoRepository : TodoRepository {
     ): Result<Unit> {
         lastUpdateTodoCall = UpdateTodoCall(listId, todoId, title, priority)
         return updateTodoResult
+    }
+
+    override fun moveTodo(fromListId: String, toListId: String, todo: Todo): Result<Unit> {
+        lastMoveTodoCall = MoveTodoCall(fromListId, toListId, todo)
+        return moveTodoResult
     }
 
     override fun deleteTodo(listId: String, todoId: String): Result<Unit> {

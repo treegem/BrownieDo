@@ -120,6 +120,10 @@ class TodoListViewModel(
                         mutableUiState.update {
                             // Offene Dialoge gehören der alten Liste. Blieben sie stehen, schriebe
                             // das Bestätigen gegen die neue — sie lesen die Liste erst dann.
+                            //
+                            // movedToListName gehört bewusst NICHT hierher: Die Bestätigung
+                            // betrifft eine abgeschlossene Aktion und bleibt wahr. Sie hier zu
+                            // löschen risse eine laufende Snackbar mittendrin ab.
                             it.copy(
                                 todos = emptyList(),
                                 isLoading = true,
@@ -270,15 +274,21 @@ class TodoListViewModel(
         }
     }
 
-    fun onEditTodoClick(todo: Todo) = mutableUiState.update {
-        it.copy(
-            editedTodo = TodoEdit(
-                todoId = todo.id,
-                title = todo.title,
-                priority = todo.priority
-            ),
-            error = null
-        )
+    fun onEditTodoClick(todo: Todo) {
+        // Dieselbe Quelle, gegen die onEditConfirm später vergleicht — nicht uiState.selectedList,
+        // sonst hingen Vorbelegung und Vergleich an zwei Werten.
+        val listId = selectedListId.value ?: return
+        mutableUiState.update {
+            it.copy(
+                editedTodo = TodoEdit(
+                    todoId = todo.id,
+                    title = todo.title,
+                    priority = todo.priority,
+                    targetListId = listId
+                ),
+                error = null
+            )
+        }
     }
 
     fun onEditedTitleChange(title: String) = mutableUiState.update {
@@ -289,21 +299,68 @@ class TodoListViewModel(
         it.copy(editedTodo = it.editedTodo?.copy(priority = priority))
     }
 
+    fun onEditedTargetListChange(list: TodoList) = mutableUiState.update {
+        it.copy(editedTodo = it.editedTodo?.copy(targetListId = list.id))
+    }
+
     fun onEditDismiss() = mutableUiState.update { it.copy(editedTodo = null) }
 
+    /**
+     * Ein Speichern ist ein Schreibvorgang — entweder an Ort und Stelle oder in die neue Liste, nie
+     * beides, siehe docs/decisions/0025-titel-und-prioritaet-in-einem-schreibvorgang.md. Titel und
+     * Priorität reisen beim Verschieben mit, statt hinterher noch einmal geschrieben zu werden.
+     */
     fun onEditConfirm() {
         val listId = selectedListId.value ?: return
         val editedTodo = mutableUiState.value.editedTodo ?: return
         val title = editedTodo.title.trim()
         if (title.isEmpty()) return
-        // Titel und Priorität gehen zusammen raus: ein Speichern ist ein Schreibvorgang, siehe
-        // docs/decisions/0025-titel-und-prioritaet-in-einem-schreibvorgang.md.
-        todoRepository.updateTodo(listId, editedTodo.todoId, title, editedTodo.priority).fold(
-            // The dialog stays open on failure so the typed title is not lost.
-            onSuccess = { mutableUiState.update { it.copy(editedTodo = null, error = null) } },
-            onFailure = { mutableUiState.update { it.copy(error = TodoListError.UPDATE_FAILED) } }
+
+        if (editedTodo.targetListId == listId) {
+            // Titel und Priorität gehen zusammen raus (ADR 0025).
+            todoRepository.updateTodo(listId, editedTodo.todoId, title, editedTodo.priority).fold(
+                // The dialog stays open on failure so the typed title is not lost.
+                onSuccess = { mutableUiState.update { it.copy(editedTodo = null, error = null) } },
+                onFailure = {
+                    mutableUiState.update { it.copy(error = TodoListError.UPDATE_FAILED) }
+                }
+            )
+            return
+        }
+
+        val state = mutableUiState.value
+        // Die Aufgabe kommt aus dem angezeigten Stand, nicht aus dem Dialog: Der Dialog trägt nur
+        // Titel und Priorität, alle übrigen Felder wandern unverändert mit (ADR 0024). Damit ist
+        // auch der Erledigt-Zustand so frisch wie der letzte Snapshot und nicht so alt wie der
+        // Dialog.
+        val todo = state.todos.firstOrNull { it.id == editedTodo.todoId }
+        val target = state.lists.firstOrNull { it.id == editedTodo.targetListId }
+        if (todo == null || target == null) {
+            // Der Eintrag oder die Zielliste ist verschwunden, während der Dialog offen stand — der
+            // Partner hat gelöscht. Anders als die übrigen Wächter hier wird das gemeldet statt
+            // still übergangen: Es ist ein Zustand, den der Partner herstellen kann, und ein
+            // Verschieben würde einen gelöschten Eintrag in der Zielliste wieder auferstehen lassen.
+            mutableUiState.update { it.copy(error = TodoListError.MOVE_FAILED) }
+            return
+        }
+
+        todoRepository.moveTodo(
+            fromListId = listId,
+            toListId = target.id,
+            todo = todo.copy(title = title, priority = editedTodo.priority)
+        ).fold(
+            onSuccess = {
+                mutableUiState.update {
+                    it.copy(editedTodo = null, error = null, movedToListName = target.name)
+                }
+            },
+            // Wie beim Speichern: Der Dialog bleibt offen, der Eintrag steht noch in der alten
+            // Liste.
+            onFailure = { mutableUiState.update { it.copy(error = TodoListError.MOVE_FAILED) } }
         )
     }
+
+    fun onMovedMessageShown() = mutableUiState.update { it.copy(movedToListName = null) }
 
     // LOAD_FAILED bleibt bewusst stehen: Firestore baut den Snapshot-Listener nach einem Fehler
     // ab, die Liste aktualisiert sich also nicht mehr. Ein Hinweis, der nach ein paar Sekunden

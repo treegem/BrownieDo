@@ -105,6 +105,31 @@ class FirestoreTodoRepository(private val firestore: FirebaseFirestore) : TodoRe
             )
         }.map { }
 
+    /**
+     * The only write here that creates a whole document instead of changing single fields
+     * (ADR 0024), and the only one touching two lists.
+     *
+     * Die Ziel-id vergibt `document()` ohne Argument lokal, genau wie `add()` es intern tut — auch
+     * das Verschieben braucht damit keinen Server und funktioniert offline.
+     *
+     * Ein Batch statt zweier Schreibvorgänge, sonst gäbe es einen Zwischenzustand, in dem die
+     * Aufgabe in beiden oder in keiner Liste steht. Die Security Rules werten jede Schreibung eines
+     * Batches einzeln aus — die eine gegen `lists/{toListId}`, die andere gegen
+     * `lists/{fromListId}`; in beiden steht die eigene uid, sonst wäre die Liste gar nicht erst
+     * geladen worden. Anders als beim Löschen einer Liste (ADR 0019) hängt hier nichts an der
+     * Reihenfolge: Beide Listen-Dokumente überstehen den Batch unberührt.
+     *
+     * `commit()` wird nicht abgewartet, siehe
+     * docs/decisions/0011-schreibvorgaenge-nicht-abwarten.md.
+     */
+    override fun moveTodo(fromListId: String, toListId: String, todo: Todo): Result<Unit> =
+        runCatching {
+            val batch = firestore.batch()
+            batch.set(todoCollection(toListId).document(), todo.toDocument())
+            batch.delete(todoCollection(fromListId).document(todo.id))
+            batch.commit()
+        }.map { }
+
     override fun deleteTodo(listId: String, todoId: String): Result<Unit> =
         runCatching { todoCollection(listId).document(todoId).delete() }.map { }
 }

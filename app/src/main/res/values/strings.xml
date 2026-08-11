@@ -40,6 +40,9 @@
     <string name="todo_list_priority_medium">Mittel</string>
     <string name="todo_list_priority_high">Hoch</string>
     <string name="todo_list_priority_content_description">Priorität: %1$s</string>
+    <string name="todo_list_target_list_label">Liste</string>
+    <string name="todo_list_choose_target_list">Zielliste wählen</string>
+    <string name="todo_list_moved_to">Nach „%1$s“ verschoben</string>
     <string name="todo_list_save">Speichern</string>
     <string name="todo_list_delete">Löschen</string>
     <string name="todo_list_cancel">Abbrechen</string>
@@ -47,6 +50,7 @@
     <string name="todo_list_error_add_failed">Die Aufgabe konnte nicht gespeichert werden.</string>
     <string name="todo_list_error_update_failed">Die Änderung konnte nicht gespeichert werden.</string>
     <string name="todo_list_error_delete_failed">Die Aufgabe konnte nicht gelöscht werden.</string>
+    <string name="todo_list_error_move_failed">Die Aufgabe konnte nicht verschoben werden.</string>
     <string name="todo_list_sign_out">Abmelden</string>
     <string name="todo_list_more_actions">Weitere Aktionen</string>
 </resources>
