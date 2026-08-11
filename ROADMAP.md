@@ -12,6 +12,15 @@ Die beiden wollen Aufgaben (Einkäufe, Erledigungen, Haushalts-To-Dos …) gemei
 verwalten. Beide sollen jederzeit Aufgaben hinzufügen, abhaken oder ändern können –
 und der jeweils andere sieht diese Änderungen zuverlässig.
 
+**Wie die beiden damit arbeiten (der Rhythmus):**
+Die App strukturiert den Alltag der beiden. Alles, was nicht alltäglich ist, sammelt sich zuerst in
+einem **gemeinsamen Backlog**; in einer **wöchentlichen Besprechung** wandern daraus die Punkte, die
+in dieser Woche wirklich dran sind, in die **Wochenliste der jeweiligen Person**. Jede Person weiß
+danach, was sie sich für die Woche vorgenommen hat. Daraus folgen zwei Dinge für Entscheidungen:
+Verschieben zwischen Listen ist keine Randfunktion, sondern der wöchentliche Kernvorgang — und ein
+Backlog-Eintrag lebt Wochen, muss sich also nach Wochen noch selbst erklären. Was das für die Art der
+Wochenlisten heißt, steht unten unter „Projektspezifische Vorgaben".
+
 **Der zentrale nicht verhandelbare Kern:**
 Die Liste muss **asynchron synchronisieren**. Das bedeutet: Es darf **nicht** vorausgesetzt
 werden, dass beide gleichzeitig online sind. Einer kann offline (z. B. im Supermarkt ohne
@@ -149,6 +158,9 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   Gerät bestätigt: `google-services.json` trägt jetzt beide Fingerabdrücke (Debug und Release),
   der Google-Login in der signierten APK funktioniert
 - [x] Direkt auf beide Geräte installieren (Sideload)
+- [ ] **Beim nächsten verteilten Build den `versionCode` heben** — die verteilte APK trägt noch `1`,
+  und `app/build.gradle.kts` steht unverändert darauf. Die Regel steht in `AGENTS.md`; der Punkt steht
+  hier, weil sie beim ersten Nachschub greift und dann leicht übersehen wird
 
 ### Phase 8 – Mehrere Listen (geteilt & privat)
 > Die Datenstruktur steht seit Phase 3
@@ -241,8 +253,8 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   Gleichstand-Entscheider umsortiert
 - [x] Unit-Tests: Mapper mit und ohne die neuen Felder, `TODO_ORDER` mit gemischten Prioritäten und
   gemischten `completedAt`-Zeitpunkten, ViewModel — 82 Unit-Tests grün. Der instrumentierte Test
-  deckt Markierung, fehlende Markierung bei „mittel" und die Segment-Auswahl ab; er übersetzt,
-  gelaufen ist er mangels Gerät noch nicht
+  deckt Markierung, fehlende Markierung bei „mittel" und die Segment-Auswahl ab; **am 2026-08-12 auf
+  einem SM-S928B gelaufen und grün**
 - [ ] Auf dem Gerät prüfen — alte Aufgabe ohne die neuen Felder erscheint und sitzt am Ende des
   erledigten Blocks · eine Aufgabe auf „hoch" setzen und steigen sehen · zwei Aufgaben in bekannter
   Reihenfolge abhaken und den erledigten Block prüfen · hell und dunkel · und nachsehen, ob die
@@ -288,16 +300,66 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   Klick-Semantik weg, TalkBack bietet die Aktion also gar nicht erst an
 - [x] Unit-Tests — 97 grün. Mapper in beide Richtungen inklusive Hin-und-zurück-Vergleich, der
   ViewModel-Zweig für Verschieben gegen Ändern, und die Fälle, in denen Eintrag oder Zielliste
-  während des offenen Dialogs verschwinden. Die vier neuen instrumentierten Tests übersetzen,
-  gelaufen sind sie mangels Gerät noch nicht
+  während des offenen Dialogs verschwinden. Die vier neuen instrumentierten Tests sind **am
+  2026-08-12 auf einem SM-S928B gelaufen**, alle 16 grün — einer davon musste dafür korrigiert
+  werden, siehe „Querlaufend"
+- [x] **Das `Popup`-im-`Dialog`-Risiko ist damit vom Tisch** — `pickingAnotherListInTheEditDialogReportsIt`
+  öffnet das Aufklappmenü im Dialog und tippt einen Eintrag an, auf dem Gerät grün. Der Ausweg über
+  `ExposedDropdownMenuBox` wird nicht gebraucht. Was der Test *nicht* zeigt, ist wie das Menü aussieht
+  — das bleibt beim Punkt unten
 - [ ] Auf dem Gerät prüfen — in eine geteilte und in eine private Liste verschieben, auf beiden
   Geräten nachsehen · eine **erledigte** Aufgabe verschieben (muss abgehakt ankommen, mit
   `completedBy` und `completedAt`, an derselben Stelle im erledigten Block) · eine alte Aufgabe
   verschieben und prüfen, dass sie in der Zielliste **nicht** nach oben springt · der Fall „nur eine
-  Liste" · Snackbar-Text, hell und dunkel · offline verschieben und wieder verbinden.
-  **Besonders hinsehen:** Das Aufklappmenü ist ein `Popup` in einem `Dialog`-Fenster — eine
-  Kombination, mit der Compose historisch Schwierigkeiten hatte. Klappt es nicht sauber auf, ist
-  `ExposedDropdownMenuBox` der erste Ausweg
+  Liste" · Snackbar-Text, hell und dunkel · offline verschieben und wieder verbinden · und ein Blick
+  darauf, wie das Aufklappmenü im Dialog *aussieht* (dass es aufgeht, steht seit dem Testlauf fest,
+  siehe den Punkt darüber). Das bleibt Handarbeit: Es geht um zwei Geräte, echte Firestore-Daten und
+  darum, wie es aussieht — nichts davon prüft ein instrumentierter Test
+
+### Phase 11 – Aus einer Aufgabe einen Termin machen
+> Der Termin gehört in den Google Kalender, **nicht** in BrownieDo: Eine Fälligkeit in der App zieht
+> Erinnerungen nach sich und damit einen weiteren Benachrichtigungskanal auf Geräten, die genug davon
+> haben. Der Weg ist ein `ACTION_INSERT`-Intent — kein OAuth-Scope, keine Berechtigung, kein
+> gespeicherter Zustand, keine Änderung an `firestore.rules` und **kein Schritt in der Firebase
+> Console**, siehe [ADR 0027](docs/decisions/0027-termine-per-kalender-intent.md). Damit die kleinste
+> Phase des Projekts.
+- [ ] Kalender-Intent in der UI-Schicht — `ACTION_INSERT` auf `CalendarContract.Events.CONTENT_URI`
+  mit dem Aufgabentitel als `Events.TITLE`. Gehört in `ui`, nicht ins ViewModel: Es gibt keinen
+  Zustand und keine Regel, und `Intent`/`CalendarContract` sind Android-Framework, das aus der
+  Logik-Schicht fernbleibt (siehe „Projektspezifische Vorgaben")
+- [ ] **Kein Datum vorbelegen** — eine Aufgabe trägt keinen Zeitpunkt, eine geratene Stunde würde
+  häufiger korrigiert als übernommen (ADR 0027)
+- [ ] Erst `setPackage("com.google.android.calendar")`, bei `ActivityNotFoundException` ohne Paket
+  erneut — auf einem Galaxy bedienen zwei Apps diesen Intent, und der Samsung Kalender kann in ein
+  lokales Konto schreiben, das nie bei Google auftaucht
+- [ ] **Kein `resolveActivity`**, sondern `try`/`catch`: Seit Android 11 liefert das ohne
+  `<queries>`-Eintrag im Manifest `null`, obwohl die Kalender-App da ist. Scheitert auch der zweite
+  Versuch, kommt eine Snackbar — neuer Wert in `TodoListError`
+- [ ] Bedienung im Bearbeiten-Dialog, wie Verschieben
+  ([ADR 0022](docs/decisions/0022-verschieben-im-bearbeiten-dialog.md)). Damit macht der Dialog fünf
+  Dinge und der Entzerrungs-Punkt unter „Querlaufend" wird fällig — er wartet dann nicht länger
+- [ ] Unit-Test auf den Intent-Bau (Action, Data-Uri, Titel-Extra), ohne Gerät
+- [ ] Auf dem Gerät prüfen — Termin aus einer Aufgabe anlegen und im Gmail-Kalender wiederfinden ·
+  nachsehen, in **welchem** Kalenderkonto er gelandet ist (der eigentliche Fallstrick) · zurück in
+  die App und prüfen, dass die Aufgabe unverändert dasteht · und dass der Titel mit Umlauten und
+  langem Text ankommt
+
+### Phase 12 – Notiz an einer Aufgabe
+> Ein Backlog-Eintrag lebt Wochen. Ein Titel allein hat dann oft verloren, was eigentlich gemeint
+> war („Fenster abdichten" — welche, und was war der Plan?). Die Security Rules bleiben unberührt: auf
+> `todos` gilt `read, write` für alle Mitglieder der Liste, ohne Feldprüfung.
+- [ ] `Todo` und `TodoDocument` um `notes: String?` erweitern, dazu `TodoField` — nullable, weil
+  „keine Notiz" der Normalfall ist und bestehende Aufgaben das Feld nicht haben
+- [ ] Mehrzeiliges Feld im Bearbeiten-Dialog; Titel, Priorität und Notiz gehen in **einem**
+  Schreibvorgang raus, wie in
+  [ADR 0025](docs/decisions/0025-titel-und-prioritaet-in-einem-schreibvorgang.md) entschieden
+- [ ] In der Zeile nur andeuten, nicht ausbreiten — ein Symbol oder eine gekürzte zweite Zeile
+  (`supportingContent` von `ListItem`). Die Liste bleibt eine Liste
+- [ ] Beim Verschieben mitwandern lassen — das verlangt
+  [ADR 0024](docs/decisions/0024-verschieben-behaelt-zustand.md) ausdrücklich für jedes neue Feld,
+  das die Aufgabe beschreibt
+- [ ] Unit-Tests: Mapper mit und ohne Notiz, Verschieben hin und zurück, ViewModel
+- [ ] Auf dem Gerät prüfen — lange Notiz, Zeilenumbrüche, und wie die Zeile mit und ohne Notiz aussieht
 
 ### Querlaufend – Werkzeuge & Doku
 > Läuft neben den Phasen und gehört zu keiner.
@@ -316,28 +378,58 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   **Achtung für den nächsten Lauf:** Sperrt der Bildschirm während des Laufs, brechen die Tests mit
   demselben „No compose hierarchies"-Fehler ab und Wireless Debugging verliert die Verbindung —
   per Kabel testen oder in den Entwickleroptionen „Aktiv lassen" einschalten.
+- [x] **Zweiter Lauf am 2026-08-12, alle 16 grün** (SM-S928B per Kabel, `stay_on_while_plugged_in`
+  war gesetzt) — dazu 97 Unit-Tests. Einer der acht neuen Tests aus Phase 9 und 10 fiel dabei durch,
+  und zwar zu Recht: `theEditDialogShowsTheListTheEntryIsIn` prüfte mit `onNodeWithText(LIST.name)`,
+  aber der Name der aktuellen Liste steht **zweimal** auf dem Bildschirm — im TopAppBar-Titel und im
+  Zielliste-Feld des Dialogs. `onNodeWithText` scheitert bei zwei Treffern, statt sich einen
+  auszusuchen. Jetzt auf den Dialog eingegrenzt (`hasAnyAncestor(isDialog()) and hasText(...)`), was
+  auch die eigentliche Aussage des Tests ist. Der Nachbartest warnte übrigens schon vor genau dieser
+  Mehrdeutigkeit — nur für den Fall mit offenem Menü, der TopAppBar-Titel war übersehen.
+  **Lehre:** Ein Name, der in dieser App irgendwo im Dialog steht, steht oft auch in der TopAppBar.
+  Bei Listennamen gehört die Eingrenzung auf den Dialog dazu, nicht die Suche nach dem bloßen Text
 - [~] Prüfen, dass die `@`-Importe in `CLAUDE.md` und die Regeln in Android Studio tatsächlich laden
   (Canary-Methode, siehe ADR 0014)
-- [-] `createAndroidComposeRule` auf `androidx.compose.ui.test.junit4.v2` umstellen —
-  zurückgestellt, bis ein Gerät da ist. Die alte Fassung ist verfallen und die Warnung in
-  `TodoListScreenTest` deshalb unterdrückt. Der Wechsel ist **kein** Import-Austausch: `v2` tauscht
-  die ganze `AndroidComposeUiTestEnvironment`, die Komposition wird eingereiht statt sofort
-  ausgeführt, Tests müssen danach von sich aus synchronisieren (vermutlich ein `waitForIdle()` nach
-  `setContent`). Genau dieser Import hat hier schon einmal alle Tests an „No compose hierarchies
-  found" scheitern lassen, siehe den Punkt oben — und der Fehlschlag sieht aus wie ein grüner
-  Build. Erst umstellen, wenn der Lauf danach auf einem Gerät grün ist
+- [x] `createAndroidComposeRule` auf `androidx.compose.ui.test.junit4.v2` umgestellt — am 2026-08-12
+  erledigt, alle 16 Tests auf einem SM-S928B grün. Die Verfallswarnung ist damit weg und
+  `@Suppress("DEPRECATION")` aus `TodoListScreenTest` verschwunden.
+  **Ein reiner Import-Austausch hat gereicht** — die befürchtete Nacharbeit blieb aus: `v2` tauscht
+  zwar die ganze `AndroidComposeUiTestEnvironment` und reiht die Komposition ein, statt sie sofort
+  auszuführen, aber die Finder (`onNodeWithText` und Verwandte) synchronisieren von sich aus, bevor
+  sie den Baum durchsuchen. Kein zusätzliches `waitForIdle()` nach `setContent` nötig; die beiden
+  vorhandenen `waitForIdle()`-Aufrufe nach den Wischgesten bleiben, wo sie sind.
+  **Der grüne Lauf allein wurde nicht als Beleg akzeptiert**, weil derselbe Import hier schon einmal
+  alle Tests an „No compose hierarchies found" scheitern ließ: Zur Gegenprobe wurde eine Zusicherung
+  absichtlich auf einen erfundenen Text gedreht. Sie scheiterte mit „is not displayed" und mit
+  aufgelöstem `hasAnyAncestorThat(IsDialog is defined)` — die Komposition entsteht also und wird
+  wirklich durchsucht. Diese Gegenprobe gehört bei jeder Änderung an der Regel wiederholt; der
+  Hinweis steht jetzt am `@get:Rule` selbst
+- [ ] `ExampleUnitTest` und `ExampleInstrumentedTest` löschen — unveränderte Projektvorlagen, die
+  `2 + 2 == 4` und den Package-Namen prüfen. `remove-unused-code` ist MUST FIX, und sie zählen bei
+  jedem „alle Tests grün" mit, ohne etwas abzusichern
 - [ ] `TodoListScreen` und den Bearbeiten-Dialog entzerren — der Bildschirm nimmt inzwischen 27
   Lambdas entgegen, und der Dialog erledigt vier Dinge (Titel, Priorität, Liste, Löschen).
   [ADR 0022](docs/decisions/0022-verschieben-im-bearbeiten-dialog.md) hat genau darauf gezeigt:
   „Wird er dadurch unübersichtlich, ist das der nächste Anlass, ihn zu überarbeiten." Naheliegend
   wäre, die Rückrufe des Dialogs in einem eigenen Halter zu bündeln, statt sie einzeln
-  durchzureichen. Kein Blocker, aber es wächst weiter mit jedem Feature
+  durchzureichen. Kein Blocker, aber es wächst weiter mit jedem Feature — Phase 11 legt den Termin
+  dazu und Phase 12 die Notiz, dann sind es sechs Dinge. **Spätestens vor Phase 12 fällig**, siehe
+  [ADR 0027](docs/decisions/0027-termine-per-kalender-intent.md)
 
 ---
 
 ## 4. Optionale / spätere Erweiterungen (nice to have)
 - [ ] Push-Benachrichtigung, wenn der andere etwas ändert (Firebase Cloud Messaging)
-- [ ] Fälligkeitsdaten / Erinnerungen
+- [ ] Fälligkeitsdaten — **nur als Anzeige, nicht als Auslöser.** Das Erinnern bleibt beim Google
+  Kalender (Phase 11), siehe [ADR 0027](docs/decisions/0027-termine-per-kalender-intent.md): Ein
+  eigener Erinnerungsweg wäre ein weiterer Benachrichtigungskanal auf Geräten, die genug davon haben
+- [ ] Mehrere Aufgaben auf einmal verschieben — Auswahlmodus mit Häkchen und *einem* Ziel-Tipp. Die
+  wöchentliche Besprechung ist heute vier Tipper pro Punkt; ein `WriteBatch` trägt bis 250 Aufgaben.
+  Erst entscheiden, wenn ein paar Besprechungen zeigen, wie viele Punkte es wirklich pro Woche sind
+- [ ] „Erledigte löschen" als eine Aktion im Überlauf-Menü — nach einer Woche steht unten ein Haufen
+  abgehakter Zeilen, und einzeln wegwischen passt nicht zu einem wöchentlichen Ritual
+- [ ] Wiederkehrende Aufgaben — **bewusst offen gelassen.** Sie brauchen einen Auslöser
+  (WorkManager) und führen damit geradewegs zu dem Benachrichtigungsweg, den ADR 0027 vermeidet
 - [ ] Play-Store-Veröffentlichung (Developer-Account, Store-Eintrag, Datenschutzerklärung)
 - [ ] iOS-Version via Kotlin Multiplatform (Logik-Schicht wiederverwenden)
 
@@ -358,5 +450,14 @@ Hier stehen nur die Entscheidungen, die speziell für BrownieDo gelten:
 - **Mehrere Listen:** BrownieDo trägt dauerhaft geteilte *und* private Listen. Die Struktur
   (`lists/{listId}` mit `members` plus Sub-Collection `todos`) steht seit Phase 3, die Bedienung
   folgt in Phase 8 — siehe [ADR 0009](docs/decisions/0009-listen-dokument-mit-todo-subcollection.md).
+- **Die Wochenlisten sind geteilte Listen, keine privaten.** Eine private Liste trägt nur die eigene
+  uid in `members` und ist damit für den Partner unsichtbar *und* unbeschreibbar: Sie taucht in dessen
+  `whereArrayContains`-Query nicht auf, und `isListMember` in `firestore.rules` lehnt den
+  Schreibvorgang ab. In der wöchentlichen Besprechung ließe sich ein Backlog-Punkt also nur auf dem
+  Gerät der Person selbst in ihre Woche übertragen. Als geteilte Listen („Woche <Name>") geht die
+  ganze Besprechung von einem Gerät aus, und beide sehen, was der andere sich vorgenommen hat. Das ist
+  eine **Vereinbarung über die Nutzung, keine Lücke** — die Abschottung privater Listen ist gewollt
+  ([ADR 0019](docs/decisions/0019-schreibrechte-auf-listen-dokumente.md)) und bleibt für alles, was
+  wirklich privat ist.
 - **Zukunftssicherheit:** Business-Logik frei von Android-Framework-Abhängigkeiten halten,
   damit sie später via Kotlin Multiplatform auf iOS wiederverwendbar ist.

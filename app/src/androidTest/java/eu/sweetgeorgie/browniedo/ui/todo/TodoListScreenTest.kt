@@ -3,7 +3,10 @@ package eu.sweetgeorgie.browniedo.ui.todo
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -31,18 +34,16 @@ import java.time.Instant
 class TodoListScreenTest {
 
     /**
-     * Die Verfallswarnung verweist auf `androidx.compose.ui.test.junit4.v2` — und genau dieser
-     * Import hat hier schon einmal **alle** Tests reproduzierbar an „No compose hierarchies found"
-     * scheitern lassen, ohne dass es jemandem auffiel. `v2` tauscht nicht nur den Dispatcher,
-     * sondern die ganze `AndroidComposeUiTestEnvironment`: Die Komposition wird eingereiht statt
-     * sofort ausgeführt, Tests müssen danach von sich aus synchronisieren.
+     * Die `v2`-Fassung der Regel: Sie tauscht die ganze `AndroidComposeUiTestEnvironment`, die
+     * Komposition wird eingereiht statt sofort ausgeführt. Der Wechsel war deshalb kein
+     * Import-Austausch, sondern eine Verhaltensänderung — und ein Fehlschlag sieht dabei aus wie ein
+     * grüner Build: Mit derselben Regel scheiterten hier schon einmal **alle** Tests reproduzierbar
+     * an „No compose hierarchies found", ohne dass es jemandem auffiel.
      *
-     * Der Wechsel ist deshalb kein Import-Austausch, sondern eine Verhaltensänderung, die sich nur
-     * **auf einem Gerät** belegen lässt — und der Fehlschlag sieht aus wie ein grüner Build. Bis
-     * ein Gerät dafür da ist, bleibt die alte Fassung stehen und die Warnung unterdrückt; der
-     * Punkt steht in `ROADMAP.md` unter „Querlaufend".
+     * Deshalb gilt für diese Datei: **Nach jeder Änderung einmal auf einem Gerät laufen lassen und
+     * die Anzahl grüner Tests nachzählen.** Ein grüner Gradle-Lauf allein beweist nichts, wenn die
+     * Tests gar nicht erst zur Komposition kommen.
      */
-    @Suppress("DEPRECATION")
     @get:Rule
     val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
@@ -213,7 +214,11 @@ class TodoListScreenTest {
     fun theEditDialogShowsTheListTheEntryIsIn() {
         setScreenContent(uiState = editingIn(LIST, lists = listOf(LIST, OTHER_LIST)))
 
-        composeTestRule.onNodeWithText(LIST.name).assertIsDisplayed()
+        // Auf den Knoten *im Dialog* eingegrenzt: Der Name der aktuellen Liste steht auch im
+        // TopAppBar-Titel, ein bloßes onNodeWithText fände zwei Knoten und scheiterte daran —
+        // dieselbe Mehrdeutigkeit, vor der der Test unten bei offenem Menü warnt.
+        composeTestRule.onNode(hasAnyAncestor(isDialog()) and hasText(LIST.name))
+            .assertIsDisplayed()
     }
 
     @Test
