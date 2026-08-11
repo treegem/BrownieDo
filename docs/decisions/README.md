@@ -47,3 +47,4 @@ der den alten als „abgelöst" markiert.
 | [0019](0019-schreibrechte-auf-listen-dokumente.md) | Schreibrechte auf Listen-Dokumente | akzeptiert |
 | [0020](0020-partner-aus-users-collection.md) | Partner aus einer handgepflegten `users`-Collection | akzeptiert |
 | [0021](0021-eigene-farbpalette-statt-dynamic-color.md) | Eigene Farbpalette statt Dynamic Color | akzeptiert |
+| [0022](0022-verschieben-im-bearbeiten-dialog.md) | Verschieben im Bearbeiten-Dialog statt per Wischgeste | akzeptiert |

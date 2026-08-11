@@ -108,10 +108,10 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 ### Phase 5 – Synchronisation & Offline (der KERN der App)
 - [x] Firestore **Offline-Persistenz** aktivieren — auf Android standardmäßig aktiv, kein Zutun nötig
 - [x] **Realtime-Listener** einbinden (Liste aktualisiert sich automatisch)
-- [-] Offline-Szenario testen: einer offline ändern → wieder online → synct beim anderen
-  — zurückgestellt, bis das zweite Handy verfügbar ist
-- [-] Konflikt-Verhalten prüfen (Last-Write-Wins über `updatedAt`)
-  — zurückgestellt, bis das zweite Handy verfügbar ist
+- [x] Offline-Szenario testen: einer offline ändern → wieder online → synct beim anderen — auf zwei
+  Geräten durchgespielt, auch mit einem Handy vorübergehend im Flugmodus
+- [ ] Konflikt-Verhalten prüfen (Last-Write-Wins über `updatedAt`) — beide Geräte ändern *dasselbe*
+  Feld, während eines offline ist; noch nicht gezielt provoziert
 
 ### Phase 6 – UI-Feinschliff
 - [x] Aufgeräumtes Layout (Material 3) — TopAppBar mit Overflow-Menü, Eingabefeld als `bottomBar`
@@ -138,8 +138,8 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   ([ADR 0021](docs/decisions/0021-eigene-farbpalette-statt-dynamic-color.md))
 
 ### Phase 7 – Test & Verteilung an euch zwei
-- [-] Auf beiden Galaxy-Phones testen — auf dem ersten Gerät (SM-S928B) erfolgreich getestet:
-  signierte APK installiert, Google-Login durchgespielt. Das zweite Handy fehlt noch
+- [x] Auf beiden Galaxy-Phones testen — signierte APK installiert, Google-Login durchgespielt und
+  der Sync zwischen beiden Geräten belegt (siehe Phase 5)
 - [x] Signierte APK bauen (Keystore NICHT committen!) — `signingConfig` liest die Zugangsdaten aus
   einer nicht eingecheckten `keystore.properties`, siehe
   [ADR 0017](docs/decisions/0017-signatur-zugangsdaten-aus-keystore-properties.md). Kein App
@@ -148,8 +148,7 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 - [x] **SHA-1 des Release-Keystores in der Firebase Console hinterlegen** — erledigt und auf dem
   Gerät bestätigt: `google-services.json` trägt jetzt beide Fingerabdrücke (Debug und Release),
   der Google-Login in der signierten APK funktioniert
-- [-] Direkt auf beide Geräte installieren (Sideload) — auf dem ersten Gerät erledigt, das zweite
-  Handy fehlt noch
+- [x] Direkt auf beide Geräte installieren (Sideload)
 
 ### Phase 8 – Mehrere Listen (geteilt & privat)
 > Die Datenstruktur steht seit Phase 3
@@ -186,9 +185,9 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 - [x] Security Rules auf das Anlegen und Ändern von Listen erweitern — `create`/`update`/`delete`
   statt `write: if false`, wobei `members` unveränderlich bleibt, siehe
   [ADR 0019](docs/decisions/0019-schreibrechte-auf-listen-dokumente.md)
-- [ ] **Die neuen Rules von Hand in der Firebase Console veröffentlichen** — vorher scheitert jeder
-  Schreibvorgang mit `PERMISSION_DENIED`
-- [ ] **Die zwei Dokumente `users/{uid}` mit `displayName` in der Console anlegen** — ohne sie lässt
+- [x] **Die neuen Rules von Hand in der Firebase Console veröffentlicht** — vorher wäre jeder
+  Schreibvorgang mit `PERMISSION_DENIED` gescheitert
+- [x] **Die zwei Dokumente `users/{uid}` mit `displayName` in der Console angelegt** — ohne sie ließe
   sich keine geteilte Liste anlegen, siehe
   [ADR 0020](docs/decisions/0020-partner-aus-users-collection.md). Die uids stehen unter
   Authentication → Users
@@ -204,9 +203,52 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   Liste **mit zwei Aufgaben** gelöscht, ohne Fehler, danach Rückfall auf die erste verbleibende
   Liste. Der Anlegen-Dialog zeigt „Geteilt mit <Name>" aus der `users`-Collection, die
   `exists()`-Leseregel greift also
-- [ ] Noch offen: eine **private** Liste aus der App heraus anlegen — auf dem Gerät nicht geprüft,
-  nur durch Unit-Tests gedeckt. Der Pfad unterscheidet sich allein darin, dass `members` eine uid
-  statt zwei enthält
+- [x] Auch der private Pfad ist auf dem Gerät belegt — private Liste aus der App angelegt und in
+  Firestore wiedergefunden; `members` trägt dort erwartungsgemäß nur die eigene uid
+
+### Phase 9 – Priorität für Aufgaben
+> Drei Stufen: niedrig · mittel · hoch. Neue Aufgaben stehen auf mittel, bestehende gelten als
+> mittel. Die Security Rules bleiben unberührt — auf `todos` gilt `read, write` für alle Mitglieder
+> der Liste, ohne Feldprüfung.
+- [ ] `Todo` um eine Priorität erweitern (Enum in `domain/todo`) — die Bezeichner sind englisch, die
+  Anzeigetexte „niedrig/mittel/hoch" stehen in `strings.xml` (Sprachregel in `AGENTS.md`)
+- [ ] `TodoDocument` und `TodoField` um das Feld ergänzen
+- [ ] Bestehende Aufgaben auf mittel bringen — **Entscheidung offen:** das fehlende Feld beim Lesen
+  als mittel auslegen oder die vorhandenen Dokumente einmalig in der Console nachziehen. Nur das
+  Erste deckt auch Dokumente ab, die ein Gerät mit älterer App-Version noch schreibt. ADR-Kandidat
+- [ ] Priorität setzen — der Bearbeiten-Dialog ist da; Wischen nach rechts ist bereits belegt
+  ([ADR 0016](docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md))
+- [ ] Priorität in der Zeile anzeigen — muss die Kontrastschwelle aus
+  [ADR 0021](docs/decisions/0021-eigene-farbpalette-statt-dynamic-color.md) in beiden Schemata
+  halten, und Farbe darf nicht das einzige Unterscheidungsmerkmal sein
+- [ ] **Entscheidung offen:** ob die Priorität die Sortierung ändert (hoch oben innerhalb der
+  offenen Aufgaben) oder nur angezeigt wird. Betrifft `TODO_ORDER` und damit das Verhalten aus
+  [ADR 0010](docs/decisions/0010-sortierung-im-client-statt-orderby.md) — ADR-Kandidat
+- [ ] Unit-Tests: Mapper mit und ohne Feld, Sortierung, ViewModel
+- [ ] Auf dem Gerät prüfen
+
+### Phase 10 – Aufgaben zwischen Listen verschieben
+> Ziel darf jede Liste sein, in deren `members` die eigene uid steht — geteilte wie private. Das
+> sind genau die Listen, die die Auswahl aus 8a ohnehin schon lädt.
+- [ ] `TodoRepository` um das Verschieben erweitern (Quell- und Ziel-`listId` explizit, wie alle
+  anderen Methoden auch)
+- [ ] Als `WriteBatch` umsetzen — Firestore kennt kein Verschieben: Dokument in der Ziel-Sub-Collection
+  anlegen und das alte löschen. Ein Batch, damit die Aufgabe nie doppelt oder gar nicht existiert
+  (dasselbe Muster wie beim Löschen einer Liste,
+  [ADR 0019](docs/decisions/0019-schreibrechte-auf-listen-dokumente.md))
+- [ ] **Entscheidung offen:** was das Verschieben überlebt — `createdAt`, der Erledigt-Zustand,
+  `completedBy`, die Dokument-id. `updatedAt` wird in jedem Fall neu gesetzt. ADR-Kandidat
+- [ ] Security Rules gegenprüfen — ein Batch über zwei Listen. `isListMember` wird pro Dokument
+  ausgewertet, die Regel sollte also unverändert tragen; falls doch nicht, muss die Änderung vor
+  dem Gerätetest von Hand veröffentlicht werden
+- [ ] Bedienung im Bearbeiten-Dialog — Titel ändern, Liste ändern, löschen an einer Stelle. Zur
+  Auswahl stehen die geladenen Listen ohne die aktuelle, siehe
+  [ADR 0022](docs/decisions/0022-verschieben-im-bearbeiten-dialog.md)
+- [-] Verschieben per Wischgeste — zurückgestellt, bis der Alltag zeigt, ob es häufig genug
+  vorkommt; dann nach links für jede Aufgabe (ADR 0022)
+- [ ] Verhalten festlegen, wenn es keine zweite Liste gibt — dann existiert kein Ziel
+- [ ] Unit-Tests und Gerätetest: je einmal in eine geteilte und in eine private Liste verschieben und
+  auf beiden Geräten nachsehen
 
 ### Querlaufend – Werkzeuge & Doku
 > Läuft neben den Phasen und gehört zu keiner.
