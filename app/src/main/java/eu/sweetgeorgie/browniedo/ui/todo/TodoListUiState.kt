@@ -2,6 +2,7 @@ package eu.sweetgeorgie.browniedo.ui.todo
 
 import eu.sweetgeorgie.browniedo.domain.list.TodoList
 import eu.sweetgeorgie.browniedo.domain.todo.Todo
+import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
 import eu.sweetgeorgie.browniedo.domain.user.Partner
 
 enum class TodoListError {
@@ -30,10 +31,15 @@ data class TodoListUiState(
     val error: TodoListError? = null
 )
 
-/** The entry currently open in the edit dialog, together with the text typed so far. */
+/**
+ * The entry currently open in the edit dialog, together with what has been typed and picked so far.
+ *
+ * [priority] is never absent — the dialog opens seeded from the entry's current level.
+ */
 data class TodoEdit(
     val todoId: String,
-    val title: String
+    val title: String,
+    val priority: TodoPriority
 )
 
 /** The list being created, together with what has been typed and picked so far. */

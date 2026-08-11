@@ -62,6 +62,14 @@ class ColorSchemeContrastTest {
             Triple("onSurfaceVariant", scheme.onSurfaceVariant, scheme.surface),
             // Der Löschen-Knopf im Dialog.
             Triple("error", scheme.error, scheme.surfaceContainerHigh),
+            // Die Markierung „hoch" am Ende einer offenen Zeile.
+            Triple("error", scheme.error, scheme.surface),
+            // Die gewählte Stufe in der Segment-Auswahl des Bearbeiten-Dialogs.
+            Triple(
+                "onSecondaryContainer",
+                scheme.onSecondaryContainer,
+                scheme.secondaryContainer
+            ),
             // Der Hintergrund der Wischgeste.
             Triple("onErrorContainer", scheme.onErrorContainer, scheme.errorContainer)
         )

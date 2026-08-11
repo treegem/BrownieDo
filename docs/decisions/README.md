@@ -48,3 +48,6 @@ der den alten als „abgelöst" markiert.
 | [0020](0020-partner-aus-users-collection.md) | Partner aus einer handgepflegten `users`-Collection | akzeptiert |
 | [0021](0021-eigene-farbpalette-statt-dynamic-color.md) | Eigene Farbpalette statt Dynamic Color | akzeptiert |
 | [0022](0022-verschieben-im-bearbeiten-dialog.md) | Verschieben im Bearbeiten-Dialog statt per Wischgeste | akzeptiert |
+| [0023](0023-prioritaet-migration-und-sortierung.md) | Priorität: Migration bestehender Aufgaben und Einfluss auf die Sortierung | akzeptiert |
+| [0024](0024-verschieben-behaelt-zustand.md) | Verschieben behält alle Felder außer der Liste | akzeptiert |
+| [0025](0025-titel-und-prioritaet-in-einem-schreibvorgang.md) | Titel und Priorität in einem Schreibvorgang | akzeptiert |

@@ -35,6 +35,11 @@
     <string name="todo_list_add">Hinzufügen</string>
     <string name="todo_list_edit_headline">Aufgabe bearbeiten</string>
     <string name="todo_list_title_label">Titel</string>
+    <string name="todo_list_priority_label">Priorität</string>
+    <string name="todo_list_priority_low">Niedrig</string>
+    <string name="todo_list_priority_medium">Mittel</string>
+    <string name="todo_list_priority_high">Hoch</string>
+    <string name="todo_list_priority_content_description">Priorität: %1$s</string>
     <string name="todo_list_save">Speichern</string>
     <string name="todo_list_delete">Löschen</string>
     <string name="todo_list_cancel">Abbrechen</string>

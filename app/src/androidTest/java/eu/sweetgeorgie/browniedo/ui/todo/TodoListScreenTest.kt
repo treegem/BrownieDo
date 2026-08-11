@@ -2,15 +2,18 @@ package eu.sweetgeorgie.browniedo.ui.todo
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeRight
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import eu.sweetgeorgie.browniedo.R
 import eu.sweetgeorgie.browniedo.domain.list.TodoList
 import eu.sweetgeorgie.browniedo.domain.todo.Todo
+import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
 import eu.sweetgeorgie.browniedo.ui.theme.BrownieDoTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -120,10 +123,88 @@ class TodoListScreenTest {
         composeTestRule.onNodeWithText(OPEN_TODO.title).assertIsDisplayed()
     }
 
+    @Test
+    fun anUrgentEntryCarriesAMarker() {
+        setScreenContent(
+            uiState = TodoListUiState(
+                selectedList = LIST,
+                isLoading = false,
+                todos = listOf(URGENT_TODO)
+            )
+        )
+
+        composeTestRule.onNodeWithContentDescription(priorityDescription(R.string.todo_list_priority_high))
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun anEntryOfMiddlingPriorityCarriesNoMarker() {
+        setScreenContent(
+            uiState = TodoListUiState(
+                selectedList = LIST,
+                isLoading = false,
+                todos = listOf(OPEN_TODO)
+            )
+        )
+
+        // „mittel" ist der Normalfall und bekommt bewusst kein Zeichen.
+        composeTestRule.onNodeWithContentDescription(priorityDescription(R.string.todo_list_priority_medium))
+            .assertDoesNotExist()
+    }
+
+    @Test
+    fun theEditDialogPreselectsTheCurrentPriority() {
+        setScreenContent(
+            uiState = TodoListUiState(
+                selectedList = LIST,
+                isLoading = false,
+                todos = listOf(URGENT_TODO),
+                editedTodo = TodoEdit(
+                    todoId = URGENT_TODO.id,
+                    title = URGENT_TODO.title,
+                    priority = TodoPriority.HIGH
+                )
+            )
+        )
+
+        val label = composeTestRule.activity.getString(R.string.todo_list_priority_high)
+        composeTestRule.onNodeWithText(label).assertIsSelected()
+    }
+
+    @Test
+    fun pickingAPriorityInTheEditDialogReportsIt() {
+        var picked: TodoPriority? = null
+        setScreenContent(
+            uiState = TodoListUiState(
+                selectedList = LIST,
+                isLoading = false,
+                todos = listOf(OPEN_TODO),
+                editedTodo = TodoEdit(
+                    todoId = OPEN_TODO.id,
+                    title = OPEN_TODO.title,
+                    priority = TodoPriority.MEDIUM
+                )
+            ),
+            onEditedPriorityChange = { picked = it }
+        )
+
+        val label = composeTestRule.activity.getString(R.string.todo_list_priority_low)
+        composeTestRule.onNodeWithText(label).performClick()
+
+        assertEquals(TodoPriority.LOW, picked)
+    }
+
+    private fun priorityDescription(labelResId: Int): String =
+        composeTestRule.activity.getString(
+            R.string.todo_list_priority_content_description,
+            composeTestRule.activity.getString(labelResId)
+        )
+
     private fun setScreenContent(
         uiState: TodoListUiState,
         onErrorShown: () -> Unit = {},
-        onTodoSwipedAway: (Todo) -> Unit = {}
+        onTodoSwipedAway: (Todo) -> Unit = {},
+        onEditedPriorityChange: (TodoPriority) -> Unit = {}
     ) {
         composeTestRule.setContent {
             BrownieDoTheme {
@@ -148,6 +229,7 @@ class TodoListScreenTest {
                     onTodoSwipedAway = onTodoSwipedAway,
                     onEditTodoClick = {},
                     onEditedTitleChange = {},
+                    onEditedPriorityChange = onEditedPriorityChange,
                     onEditConfirm = {},
                     onDeleteTodoClick = {},
                     onEditDismiss = {},
@@ -169,16 +251,25 @@ class TodoListScreenTest {
             id = "todo-open",
             title = "Milch kaufen",
             isDone = false,
+            priority = TodoPriority.MEDIUM,
             createdAt = TIMESTAMP,
             updatedAt = TIMESTAMP,
-            completedBy = null
+            completedBy = null,
+            completedAt = null
         )
 
         val FINISHED_TODO = OPEN_TODO.copy(
             id = "todo-finished",
             title = "Kaffee kaufen",
             isDone = true,
-            completedBy = "uid-1"
+            completedBy = "uid-1",
+            completedAt = TIMESTAMP
+        )
+
+        val URGENT_TODO = OPEN_TODO.copy(
+            id = "todo-urgent",
+            title = "Geschenk besorgen",
+            priority = TodoPriority.HIGH
         )
 
         val TODOS = listOf(OPEN_TODO, FINISHED_TODO)

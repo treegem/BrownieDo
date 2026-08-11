@@ -7,6 +7,7 @@ import eu.sweetgeorgie.browniedo.domain.list.ListRepository
 import eu.sweetgeorgie.browniedo.domain.list.SelectedListRepository
 import eu.sweetgeorgie.browniedo.domain.list.TodoList
 import eu.sweetgeorgie.browniedo.domain.todo.Todo
+import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
 import eu.sweetgeorgie.browniedo.domain.todo.TodoRepository
 import eu.sweetgeorgie.browniedo.domain.user.PartnerRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -270,11 +271,22 @@ class TodoListViewModel(
     }
 
     fun onEditTodoClick(todo: Todo) = mutableUiState.update {
-        it.copy(editedTodo = TodoEdit(todoId = todo.id, title = todo.title), error = null)
+        it.copy(
+            editedTodo = TodoEdit(
+                todoId = todo.id,
+                title = todo.title,
+                priority = todo.priority
+            ),
+            error = null
+        )
     }
 
     fun onEditedTitleChange(title: String) = mutableUiState.update {
         it.copy(editedTodo = it.editedTodo?.copy(title = title))
+    }
+
+    fun onEditedPriorityChange(priority: TodoPriority) = mutableUiState.update {
+        it.copy(editedTodo = it.editedTodo?.copy(priority = priority))
     }
 
     fun onEditDismiss() = mutableUiState.update { it.copy(editedTodo = null) }
@@ -284,7 +296,9 @@ class TodoListViewModel(
         val editedTodo = mutableUiState.value.editedTodo ?: return
         val title = editedTodo.title.trim()
         if (title.isEmpty()) return
-        todoRepository.setTitle(listId, editedTodo.todoId, title).fold(
+        // Titel und Priorität gehen zusammen raus: ein Speichern ist ein Schreibvorgang, siehe
+        // docs/decisions/0025-titel-und-prioritaet-in-einem-schreibvorgang.md.
+        todoRepository.updateTodo(listId, editedTodo.todoId, title, editedTodo.priority).fold(
             // The dialog stays open on failure so the typed title is not lost.
             onSuccess = { mutableUiState.update { it.copy(editedTodo = null, error = null) } },
             onFailure = { mutableUiState.update { it.copy(error = TodoListError.UPDATE_FAILED) } }

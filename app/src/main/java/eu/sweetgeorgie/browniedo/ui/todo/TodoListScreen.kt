@@ -36,6 +36,9 @@ import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -68,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import eu.sweetgeorgie.browniedo.R
 import eu.sweetgeorgie.browniedo.domain.list.TodoList
 import eu.sweetgeorgie.browniedo.domain.todo.Todo
+import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
 import eu.sweetgeorgie.browniedo.domain.user.Partner
 import eu.sweetgeorgie.browniedo.ui.theme.BrownieDoTheme
 import java.time.Instant
@@ -94,6 +98,7 @@ fun TodoListScreen(
     onTodoSwipedAway: (Todo) -> Unit,
     onEditTodoClick: (Todo) -> Unit,
     onEditedTitleChange: (String) -> Unit,
+    onEditedPriorityChange: (TodoPriority) -> Unit,
     onEditConfirm: () -> Unit,
     onDeleteTodoClick: () -> Unit,
     onEditDismiss: () -> Unit,
@@ -213,7 +218,9 @@ fun TodoListScreen(
     uiState.editedTodo?.let { editedTodo ->
         EditTodoDialog(
             title = editedTodo.title,
+            priority = editedTodo.priority,
             onTitleChange = onEditedTitleChange,
+            onPriorityChange = onEditedPriorityChange,
             onConfirm = onEditConfirm,
             onDelete = onDeleteTodoClick,
             onDismiss = onEditDismiss
@@ -542,6 +549,8 @@ private fun TodoRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val markerIconResId = todo.priority.markerIconResId()
+
     ListItem(
         headlineContent = {
             Text(
@@ -551,6 +560,28 @@ private fun TodoRow(
         },
         modifier = modifier.clickable(onClick = onClick),
         leadingContent = { Checkbox(checked = todo.isDone, onCheckedChange = onDoneChange) },
+        trailingContent = if (markerIconResId == null) {
+            null
+        } else {
+            {
+                Icon(
+                    painter = painterResource(markerIconResId),
+                    // Die Stufe steckt sonst allein in der Form des Pfeils — für TalkBack ist das
+                    // nichts.
+                    contentDescription = stringResource(
+                        R.string.todo_list_priority_content_description,
+                        stringResource(todo.priority.labelResId())
+                    ),
+                    // Rot nur, solange die Aufgabe offen ist: Auf einer durchgestrichenen Zeile
+                    // wäre es Lärm, und „niedrig" ist ohnehin kein Alarm.
+                    tint = if (todo.isDone || todo.priority == TodoPriority.LOW) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    }
+                )
+            }
+        },
         // Die Farbe gehört an die Slot-Dekoration von ListItem, nicht an den inneren Text —
         // ListItem setzt die Textfarbe selbst und würde eine Farbe am Text überschreiben.
         colors = ListItemDefaults.colors(
@@ -561,6 +592,23 @@ private fun TodoRow(
             }
         )
     )
+}
+
+private fun TodoPriority.labelResId(): Int = when (this) {
+    TodoPriority.LOW -> R.string.todo_list_priority_low
+    TodoPriority.MEDIUM -> R.string.todo_list_priority_medium
+    TodoPriority.HIGH -> R.string.todo_list_priority_high
+}
+
+/**
+ * Nur Abweichungen bekommen ein Symbol: „mittel" ist der Normalfall und stünde sonst in jeder
+ * Zeile, ohne etwas auszusagen. Die beiden Pfeile unterscheiden sich in der Form, nicht nur in der
+ * Farbe — das verlangt docs/decisions/0021-eigene-farbpalette-statt-dynamic-color.md.
+ */
+private fun TodoPriority.markerIconResId(): Int? = when (this) {
+    TodoPriority.HIGH -> R.drawable.ic_arrow_upward
+    TodoPriority.MEDIUM -> null
+    TodoPriority.LOW -> R.drawable.ic_arrow_downward
 }
 
 @Composable
@@ -715,10 +763,13 @@ private fun DeleteListDialog(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditTodoDialog(
     title: String,
+    priority: TodoPriority,
     onTitleChange: (String) -> Unit,
+    onPriorityChange: (TodoPriority) -> Unit,
     onConfirm: () -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit
@@ -727,12 +778,33 @@ private fun EditTodoDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = stringResource(R.string.todo_list_edit_headline)) },
         text = {
-            OutlinedTextField(
-                value = title,
-                onValueChange = onTitleChange,
-                label = { Text(text = stringResource(R.string.todo_list_title_label)) },
-                singleLine = true
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = onTitleChange,
+                    label = { Text(text = stringResource(R.string.todo_list_title_label)) },
+                    singleLine = true
+                )
+                Text(
+                    text = stringResource(R.string.todo_list_priority_label),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                // Drei feste Stufen, genau eine gewählt — dafür ist die Segment-Auswahl gemacht.
+                // Radio-Zeilen wie in NewListDialog bräuchten hier drei volle Zeilen.
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    TodoPriority.entries.forEachIndexed { index, entry ->
+                        SegmentedButton(
+                            selected = entry == priority,
+                            onClick = { onPriorityChange(entry) },
+                            shape = SegmentedButtonDefaults.itemShape(
+                                index = index,
+                                count = TodoPriority.entries.size
+                            ),
+                            label = { Text(text = stringResource(entry.labelResId())) }
+                        )
+                    }
+                }
+            }
         },
         confirmButton = {
             TextButton(onClick = onConfirm, enabled = title.isNotBlank()) {
@@ -789,6 +861,7 @@ private fun TodoListScreenPreview() {
             onTodoSwipedAway = {},
             onEditTodoClick = {},
             onEditedTitleChange = {},
+            onEditedPriorityChange = {},
             onEditConfirm = {},
             onDeleteTodoClick = {},
             onEditDismiss = {},
@@ -829,6 +902,7 @@ private fun TodoListScreenEmptyPreview() {
             onTodoSwipedAway = {},
             onEditTodoClick = {},
             onEditedTitleChange = {},
+            onEditedPriorityChange = {},
             onEditConfirm = {},
             onDeleteTodoClick = {},
             onEditDismiss = {},
@@ -845,21 +919,46 @@ private val PREVIEW_LISTS = listOf(
     TodoList(id = "list-private", name = "Meine Erledigungen", isShared = false)
 )
 
+// Alle drei Stufen, damit die Vorschau die Markierung und ihr Fehlen zeigt.
 private val PREVIEW_TODOS = listOf(
     Todo(
         id = "todo-1",
         title = "Milch kaufen",
         isDone = false,
+        priority = TodoPriority.HIGH,
         createdAt = PREVIEW_TIMESTAMP,
         updatedAt = PREVIEW_TIMESTAMP,
-        completedBy = null
+        completedBy = null,
+        completedAt = null
     ),
     Todo(
         id = "todo-2",
-        title = "Kaffee kaufen",
-        isDone = true,
+        title = "Zeitschrift mitbringen",
+        isDone = false,
+        priority = TodoPriority.MEDIUM,
         createdAt = PREVIEW_TIMESTAMP,
         updatedAt = PREVIEW_TIMESTAMP,
-        completedBy = "uid-1"
+        completedBy = null,
+        completedAt = null
+    ),
+    Todo(
+        id = "todo-3",
+        title = "Gläser zum Container",
+        isDone = false,
+        priority = TodoPriority.LOW,
+        createdAt = PREVIEW_TIMESTAMP,
+        updatedAt = PREVIEW_TIMESTAMP,
+        completedBy = null,
+        completedAt = null
+    ),
+    Todo(
+        id = "todo-4",
+        title = "Kaffee kaufen",
+        isDone = true,
+        priority = TodoPriority.MEDIUM,
+        createdAt = PREVIEW_TIMESTAMP,
+        updatedAt = PREVIEW_TIMESTAMP,
+        completedBy = "uid-1",
+        completedAt = PREVIEW_TIMESTAMP
     )
 )

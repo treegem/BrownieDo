@@ -210,22 +210,43 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 > Drei Stufen: niedrig · mittel · hoch. Neue Aufgaben stehen auf mittel, bestehende gelten als
 > mittel. Die Security Rules bleiben unberührt — auf `todos` gilt `read, write` für alle Mitglieder
 > der Liste, ohne Feldprüfung.
-- [ ] `Todo` um eine Priorität erweitern (Enum in `domain/todo`) — die Bezeichner sind englisch, die
-  Anzeigetexte „niedrig/mittel/hoch" stehen in `strings.xml` (Sprachregel in `AGENTS.md`)
-- [ ] `TodoDocument` und `TodoField` um das Feld ergänzen
-- [ ] Bestehende Aufgaben auf mittel bringen — **Entscheidung offen:** das fehlende Feld beim Lesen
-  als mittel auslegen oder die vorhandenen Dokumente einmalig in der Console nachziehen. Nur das
-  Erste deckt auch Dokumente ab, die ein Gerät mit älterer App-Version noch schreibt. ADR-Kandidat
-- [ ] Priorität setzen — der Bearbeiten-Dialog ist da; Wischen nach rechts ist bereits belegt
+- [x] `Todo` um eine Priorität erweitern — `TodoPriority` in `domain/todo`, Bezeichner englisch,
+  Anzeigetexte „Niedrig/Mittel/Hoch" in `strings.xml` (Sprachregel in `AGENTS.md`)
+- [x] `TodoDocument` und `TodoField` um das Feld ergänzen — im Dokument steht der **Name** der
+  Stufe als `String?`, kein Enum-Typ: Firestore wirft bei einem unbekannten Enum-Wert innerhalb des
+  Snapshot-Listeners, wo der Fehler nicht als `Result` herauskommt, sondern die ganze
+  Aktualisierung mitreißt
+- [x] Bestehende Aufgaben ohne das Feld gelten beim Lesen als mittel — kein Nachziehen in der
+  Console, siehe [ADR 0023](docs/decisions/0023-prioritaet-migration-und-sortierung.md)
+- [x] Priorität setzen — im Bearbeiten-Dialog über eine Segment-Auswahl. Titel und Priorität gehen
+  in **einem** Schreibvorgang raus (`updateTodo` statt `setTitle`), siehe
+  [ADR 0025](docs/decisions/0025-titel-und-prioritaet-in-einem-schreibvorgang.md). Wischen nach
+  rechts bleibt unangetastet
   ([ADR 0016](docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md))
-- [ ] Priorität in der Zeile anzeigen — muss die Kontrastschwelle aus
-  [ADR 0021](docs/decisions/0021-eigene-farbpalette-statt-dynamic-color.md) in beiden Schemata
-  halten, und Farbe darf nicht das einzige Unterscheidungsmerkmal sein
-- [ ] **Entscheidung offen:** ob die Priorität die Sortierung ändert (hoch oben innerhalb der
-  offenen Aufgaben) oder nur angezeigt wird. Betrifft `TODO_ORDER` und damit das Verhalten aus
-  [ADR 0010](docs/decisions/0010-sortierung-im-client-statt-orderby.md) — ADR-Kandidat
-- [ ] Unit-Tests: Mapper mit und ohne Feld, Sortierung, ViewModel
-- [ ] Auf dem Gerät prüfen
+- [x] Priorität in der Zeile anzeigen — nur Abweichungen bekommen ein Symbol, „mittel" bleibt
+  unmarkiert. Pfeil hoch bzw. runter am Zeilenende, je mit `contentDescription`; die Form trägt die
+  Bedeutung allein, Farbe kommt nur dazu. Die zwei neuen Farbpaare sind in
+  `ColorSchemeContrastTest` aufgenommen
+  ([ADR 0021](docs/decisions/0021-eigene-farbpalette-statt-dynamic-color.md))
+- [x] `Todo` und `TodoDocument` um `completedAt` erweitern (nullable, analog zu `completedBy`) —
+  `setDone` setzt es beim Abhaken und löscht es beim Wiederöffnen, siehe
+  [ADR 0023](docs/decisions/0023-prioritaet-migration-und-sortierung.md). Bewusst **ohne**
+  `@ServerTimestamp`: die Annotation greift beim Schreiben des ganzen Objekts, `addTodo` gäbe damit
+  jeder frisch angelegten offenen Aufgabe einen Erledigungszeitpunkt
+- [x] `TODO_ORDER` um die Priorität erweitern — offen vor erledigt; innerhalb der offenen Aufgaben
+  zuerst nach Priorität (hoch → mittel → niedrig), dann wie bisher nach `createdAt`; innerhalb der
+  erledigten Aufgaben neu nach `completedAt` absteigend statt nach `createdAt`, siehe
+  [ADR 0023](docs/decisions/0023-prioritaet-migration-und-sortierung.md). Zwei getrennte
+  Vergleiche statt einer Kette, damit die Priorität erledigte Aufgaben nicht doch als
+  Gleichstand-Entscheider umsortiert
+- [x] Unit-Tests: Mapper mit und ohne die neuen Felder, `TODO_ORDER` mit gemischten Prioritäten und
+  gemischten `completedAt`-Zeitpunkten, ViewModel — 82 Unit-Tests grün. Der instrumentierte Test
+  deckt Markierung, fehlende Markierung bei „mittel" und die Segment-Auswahl ab; er übersetzt,
+  gelaufen ist er mangels Gerät noch nicht
+- [ ] Auf dem Gerät prüfen — alte Aufgabe ohne die neuen Felder erscheint und sitzt am Ende des
+  erledigten Blocks · eine Aufgabe auf „hoch" setzen und steigen sehen · zwei Aufgaben in bekannter
+  Reihenfolge abhaken und den erledigten Block prüfen · hell und dunkel · und nachsehen, ob die
+  drei Segment-Beschriftungen im Dialog abgeschnitten werden
 
 ### Phase 10 – Aufgaben zwischen Listen verschieben
 > Ziel darf jede Liste sein, in deren `members` die eigene uid steht — geteilte wie private. Das
@@ -236,8 +257,9 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   anlegen und das alte löschen. Ein Batch, damit die Aufgabe nie doppelt oder gar nicht existiert
   (dasselbe Muster wie beim Löschen einer Liste,
   [ADR 0019](docs/decisions/0019-schreibrechte-auf-listen-dokumente.md))
-- [ ] **Entscheidung offen:** was das Verschieben überlebt — `createdAt`, der Erledigt-Zustand,
-  `completedBy`, die Dokument-id. `updatedAt` wird in jedem Fall neu gesetzt. ADR-Kandidat
+- [ ] Alle fachlichen Felder wandern unverändert mit — `createdAt`, der Erledigt-Zustand,
+  `completedBy`, `priority` und `completedAt`; nur `updatedAt` und die Dokument-id entstehen neu,
+  siehe [ADR 0024](docs/decisions/0024-verschieben-behaelt-zustand.md)
 - [ ] Security Rules gegenprüfen — ein Batch über zwei Listen. `isListMember` wird pro Dokument
   ausgewertet, die Regel sollte also unverändert tragen; falls doch nicht, muss die Änderung vor
   dem Gerätetest von Hand veröffentlicht werden
@@ -246,7 +268,8 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   [ADR 0022](docs/decisions/0022-verschieben-im-bearbeiten-dialog.md)
 - [-] Verschieben per Wischgeste — zurückgestellt, bis der Alltag zeigt, ob es häufig genug
   vorkommt; dann nach links für jede Aufgabe (ADR 0022)
-- [ ] Verhalten festlegen, wenn es keine zweite Liste gibt — dann existiert kein Ziel
+- [ ] Ist die aktuelle Liste die einzige, ist „Verschieben" im Dialog sichtbar, aber deaktiviert
+  (Standardmuster für einen Menüpunkt ohne gültiges Ziel, statt ihn ganz auszublenden)
 - [ ] Unit-Tests und Gerätetest: je einmal in eine geteilte und in eine private Liste verschieben und
   auf beiden Geräten nachsehen
 

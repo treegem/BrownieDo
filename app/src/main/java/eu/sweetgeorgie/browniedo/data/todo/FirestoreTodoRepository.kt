@@ -7,15 +7,19 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.QuerySnapshot
 import eu.sweetgeorgie.browniedo.data.LISTS_COLLECTION
 import eu.sweetgeorgie.browniedo.data.TODOS_COLLECTION
+import eu.sweetgeorgie.browniedo.data.todo.TodoField.COMPLETED_AT
 import eu.sweetgeorgie.browniedo.data.todo.TodoField.COMPLETED_BY
 import eu.sweetgeorgie.browniedo.data.todo.TodoField.DONE
+import eu.sweetgeorgie.browniedo.data.todo.TodoField.PRIORITY
 import eu.sweetgeorgie.browniedo.data.todo.TodoField.TITLE
 import eu.sweetgeorgie.browniedo.data.todo.TodoField.UPDATED_AT
 import eu.sweetgeorgie.browniedo.domain.todo.Todo
+import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
 import eu.sweetgeorgie.browniedo.domain.todo.TodoRepository
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import java.time.Instant
 
 /**
  * Reads and writes the entries at `lists/{listId}/todos`, see
@@ -41,18 +45,25 @@ class FirestoreTodoRepository(private val firestore: FirebaseFirestore) : TodoRe
     }
 
     /**
-     * The server fills in the timestamps, so only the title is written here.
+     * The server fills in the timestamps, so only the title and the starting priority are written
+     * here — a control for the priority sits in the edit dialog, not in the input bar.
      *
      * The write is not awaited, see docs/decisions/0011-schreibvorgaenge-nicht-abwarten.md.
      */
     override fun addTodo(listId: String, title: String): Result<Unit> =
-        runCatching { todoCollection(listId).add(TodoDocument(title = title)) }.map { }
+        runCatching {
+            todoCollection(listId).add(
+                TodoDocument(title = title, priority = TodoPriority.MEDIUM.name)
+            )
+        }.map { }
 
     /**
-     * Writes single fields instead of the whole document, which is exactly the field-level
-     * last-write-wins the project settled on: a title edited at the same time survives.
+     * Writes single fields instead of the whole document, which is the field-level
+     * last-write-wins the project settled on: whatever the partner changes at the same time in a
+     * *different* field survives. Title and priority are the exception — they travel together, see
+     * docs/decisions/0025-titel-und-prioritaet-in-einem-schreibvorgang.md.
      *
-     * [UPDATED_AT] has to be set by hand here and in [setTitle] — the `@ServerTimestamp`
+     * [UPDATED_AT] has to be set by hand here and in [updateTodo] — the `@ServerTimestamp`
      * annotation on [TodoDocument] only applies when the whole object is written, so a field
      * update would leave the old timestamp in place and break conflict resolution, see
      * docs/decisions/0006-server-zeitstempel-fuer-last-write-wins.md.
@@ -68,16 +79,27 @@ class FirestoreTodoRepository(private val firestore: FirebaseFirestore) : TodoRe
                 mapOf(
                     DONE to isDone,
                     COMPLETED_BY to completedBy,
+                    // Zusammen mit completedBy gesetzt und zusammen mit ihm wieder geleert. Der
+                    // Zeitpunkt kommt vom Server, aus demselben Grund wie updatedAt (ADR 0006).
+                    COMPLETED_AT to if (isDone) FieldValue.serverTimestamp() else null,
                     UPDATED_AT to FieldValue.serverTimestamp()
                 )
             )
         }.map { }
 
-    override fun setTitle(listId: String, todoId: String, title: String): Result<Unit> =
+    override fun updateTodo(
+        listId: String,
+        todoId: String,
+        title: String,
+        priority: TodoPriority
+    ): Result<Unit> =
         runCatching {
             todoCollection(listId).document(todoId).update(
                 mapOf(
                     TITLE to title,
+                    // Der Name, nicht die Position im Enum: Eine spätere Umsortierung der Stufen
+                    // darf gespeicherte Aufgaben nicht umdeuten.
+                    PRIORITY to priority.name,
                     UPDATED_AT to FieldValue.serverTimestamp()
                 )
             )
@@ -88,13 +110,46 @@ class FirestoreTodoRepository(private val firestore: FirebaseFirestore) : TodoRe
 }
 
 /**
- * Open entries first, and within both groups the newest on top. Ticking an entry off therefore
- * moves it out of the way immediately, which is what the list is walked down for while shopping.
+ * Open entries first, finished ones below. Ticking an entry off therefore moves it out of the way
+ * immediately, which is what the list is walked down for while shopping.
+ *
+ * Innerhalb der offenen Aufgaben entscheidet die Priorität und erst danach das Anlagedatum,
+ * innerhalb der erledigten der Zeitpunkt des Abhakens — siehe
+ * docs/decisions/0023-prioritaet-migration-und-sortierung.md, das ADR 0010 dafür erweitert.
+ *
+ * Die beiden Gruppen brauchen getrennte Vergleiche und lassen sich nicht zu einer Kette
+ * zusammenziehen: Die Priorität soll erledigte Aufgaben ausdrücklich *nicht* umsortieren, eine
+ * durchgehende Kette setzte sie dort aber als Gleichstand-Entscheider ein — genau zwischen den
+ * alten Einträgen ohne `completedAt`, die alle gleich vergleichen.
  *
  * Kept apart from [toTodos] so it can be tested without a [QuerySnapshot].
  */
-internal val TODO_ORDER: Comparator<Todo> =
-    compareBy(Todo::isDone).thenByDescending(Todo::createdAt)
+internal val TODO_ORDER: Comparator<Todo> = Comparator { first, second ->
+    when {
+        first.isDone != second.isDone -> if (first.isDone) 1 else -1
+        first.isDone -> FINISHED_ORDER.compare(first, second)
+        else -> OPEN_ORDER.compare(first, second)
+    }
+}
+
+/** Das Dringendste oben, bei gleicher Stufe die neueste Aufgabe. */
+private val OPEN_ORDER: Comparator<Todo> =
+    compareByDescending(Todo::priority).thenByDescending(Todo::createdAt)
+
+/**
+ * Zuletzt abgehakt oben, Einträge ohne Erledigungszeitpunkt ans Ende.
+ *
+ * `nullsLast` sitzt bewusst **um** die umgekehrte Ordnung herum und nicht umgekehrt: Bei
+ * `compareByDescending(nullsLast(...))` würde die Umkehrung auch die Null-Behandlung mitdrehen —
+ * `nullsLast` stellt null als „größer als alles" ein, absteigend sortiert stünde es damit ganz
+ * oben. Die alten Einträge ohne `completedAt` sähen dann aus, als wären sie gerade eben abgehakt
+ * worden. So herum kehrt `reverseOrder()` nur die echten Zeitpunkte um, und `nullsLast` hängt die
+ * fehlenden hinten an. Der letzte Schritt entscheidet nur noch zwischen zwei alten Einträgen und
+ * lässt ihnen die Reihenfolge, die sie vor Phase 9 hatten.
+ */
+private val FINISHED_ORDER: Comparator<Todo> =
+    compareBy(nullsLast(reverseOrder<Instant>()), Todo::completedAt)
+        .thenByDescending(Todo::createdAt)
 
 /**
  * Documents that cannot be mapped are dropped instead of reported: they were not written by this

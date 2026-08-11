@@ -6,6 +6,7 @@ import eu.sweetgeorgie.browniedo.domain.list.ListRepository
 import eu.sweetgeorgie.browniedo.domain.list.SelectedListRepository
 import eu.sweetgeorgie.browniedo.domain.list.TodoList
 import eu.sweetgeorgie.browniedo.domain.todo.Todo
+import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
 import eu.sweetgeorgie.browniedo.domain.todo.TodoRepository
 import eu.sweetgeorgie.browniedo.domain.user.Partner
 import eu.sweetgeorgie.browniedo.domain.user.PartnerRepository
@@ -401,14 +402,21 @@ class TodoListViewModelTest {
     }
 
     @Test
-    fun `opening the edit dialog shows the current title`() = runTest(testDispatcher) {
-        viewModel.onEditTodoClick(TODO_ENTRY)
+    fun `opening the edit dialog shows the current title and priority`() =
+        runTest(testDispatcher) {
+            val urgentEntry = TODO_ENTRY.copy(priority = TodoPriority.HIGH)
 
-        assertEquals(
-            TodoEdit(todoId = TODO_ENTRY.id, title = TODO_ENTRY.title),
-            viewModel.uiState.value.editedTodo
-        )
-    }
+            viewModel.onEditTodoClick(urgentEntry)
+
+            assertEquals(
+                TodoEdit(
+                    todoId = urgentEntry.id,
+                    title = urgentEntry.title,
+                    priority = TodoPriority.HIGH
+                ),
+                viewModel.uiState.value.editedTodo
+            )
+        }
 
     @Test
     fun `saving an edit writes the trimmed title and closes the dialog`() =
@@ -420,12 +428,38 @@ class TodoListViewModelTest {
             viewModel.onEditConfirm()
 
             assertEquals(
-                SetTitleCall(LIST_A.id, TODO_ENTRY.id, "Brot kaufen"),
-                todoRepository.lastSetTitleCall
+                UpdateTodoCall(LIST_A.id, TODO_ENTRY.id, "Brot kaufen", TodoPriority.MEDIUM),
+                todoRepository.lastUpdateTodoCall
             )
             assertNull(viewModel.uiState.value.editedTodo)
             assertNull(viewModel.uiState.value.error)
         }
+
+    @Test
+    fun `saving an edit writes the picked priority together with the title`() =
+        runTest(testDispatcher) {
+            advanceUntilIdle()
+
+            viewModel.onEditTodoClick(TODO_ENTRY)
+            viewModel.onEditedPriorityChange(TodoPriority.HIGH)
+            viewModel.onEditConfirm()
+
+            assertEquals(
+                UpdateTodoCall(LIST_A.id, TODO_ENTRY.id, TODO_ENTRY.title, TodoPriority.HIGH),
+                todoRepository.lastUpdateTodoCall
+            )
+        }
+
+    @Test
+    fun `picking a priority writes nothing before the edit is saved`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onEditedPriorityChange(TodoPriority.LOW)
+
+        assertNull(todoRepository.lastUpdateTodoCall)
+        assertEquals(TodoPriority.LOW, viewModel.uiState.value.editedTodo?.priority)
+    }
 
     @Test
     fun `an edit with a blank title is not written`() = runTest(testDispatcher) {
@@ -433,16 +467,19 @@ class TodoListViewModelTest {
 
         viewModel.onEditTodoClick(TODO_ENTRY)
         viewModel.onEditedTitleChange("   ")
+        viewModel.onEditedPriorityChange(TodoPriority.HIGH)
         viewModel.onEditConfirm()
 
-        assertNull(todoRepository.lastSetTitleCall)
+        // Der leere Titel hält auch die Priorität zurück — beide gehen zusammen raus.
+        assertNull(todoRepository.lastUpdateTodoCall)
     }
 
     @Test
     fun `a failing edit keeps the dialog open and reports an update error`() =
         runTest(testDispatcher) {
             advanceUntilIdle()
-            todoRepository.setTitleResult = Result.failure(IllegalStateException("no permission"))
+            todoRepository.updateTodoResult =
+                Result.failure(IllegalStateException("no permission"))
 
             viewModel.onEditTodoClick(TODO_ENTRY)
             viewModel.onEditedTitleChange("Brot kaufen")
@@ -460,7 +497,7 @@ class TodoListViewModelTest {
         viewModel.onEditedTitleChange("Brot kaufen")
         viewModel.onEditDismiss()
 
-        assertNull(todoRepository.lastSetTitleCall)
+        assertNull(todoRepository.lastUpdateTodoCall)
         assertNull(viewModel.uiState.value.editedTodo)
     }
 
@@ -564,12 +601,18 @@ private val TODO_ENTRY = Todo(
     id = "todo-1",
     title = "Milch kaufen",
     isDone = false,
+    priority = TodoPriority.MEDIUM,
     createdAt = Instant.parse("2026-08-07T20:00:00Z"),
     updatedAt = Instant.parse("2026-08-07T20:00:00Z"),
-    completedBy = null
+    completedBy = null,
+    completedAt = null
 )
 
-private val FINISHED_TODO_ENTRY = TODO_ENTRY.copy(isDone = true, completedBy = "uid-1")
+private val FINISHED_TODO_ENTRY = TODO_ENTRY.copy(
+    isDone = true,
+    completedBy = "uid-1",
+    completedAt = Instant.parse("2026-08-07T20:05:00Z")
+)
 
 private data class AddCall(val listId: String, val title: String)
 
@@ -580,14 +623,19 @@ private data class SetDoneCall(
     val completedBy: String?
 )
 
-private data class SetTitleCall(val listId: String, val todoId: String, val title: String)
+private data class UpdateTodoCall(
+    val listId: String,
+    val todoId: String,
+    val title: String,
+    val priority: TodoPriority
+)
 
 private data class DeleteCall(val listId: String, val todoId: String)
 
 private class FakeTodoRepository : TodoRepository {
     var addResult: Result<Unit> = Result.success(Unit)
     var setDoneResult: Result<Unit> = Result.success(Unit)
-    var setTitleResult: Result<Unit> = Result.success(Unit)
+    var updateTodoResult: Result<Unit> = Result.success(Unit)
     var deleteResult: Result<Unit> = Result.success(Unit)
     var addCallCount = 0
         private set
@@ -595,7 +643,7 @@ private class FakeTodoRepository : TodoRepository {
         private set
     var lastSetDoneCall: SetDoneCall? = null
         private set
-    var lastSetTitleCall: SetTitleCall? = null
+    var lastUpdateTodoCall: UpdateTodoCall? = null
         private set
     var lastDeleteCall: DeleteCall? = null
         private set
@@ -633,9 +681,14 @@ private class FakeTodoRepository : TodoRepository {
         return setDoneResult
     }
 
-    override fun setTitle(listId: String, todoId: String, title: String): Result<Unit> {
-        lastSetTitleCall = SetTitleCall(listId, todoId, title)
-        return setTitleResult
+    override fun updateTodo(
+        listId: String,
+        todoId: String,
+        title: String,
+        priority: TodoPriority
+    ): Result<Unit> {
+        lastUpdateTodoCall = UpdateTodoCall(listId, todoId, title, priority)
+        return updateTodoResult
     }
 
     override fun deleteTodo(listId: String, todoId: String): Result<Unit> {

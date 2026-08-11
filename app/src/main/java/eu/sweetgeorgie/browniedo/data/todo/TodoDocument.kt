@@ -20,7 +20,24 @@ data class TodoDocument(
     var done: Boolean = false,
     @ServerTimestamp var createdAt: Date? = null,
     @ServerTimestamp var updatedAt: Date? = null,
-    var completedBy: String? = null
+    var completedBy: String? = null,
+    /**
+     * Bewusst **ohne** [ServerTimestamp]: Die Annotation füllt ein leeres Feld beim Schreiben des
+     * ganzen Objekts, und `addTodo` schreibt das ganze Objekt. Jede frisch angelegte, offene
+     * Aufgabe käme damit mit einem Erledigungszeitpunkt auf die Welt. Gesetzt wird das Feld
+     * stattdessen gezielt in `setDone`.
+     */
+    var completedAt: Date? = null,
+    /**
+     * Name einer `TodoPriority`, siehe docs/decisions/0023-prioritaet-migration-und-sortierung.md.
+     *
+     * Absichtlich ein String und kein Enum-Typ: Firestore wirft beim Abbilden eines unbekannten
+     * Enum-Werts, und zwar innerhalb des Snapshot-Listeners — der Fehler käme nicht als `Result`
+     * heraus, sondern risse die ganze Aktualisierung mit. Ein Gerät mit neuerer App-Version, das
+     * eine vierte Stufe schreibt, würde das ältere damit lahmlegen. Nullable, weil Aufgaben von
+     * vor Phase 9 das Feld nicht haben und in der Console von Hand editiert wird.
+     */
+    var priority: String? = null
 )
 
 /**
@@ -32,4 +49,6 @@ internal object TodoField {
     const val DONE = "done"
     const val UPDATED_AT = "updatedAt"
     const val COMPLETED_BY = "completedBy"
+    const val COMPLETED_AT = "completedAt"
+    const val PRIORITY = "priority"
 }
