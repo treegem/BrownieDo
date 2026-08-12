@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -193,6 +195,7 @@ internal fun DeleteListDialog(
 @Composable
 internal fun EditTodoDialog(
     title: String,
+    notes: String,
     priority: TodoPriority,
     lists: List<TodoList>,
     targetListId: String,
@@ -202,12 +205,27 @@ internal fun EditTodoDialog(
         onDismissRequest = actions.onDismiss,
         title = { Text(text = stringResource(R.string.todo_list_edit_headline)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Der Dialog trägt fünf Dinge. Der text-Slot von AlertDialog begrenzt seine Höhe zwar,
+            // scrollt aber nicht von allein — mit offener Tastatur wäre der untere Teil sonst
+            // abgeschnitten.
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = actions.onTitleChange,
                     label = { Text(text = stringResource(R.string.todo_list_title_label)) },
                     singleLine = true
+                )
+                // Mehrzeilig, weil ein Backlog-Eintrag nach Wochen mehr braucht als eine Zeile —
+                // und mit Obergrenze, damit eine lange Notiz den Dialog nicht auffrisst.
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = actions.onNotesChange,
+                    label = { Text(text = stringResource(R.string.todo_list_notes_label)) },
+                    minLines = 3,
+                    maxLines = 5
                 )
                 Text(
                     text = stringResource(R.string.todo_list_priority_label),

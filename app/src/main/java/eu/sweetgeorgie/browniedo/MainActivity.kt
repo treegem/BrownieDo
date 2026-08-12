@@ -88,6 +88,7 @@ class MainActivity : ComponentActivity() {
                     val editActions = remember(todoListViewModel) {
                         TodoEditActions(
                             onTitleChange = todoListViewModel::onEditedTitleChange,
+                            onNotesChange = todoListViewModel::onEditedNotesChange,
                             onPriorityChange = todoListViewModel::onEditedPriorityChange,
                             onTargetListChange = todoListViewModel::onEditedTargetListChange,
                             // Der Kalender-Intent lebt in der UI-Schicht (ADR 0027); nur sein

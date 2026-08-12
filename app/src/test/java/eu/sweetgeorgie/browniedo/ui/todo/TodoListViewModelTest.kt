@@ -404,10 +404,11 @@ class TodoListViewModelTest {
     }
 
     @Test
-    fun `opening the edit dialog shows the current title, priority and list`() =
+    fun `opening the edit dialog shows the current title, priority, list and notes`() =
         runTest(testDispatcher) {
             advanceUntilIdle()
-            val urgentEntry = TODO_ENTRY.copy(priority = TodoPriority.HIGH)
+            val urgentEntry =
+                TODO_ENTRY.copy(priority = TodoPriority.HIGH, notes = "Die haltbare")
 
             viewModel.onEditTodoClick(urgentEntry)
 
@@ -418,11 +419,22 @@ class TodoListViewModelTest {
                     priority = TodoPriority.HIGH,
                     // Die Zielliste startet auf der Liste, in der die Aufgabe steht: „Speichern"
                     // schreibt dann an Ort und Stelle.
-                    targetListId = LIST_A.id
+                    targetListId = LIST_A.id,
+                    notes = "Die haltbare"
                 ),
                 viewModel.uiState.value.editedTodo
             )
         }
+
+    @Test
+    fun `an entry without notes opens with an empty notes field`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+
+        viewModel.onEditTodoClick(TODO_ENTRY)
+
+        // Aus null wird der leere Puffer — ein Textfeld kann kein null anzeigen.
+        assertEquals("", viewModel.uiState.value.editedTodo?.notes)
+    }
 
     @Test
     fun `saving an edit writes the trimmed title and closes the dialog`() =
@@ -434,7 +446,13 @@ class TodoListViewModelTest {
             viewModel.onEditConfirm()
 
             assertEquals(
-                UpdateTodoCall(LIST_A.id, TODO_ENTRY.id, "Brot kaufen", TodoPriority.MEDIUM),
+                UpdateTodoCall(
+                    LIST_A.id,
+                    TODO_ENTRY.id,
+                    "Brot kaufen",
+                    TodoPriority.MEDIUM,
+                    notes = null
+                ),
                 todoRepository.lastUpdateTodoCall
             )
             assertNull(viewModel.uiState.value.editedTodo)
@@ -451,7 +469,13 @@ class TodoListViewModelTest {
             viewModel.onEditConfirm()
 
             assertEquals(
-                UpdateTodoCall(LIST_A.id, TODO_ENTRY.id, TODO_ENTRY.title, TodoPriority.HIGH),
+                UpdateTodoCall(
+                    LIST_A.id,
+                    TODO_ENTRY.id,
+                    TODO_ENTRY.title,
+                    TodoPriority.HIGH,
+                    notes = null
+                ),
                 todoRepository.lastUpdateTodoCall
             )
         }
@@ -465,6 +489,43 @@ class TodoListViewModelTest {
 
         assertNull(todoRepository.lastUpdateTodoCall)
         assertEquals(TodoPriority.LOW, viewModel.uiState.value.editedTodo?.priority)
+    }
+
+    @Test
+    fun `saving an edit writes the trimmed notes`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onEditedNotesChange("  Die haltbare, nicht die frische  ")
+        viewModel.onEditConfirm()
+
+        assertEquals(
+            "Die haltbare, nicht die frische",
+            todoRepository.lastUpdateTodoCall?.notes
+        )
+    }
+
+    @Test
+    fun `emptying the notes writes null instead of a blank string`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+
+        viewModel.onEditTodoClick(TODO_ENTRY.copy(notes = "Die haltbare"))
+        viewModel.onEditedNotesChange("   ")
+        viewModel.onEditConfirm()
+
+        // „Keine Notiz" hat genau eine Form, und die ist null.
+        assertNull(todoRepository.lastUpdateTodoCall?.notes)
+    }
+
+    @Test
+    fun `typing notes writes nothing before the edit is saved`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onEditedNotesChange("Die haltbare")
+
+        assertNull(todoRepository.lastUpdateTodoCall)
+        assertEquals("Die haltbare", viewModel.uiState.value.editedTodo?.notes)
     }
 
     @Test
@@ -538,18 +599,48 @@ class TodoListViewModelTest {
     }
 
     @Test
-    fun `a move carries the edited title and priority`() = runTest(testDispatcher) {
+    fun `a move carries the edited title, priority and notes`() = runTest(testDispatcher) {
         seedEntryInFirstList()
 
         viewModel.onEditTodoClick(TODO_ENTRY)
         viewModel.onEditedTitleChange("  Brot kaufen  ")
         viewModel.onEditedPriorityChange(TodoPriority.HIGH)
+        viewModel.onEditedNotesChange("  Vom Bäcker, nicht vom Supermarkt  ")
         viewModel.onEditedTargetListChange(LIST_B)
         viewModel.onEditConfirm()
 
         val moved = todoRepository.lastMoveTodoCall?.todo
         assertEquals("Brot kaufen", moved?.title)
         assertEquals(TodoPriority.HIGH, moved?.priority)
+        // Der Fall, der durch keinen Mapper-Test auffällt: Die verschobene Aufgabe kommt aus dem
+        // Snapshot, und was der Dialog besitzt, muss darauf überschrieben werden — sonst reiste
+        // hier die *alte* Notiz mit und die getippte wäre verloren.
+        assertEquals("Vom Bäcker, nicht vom Supermarkt", moved?.notes)
+    }
+
+    @Test
+    fun `a move carries the stored notes when they were not edited`() = runTest(testDispatcher) {
+        val entryWithNotes = TODO_ENTRY.copy(notes = "Die haltbare")
+        seedEntryInFirstList(entryWithNotes)
+
+        viewModel.onEditTodoClick(entryWithNotes)
+        viewModel.onEditedTargetListChange(LIST_B)
+        viewModel.onEditConfirm()
+
+        assertEquals("Die haltbare", todoRepository.lastMoveTodoCall?.todo?.notes)
+    }
+
+    @Test
+    fun `a move can clear the notes`() = runTest(testDispatcher) {
+        val entryWithNotes = TODO_ENTRY.copy(notes = "Die haltbare")
+        seedEntryInFirstList(entryWithNotes)
+
+        viewModel.onEditTodoClick(entryWithNotes)
+        viewModel.onEditedNotesChange("")
+        viewModel.onEditedTargetListChange(LIST_B)
+        viewModel.onEditConfirm()
+
+        assertNull(todoRepository.lastMoveTodoCall?.todo?.notes)
     }
 
     @Test
@@ -770,7 +861,8 @@ private val TODO_ENTRY = Todo(
     createdAt = Instant.parse("2026-08-07T20:00:00Z"),
     updatedAt = Instant.parse("2026-08-07T20:00:00Z"),
     completedBy = null,
-    completedAt = null
+    completedAt = null,
+    notes = null
 )
 
 private val FINISHED_TODO_ENTRY = TODO_ENTRY.copy(
@@ -792,7 +884,8 @@ private data class UpdateTodoCall(
     val listId: String,
     val todoId: String,
     val title: String,
-    val priority: TodoPriority
+    val priority: TodoPriority,
+    val notes: String?
 )
 
 private data class MoveTodoCall(val fromListId: String, val toListId: String, val todo: Todo)
@@ -855,9 +948,10 @@ private class FakeTodoRepository : TodoRepository {
         listId: String,
         todoId: String,
         title: String,
-        priority: TodoPriority
+        priority: TodoPriority,
+        notes: String?
     ): Result<Unit> {
-        lastUpdateTodoCall = UpdateTodoCall(listId, todoId, title, priority)
+        lastUpdateTodoCall = UpdateTodoCall(listId, todoId, title, priority, notes)
         return updateTodoResult
     }
 

@@ -29,7 +29,11 @@ fun TodoDocument.toTodo(id: String): Todo? {
         createdAt = createdAtInstant,
         updatedAt = updatedAtInstant,
         completedBy = completedBy.takeIf { done },
-        completedAt = completedAt?.toInstant().takeIf { done }
+        completedAt = completedAt?.toInstant().takeIf { done },
+        // Ein fehlendes Feld kommt hier schon als null an; `takeIf` fängt zusätzlich das leere Feld
+        // ab, das beim Editieren in der Console entsteht — sonst trüge die Zeile eine leere
+        // zweite Zeile.
+        notes = notes?.takeIf { it.isNotBlank() }
     )
 }
 
@@ -71,5 +75,6 @@ fun Todo.toDocument(): TodoDocument = TodoDocument(
     completedBy = completedBy,
     completedAt = completedAt?.let(Date::from),
     // Der Name, nicht die Position im Enum — dieselbe Regel wie in `updateTodo`.
-    priority = priority.name
+    priority = priority.name,
+    notes = notes
 )

@@ -149,7 +149,9 @@ class TodoOrderTest {
             // Ohne Belang für die Reihenfolge, muss aber gesetzt sein.
             updatedAt = createdAt,
             completedBy = "uid-partner".takeIf { isDone },
-            completedAt = completedAtMillis?.let(Instant::ofEpochMilli)
+            completedAt = completedAtMillis?.let(Instant::ofEpochMilli),
+            // Die Notiz ordnet nichts — TODO_ORDER fasst sie nicht an.
+            notes = null
         )
     }
 }

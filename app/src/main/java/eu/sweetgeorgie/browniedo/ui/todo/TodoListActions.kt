@@ -73,6 +73,7 @@ data class TodoActions(
 @Immutable
 data class TodoEditActions(
     val onTitleChange: (String) -> Unit,
+    val onNotesChange: (String) -> Unit,
     val onPriorityChange: (TodoPriority) -> Unit,
     val onTargetListChange: (TodoList) -> Unit,
     val onCalendarEventClick: (String) -> Unit,

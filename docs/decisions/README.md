@@ -55,3 +55,4 @@ der den alten als „abgelöst" markiert.
 | [0027](0027-termine-per-kalender-intent.md) | Termine per Kalender-Intent statt Calendar API | akzeptiert |
 | [0028](0028-rueckrufe-in-actions-haltern.md) | Rückrufe des Aufgaben-Bildschirms in Actions-Haltern bündeln | akzeptiert |
 | [0029](0029-kalender-fehler-ueber-todolisterror.md) | Der Kalender-Fehler läuft über `TodoListError` | akzeptiert |
+| [0030](0030-notiz-als-zweite-zeile.md) | Die Notiz erscheint als gekürzte zweite Zeile, nicht als Symbol | akzeptiert |

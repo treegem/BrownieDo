@@ -1,15 +1,18 @@
 package eu.sweetgeorgie.browniedo.ui.todo
 
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeRight
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -177,7 +180,8 @@ class TodoListScreenTest {
                     todoId = URGENT_TODO.id,
                     title = URGENT_TODO.title,
                     priority = TodoPriority.HIGH,
-                    targetListId = LIST.id
+                    targetListId = LIST.id,
+                    notes = ""
                 )
             )
         )
@@ -198,7 +202,8 @@ class TodoListScreenTest {
                     todoId = OPEN_TODO.id,
                     title = OPEN_TODO.title,
                     priority = TodoPriority.MEDIUM,
-                    targetListId = LIST.id
+                    targetListId = LIST.id,
+                    notes = ""
                 )
             ),
             editActions = NO_EDIT_ACTIONS.copy(onPriorityChange = { picked = it })
@@ -286,6 +291,50 @@ class TodoListScreenTest {
         assertEquals(OPEN_TODO.title, reportedTitle)
     }
 
+    @Test
+    fun aRowShowsTheNotesBelowTheTitle() {
+        setScreenContent(
+            uiState = TodoListUiState(
+                selectedList = LIST,
+                isLoading = false,
+                todos = listOf(TODO_WITH_NOTES)
+            )
+        )
+
+        composeTestRule.onNodeWithText(TODO_WITH_NOTES.notes!!).assertIsDisplayed()
+    }
+
+    @Test
+    fun aRowWithoutNotesHasNoSecondLine() {
+        setScreenContent(
+            uiState = TodoListUiState(
+                selectedList = LIST,
+                isLoading = false,
+                todos = listOf(OPEN_TODO, TODO_WITH_NOTES)
+            )
+        )
+
+        // Gegen die Notiz der *anderen* Zeile geprüft: Stünde sie an beiden, wäre der Knoten
+        // zweimal da — der Test soll aber zeigen, dass eine Zeile ohne Notiz keine zweite Zeile hat.
+        composeTestRule.onNodeWithText(OPEN_TODO.title).assertIsDisplayed()
+        composeTestRule.onAllNodesWithText(TODO_WITH_NOTES.notes!!).assertCountEquals(1)
+    }
+
+    @Test
+    fun typingNotesInTheEditDialogReportsIt() {
+        var typed: String? = null
+        setScreenContent(
+            uiState = editingIn(LIST, lists = listOf(LIST)),
+            editActions = NO_EDIT_ACTIONS.copy(onNotesChange = { typed = it })
+        )
+
+        val label = composeTestRule.activity.getString(R.string.todo_list_notes_label)
+        composeTestRule.onNode(hasAnyAncestor(isDialog()) and hasText(label))
+            .performTextInput("Die haltbare")
+
+        assertEquals("Die haltbare", typed)
+    }
+
     private fun editingIn(list: TodoList, lists: List<TodoList>) = TodoListUiState(
         lists = lists,
         selectedList = list,
@@ -295,7 +344,8 @@ class TodoListScreenTest {
             todoId = OPEN_TODO.id,
             title = OPEN_TODO.title,
             priority = TodoPriority.MEDIUM,
-            targetListId = list.id
+            targetListId = list.id,
+            notes = ""
         )
     )
 
@@ -372,6 +422,7 @@ class TodoListScreenTest {
 
         val NO_EDIT_ACTIONS = TodoEditActions(
             onTitleChange = {},
+            onNotesChange = {},
             onPriorityChange = {},
             onTargetListChange = {},
             onCalendarEventClick = {},
@@ -394,7 +445,14 @@ class TodoListScreenTest {
             createdAt = TIMESTAMP,
             updatedAt = TIMESTAMP,
             completedBy = null,
-            completedAt = null
+            completedAt = null,
+            notes = null
+        )
+
+        val TODO_WITH_NOTES = OPEN_TODO.copy(
+            id = "todo-with-notes",
+            title = "Fenster abdichten",
+            notes = "Das im Schlafzimmer, Schaumband aus dem Baumarkt"
         )
 
         val FINISHED_TODO = OPEN_TODO.copy(

@@ -22,5 +22,12 @@ data class Todo(
      * finished before this field existed. Those sort to the end of the finished block, see
      * docs/decisions/0023-prioritaet-migration-und-sortierung.md.
      */
-    val completedAt: Instant?
+    val completedAt: Instant?,
+    /**
+     * Was der Titel allein nach Wochen nicht mehr sagt. Null heißt „keine Notiz" — nicht „leer": Ein
+     * geleertes Feld wird beim Speichern zu null, damit es nur eine Form für „nichts" gibt.
+     *
+     * Aufgaben von vor Phase 12 tragen das Feld nicht und werden ebenfalls zu null gelesen.
+     */
+    val notes: String?
 )

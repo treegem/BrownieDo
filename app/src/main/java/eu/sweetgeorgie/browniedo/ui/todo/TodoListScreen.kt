@@ -188,6 +188,7 @@ fun TodoListScreen(
     uiState.editedTodo?.let { editedTodo ->
         EditTodoDialog(
             title = editedTodo.title,
+            notes = editedTodo.notes,
             priority = editedTodo.priority,
             lists = uiState.lists,
             targetListId = editedTodo.targetListId,
@@ -386,6 +387,7 @@ private val PREVIEW_TODO_ACTIONS = TodoActions(
 
 private val PREVIEW_EDIT_ACTIONS = TodoEditActions(
     onTitleChange = {},
+    onNotesChange = {},
     onPriorityChange = {},
     onTargetListChange = {},
     onCalendarEventClick = {},
@@ -401,7 +403,8 @@ private val PREVIEW_LISTS = listOf(
     TodoList(id = "list-private", name = "Meine Erledigungen", isShared = false)
 )
 
-// Alle drei Stufen, damit die Vorschau die Markierung und ihr Fehlen zeigt.
+// Alle drei Stufen, damit die Vorschau die Markierung und ihr Fehlen zeigt — und genau eine Notiz,
+// damit die zweite Zeile neben einer Zeile ohne sie zu sehen ist.
 private val PREVIEW_TODOS = listOf(
     Todo(
         id = "todo-1",
@@ -411,7 +414,8 @@ private val PREVIEW_TODOS = listOf(
         createdAt = PREVIEW_TIMESTAMP,
         updatedAt = PREVIEW_TIMESTAMP,
         completedBy = null,
-        completedAt = null
+        completedAt = null,
+        notes = "Die haltbare, nicht die frische — und zwei Packungen"
     ),
     Todo(
         id = "todo-2",
@@ -421,7 +425,8 @@ private val PREVIEW_TODOS = listOf(
         createdAt = PREVIEW_TIMESTAMP,
         updatedAt = PREVIEW_TIMESTAMP,
         completedBy = null,
-        completedAt = null
+        completedAt = null,
+        notes = null
     ),
     Todo(
         id = "todo-3",
@@ -431,7 +436,8 @@ private val PREVIEW_TODOS = listOf(
         createdAt = PREVIEW_TIMESTAMP,
         updatedAt = PREVIEW_TIMESTAMP,
         completedBy = null,
-        completedAt = null
+        completedAt = null,
+        notes = null
     ),
     Todo(
         id = "todo-4",
@@ -441,6 +447,7 @@ private val PREVIEW_TODOS = listOf(
         createdAt = PREVIEW_TIMESTAMP,
         updatedAt = PREVIEW_TIMESTAMP,
         completedBy = "uid-1",
-        completedAt = PREVIEW_TIMESTAMP
+        completedAt = PREVIEW_TIMESTAMP,
+        notes = null
     )
 )

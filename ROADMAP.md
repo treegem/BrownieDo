@@ -372,18 +372,55 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 > Ein Backlog-Eintrag lebt Wochen. Ein Titel allein hat dann oft verloren, was eigentlich gemeint
 > war („Fenster abdichten" — welche, und was war der Plan?). Die Security Rules bleiben unberührt: auf
 > `todos` gilt `read, write` für alle Mitglieder der Liste, ohne Feldprüfung.
-- [ ] `Todo` und `TodoDocument` um `notes: String?` erweitern, dazu `TodoField` — nullable, weil
+- [x] `Todo` und `TodoDocument` um `notes: String?` erweitern, dazu `TodoField` — nullable, weil
   „keine Notiz" der Normalfall ist und bestehende Aufgaben das Feld nicht haben
-- [ ] Mehrzeiliges Feld im Bearbeiten-Dialog; Titel, Priorität und Notiz gehen in **einem**
-  Schreibvorgang raus, wie in
-  [ADR 0025](docs/decisions/0025-titel-und-prioritaet-in-einem-schreibvorgang.md) entschieden
-- [ ] In der Zeile nur andeuten, nicht ausbreiten — ein Symbol oder eine gekürzte zweite Zeile
-  (`supportingContent` von `ListItem`). Die Liste bleibt eine Liste
-- [ ] Beim Verschieben mitwandern lassen — das verlangt
+- [x] **Bestehende Aufgaben ohne das Feld haben keine Notiz — kein Nachziehen in der Console.**
+  `TodoDocument.notes` steht auf `null`, und Firestores `toObject` lässt ein fehlendes Feld genau
+  darauf stehen. Anders als bei der Priorität braucht es **keinen Rückfallwert**: Dort war
+  `TodoPriority` nicht-nullable, „fehlt" musste also zu „mittel" werden
+  ([ADR 0023](docs/decisions/0023-prioritaet-migration-und-sortierung.md)) — hier ist null bereits
+  die richtige Antwort. Ein `update()` legt das fehlende Feld beim ersten Speichern an; es scheitert
+  nur an einem fehlenden *Dokument*. **Auf die Sortierung wirkt das Feld nicht**, `TODO_ORDER` fasst
+  es nicht an
+- [x] Eine gelöschte Notiz wird als `null` geschrieben, **nicht** mit `FieldValue.delete()` entfernt
+  — beides liest sich gleich, aber so zerfällt der Bestand nicht in „Feld fehlt" und „Feld ist
+  null". Der leere Puffer des Textfelds wird dafür im ViewModel zu null, an einer Stelle und vor der
+  Verzweigung zwischen Ändern und Verschieben
+- [x] Mehrzeiliges Feld im Bearbeiten-Dialog (`minLines = 3`, `maxLines = 5`); Titel, Priorität und
+  Notiz gehen in **einem** Schreibvorgang raus, wie in
+  [ADR 0025](docs/decisions/0025-titel-und-prioritaet-in-einem-schreibvorgang.md) entschieden. Der
+  Dialog trägt damit fünf Dinge und bekam ein `verticalScroll`: Der `text`-Slot von `AlertDialog`
+  begrenzt seine Höhe zwar, scrollt aber nicht von allein
+- [x] In der Zeile nur angedeutet — **gekürzte zweite Zeile** (`supportingContent`, einzeilig mit
+  Auslassungspunkten), kein Symbol. Warum, steht in
+  [ADR 0030](docs/decisions/0030-notiz-als-zweite-zeile.md): Ein Symbol sagt nur, *dass* es etwas
+  gibt, und müsste sich den `trailingContent` mit dem Prioritäts-Pfeil teilen. Erledigte Aufgaben
+  zeigen die Notiz mit, das spart eine Regel
+- [x] Beim Verschieben mitwandern lassen — das verlangt
   [ADR 0024](docs/decisions/0024-verschieben-behaelt-zustand.md) ausdrücklich für jedes neue Feld,
-  das die Aufgabe beschreibt
-- [ ] Unit-Tests: Mapper mit und ohne Notiz, Verschieben hin und zurück, ViewModel
-- [ ] Auf dem Gerät prüfen — lange Notiz, Zeilenumbrüche, und wie die Zeile mit und ohne Notiz aussieht
+  das die Aufgabe beschreibt. Es hängt an **zwei** Stellen, und nur eine ist offensichtlich:
+  `toDocument()` nimmt das Feld mit (das sichert der Hin-und-zurück-Test), **und `onEditConfirm`
+  muss die Notiz aus dem Dialog auf den Snapshot überschreiben** — sonst reiste beim gleichzeitigen
+  Verschieben und Ändern die *alte* Notiz mit und die getippte wäre verloren. Der Fall fällt durch
+  keinen Mapper-Test auf und hat deshalb einen eigenen ViewModel-Test
+- [x] Unit-Tests — **108 grün** (vorher 99). Mapper mit Notiz, **ohne das Feld** (der
+  Migrationsfall) und mit leerem Feld, dazu ein Hin-und-zurück ohne das Feld für das Verschieben
+  einer alten Aufgabe; im ViewModel die Vorbelegung, das Trimmen, das Leeren zu `null` und drei
+  Verschieben-Fälle (Notiz mitgeführt · Notiz gleichzeitig geändert · Notiz gleichzeitig geleert)
+- [x] Instrumentierte Tests **am 2026-08-12 auf einem SM-S928B gelaufen, alle 24 grün** (vorher 21:
+  drei neue im `TodoListScreenTest` — Zeile mit Notiz · Zeile ohne Notiz hat keine zweite ·
+  Notizfeld im Dialog meldet die Eingabe). Canary-Gegenprobe mitgemacht: `aRowShowsTheNotesBelowTheTitle`
+  auf einen erfundenen Text gedreht scheitert mit „is not displayed" und aufgelöstem Matcher, nicht
+  an „No compose hierarchies found".
+  **Nebenbei gelernt:** Wird das Kabel während eines Laufs gezogen, bleibt die App halb installiert
+  zurück und der nächste Versuch scheitert mit „Failed to install APK(s)" plus
+  `DELETE_FAILED_INTERNAL_ERROR` beim Test-APK. Einfach erneut starten, sobald das Gerät wieder
+  stabil hängt — es braucht kein Deinstallieren von Hand
+- [x] Auf dem Gerät geprüft (2026-08-12, SM-S928B) — lange Notiz und eine mit Zeilenumbrüchen ·
+  Dialog mit offener Tastatur, das `verticalScroll` greift · Zeile mit und ohne Notiz nebeneinander,
+  offen und erledigt, hell und dunkel · alte Aufgabe ohne das Feld bearbeitet und ihr eine Notiz
+  gegeben · Notiz gelöscht und beim Partner nachgesehen · Aufgabe mit Notiz verschoben, ohne und mit
+  gleichzeitiger Änderung. **Damit ist auch die aus Phase 11 offene Hell/Dunkel-Sicht nachgeholt**
 
 ### Querlaufend – Werkzeuge & Doku
 > Läuft neben den Phasen und gehört zu keiner.

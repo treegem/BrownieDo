@@ -24,7 +24,8 @@ class TodoMapperTest {
                 createdAt = CREATED_AT,
                 updatedAt = UPDATED_AT,
                 completedBy = "uid-partner",
-                completedAt = COMPLETED_AT
+                completedAt = COMPLETED_AT,
+                notes = "Die haltbare, nicht die frische"
             ),
             todo
         )
@@ -54,6 +55,26 @@ class TodoMapperTest {
         // nicht verworfen werden.
         assertNotNull(todo)
         assertNull(todo?.completedAt)
+    }
+
+    @Test
+    fun `reads an entry that has no notes field at all`() {
+        // Der Migrationsfall: Aufgaben von vor Phase 12 tragen das Feld nicht. Firestores toObject
+        // lässt es auf dem Standardwert stehen, also null — und die Aufgabe bleibt erhalten.
+        val document = completeDocument().copy(notes = null)
+
+        val todo = document.toTodo(DOCUMENT_ID)
+
+        assertNotNull(todo)
+        assertNull(todo?.notes)
+    }
+
+    @Test
+    fun `reads an empty notes field as no notes`() {
+        // Kann beim Editieren in der Console entstehen. Sonst trüge die Zeile eine leere zweite.
+        val document = completeDocument().copy(notes = "   ")
+
+        assertNull(document.toTodo(DOCUMENT_ID)?.notes)
     }
 
     @Test
@@ -93,7 +114,8 @@ class TodoMapperTest {
                 updatedAt = null,
                 completedBy = "uid-partner",
                 completedAt = Date.from(COMPLETED_AT),
-                priority = TodoPriority.HIGH.name
+                priority = TodoPriority.HIGH.name,
+                notes = "Die haltbare, nicht die frische"
             ),
             todo?.toDocument()
         )
@@ -142,6 +164,17 @@ class TodoMapperTest {
     }
 
     @Test
+    fun `an entry without notes survives being mapped to the domain and back`() {
+        // Der Migrationsfall beim Verschieben: Eine Aufgabe von vor Phase 12 darf dabei nicht
+        // hängen bleiben, nur weil das Feld fehlt.
+        val document = completeDocument().copy(notes = null)
+
+        val roundTripped = document.toTodo(DOCUMENT_ID)?.toDocument()
+
+        assertEquals(document.copy(updatedAt = null), roundTripped)
+    }
+
+    @Test
     fun `rejects a document whose server timestamps are still missing`() {
         assertNull(completeDocument().copy(createdAt = null).toTodo(DOCUMENT_ID))
         assertNull(completeDocument().copy(updatedAt = null).toTodo(DOCUMENT_ID))
@@ -159,7 +192,8 @@ class TodoMapperTest {
         updatedAt = Date.from(UPDATED_AT),
         completedBy = "uid-partner",
         completedAt = Date.from(COMPLETED_AT),
-        priority = TodoPriority.HIGH.name
+        priority = TodoPriority.HIGH.name,
+        notes = "Die haltbare, nicht die frische"
     )
 
     private companion object {

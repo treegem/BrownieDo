@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import eu.sweetgeorgie.browniedo.R
 import eu.sweetgeorgie.browniedo.domain.todo.Todo
@@ -111,6 +112,14 @@ private fun TodoRow(
             )
         },
         modifier = modifier.clickable(onClick = onClick),
+        // Angedeutet, nicht ausgebreitet: eine Zeile mit Auslassungspunkten, siehe
+        // docs/decisions/0030-notiz-als-zweite-zeile.md. Keine eigene Farbe — ListItem färbt den
+        // Slot schon auf onSurfaceVariant, und eine Farbe am inneren Text würde überschrieben.
+        supportingContent = todo.notes?.let { notes ->
+            {
+                Text(text = notes, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        },
         leadingContent = { Checkbox(checked = todo.isDone, onCheckedChange = onDoneChange) },
         trailingContent = if (markerIconResId == null) {
             null

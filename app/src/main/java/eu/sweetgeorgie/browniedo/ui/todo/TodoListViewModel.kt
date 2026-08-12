@@ -284,7 +284,9 @@ class TodoListViewModel(
                     todoId = todo.id,
                     title = todo.title,
                     priority = todo.priority,
-                    targetListId = listId
+                    targetListId = listId,
+                    // Aus null wird der leere Puffer des Textfelds; beim Speichern wieder zurück.
+                    notes = todo.notes.orEmpty()
                 ),
                 error = null
             )
@@ -303,6 +305,10 @@ class TodoListViewModel(
         it.copy(editedTodo = it.editedTodo?.copy(targetListId = list.id))
     }
 
+    fun onEditedNotesChange(notes: String) = mutableUiState.update {
+        it.copy(editedTodo = it.editedTodo?.copy(notes = notes))
+    }
+
     fun onEditDismiss() = mutableUiState.update { it.copy(editedTodo = null) }
 
     /**
@@ -315,10 +321,19 @@ class TodoListViewModel(
         val editedTodo = mutableUiState.value.editedTodo ?: return
         val title = editedTodo.title.trim()
         if (title.isEmpty()) return
+        // Vor der Verzweigung, damit beide Zweige denselben Wert schreiben. Der leere Puffer wird
+        // hier wieder zu null — „keine Notiz" hat damit genau eine Form.
+        val notes = editedTodo.notes.trim().takeIf { it.isNotBlank() }
 
         if (editedTodo.targetListId == listId) {
-            // Titel und Priorität gehen zusammen raus (ADR 0025).
-            todoRepository.updateTodo(listId, editedTodo.todoId, title, editedTodo.priority).fold(
+            // Titel, Priorität und Notiz gehen zusammen raus (ADR 0025).
+            todoRepository.updateTodo(
+                listId = listId,
+                todoId = editedTodo.todoId,
+                title = title,
+                priority = editedTodo.priority,
+                notes = notes
+            ).fold(
                 // The dialog stays open on failure so the typed title is not lost.
                 onSuccess = { mutableUiState.update { it.copy(editedTodo = null, error = null) } },
                 onFailure = {
@@ -330,8 +345,8 @@ class TodoListViewModel(
 
         val state = mutableUiState.value
         // Die Aufgabe kommt aus dem angezeigten Stand, nicht aus dem Dialog: Der Dialog trägt nur
-        // Titel und Priorität, alle übrigen Felder wandern unverändert mit (ADR 0024). Damit ist
-        // auch der Erledigt-Zustand so frisch wie der letzte Snapshot und nicht so alt wie der
+        // Titel, Priorität und Notiz, alle übrigen Felder wandern unverändert mit (ADR 0024). Damit
+        // ist auch der Erledigt-Zustand so frisch wie der letzte Snapshot und nicht so alt wie der
         // Dialog.
         val todo = state.todos.firstOrNull { it.id == editedTodo.todoId }
         val target = state.lists.firstOrNull { it.id == editedTodo.targetListId }
@@ -347,7 +362,9 @@ class TodoListViewModel(
         todoRepository.moveTodo(
             fromListId = listId,
             toListId = target.id,
-            todo = todo.copy(title = title, priority = editedTodo.priority)
+            // Was der Dialog besitzt, überschreibt den Snapshot — sonst reiste beim gleichzeitigen
+            // Verschieben und Ändern die *alte* Notiz mit und die getippte wäre verloren.
+            todo = todo.copy(title = title, priority = editedTodo.priority, notes = notes)
         ).fold(
             onSuccess = {
                 mutableUiState.update {

@@ -10,6 +10,7 @@ import eu.sweetgeorgie.browniedo.data.TODOS_COLLECTION
 import eu.sweetgeorgie.browniedo.data.todo.TodoField.COMPLETED_AT
 import eu.sweetgeorgie.browniedo.data.todo.TodoField.COMPLETED_BY
 import eu.sweetgeorgie.browniedo.data.todo.TodoField.DONE
+import eu.sweetgeorgie.browniedo.data.todo.TodoField.NOTES
 import eu.sweetgeorgie.browniedo.data.todo.TodoField.PRIORITY
 import eu.sweetgeorgie.browniedo.data.todo.TodoField.TITLE
 import eu.sweetgeorgie.browniedo.data.todo.TodoField.UPDATED_AT
@@ -91,7 +92,8 @@ class FirestoreTodoRepository(private val firestore: FirebaseFirestore) : TodoRe
         listId: String,
         todoId: String,
         title: String,
-        priority: TodoPriority
+        priority: TodoPriority,
+        notes: String?
     ): Result<Unit> =
         runCatching {
             todoCollection(listId).document(todoId).update(
@@ -100,6 +102,12 @@ class FirestoreTodoRepository(private val firestore: FirebaseFirestore) : TodoRe
                     // Der Name, nicht die Position im Enum: Eine spätere Umsortierung der Stufen
                     // darf gespeicherte Aufgaben nicht umdeuten.
                     PRIORITY to priority.name,
+                    // Eine gelöschte Notiz wird zu null geschrieben und **nicht** mit
+                    // FieldValue.delete() entfernt: Beides liest sich später gleich, aber so
+                    // zerfällt der Bestand nicht in „Feld fehlt" und „Feld ist null". Dass eine
+                    // alte Aufgabe das Feld noch gar nicht hat, stört update() nicht — es legt
+                    // fehlende Felder an und scheitert nur an einem fehlenden Dokument.
+                    NOTES to notes,
                     UPDATED_AT to FieldValue.serverTimestamp()
                 )
             )

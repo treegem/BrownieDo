@@ -53,12 +53,17 @@ data class TodoListUiState(
  * der Liste, in der die Aufgabe gerade steht: „Speichern" schreibt dann an Ort und Stelle, und erst
  * eine andere Wahl macht daraus ein Verschieben, siehe
  * docs/decisions/0022-verschieben-im-bearbeiten-dialog.md.
+ *
+ * [notes] ist **nicht** nullable, anders als [Todo.notes]: Das hier ist der Puffer des Textfelds,
+ * und ein Textfeld braucht einen String. Leer heißt „keine Notiz"; die Übersetzung nach null
+ * passiert beim Speichern, an einer Stelle.
  */
 data class TodoEdit(
     val todoId: String,
     val title: String,
     val priority: TodoPriority,
-    val targetListId: String
+    val targetListId: String,
+    val notes: String
 )
 
 /** The list being created, together with what has been typed and picked so far. */

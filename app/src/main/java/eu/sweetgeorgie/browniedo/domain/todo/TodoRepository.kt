@@ -37,15 +37,19 @@ interface TodoRepository {
     fun setDone(listId: String, todoId: String, isDone: Boolean, completedBy: String?): Result<Unit>
 
     /**
-     * Writes what the edit dialog owns — title and priority — in a single update, so that one save
-     * is one write. What that means for concurrent edits is in
+     * Writes what the edit dialog owns — title, priority and notes — in a single update, so that one
+     * save is one write. What that means for concurrent edits is in
      * docs/decisions/0025-titel-und-prioritaet-in-einem-schreibvorgang.md.
+     *
+     * [notes] `null` löscht die Notiz. Aufrufer geben ihre Argumente benannt an: [title] und [notes]
+     * sind beide `String` und stünden sonst vertauschbar nebeneinander.
      */
     fun updateTodo(
         listId: String,
         todoId: String,
         title: String,
-        priority: TodoPriority
+        priority: TodoPriority,
+        notes: String?
     ): Result<Unit>
 
     /**

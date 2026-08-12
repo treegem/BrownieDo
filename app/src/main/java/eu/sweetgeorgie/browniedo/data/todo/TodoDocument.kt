@@ -37,7 +37,15 @@ data class TodoDocument(
      * eine vierte Stufe schreibt, würde das ältere damit lahmlegen. Nullable, weil Aufgaben von
      * vor Phase 9 das Feld nicht haben und in der Console von Hand editiert wird.
      */
-    var priority: String? = null
+    var priority: String? = null,
+    /**
+     * Die Notiz zur Aufgabe. Nullable und mit Standardwert `null`, und beides trägt die Migration:
+     * Aufgaben von vor Phase 12 haben das Feld nicht, und Firestores `toObject` lässt ein fehlendes
+     * Feld genau auf diesem Standardwert stehen. Kein Nachziehen in der Console nötig — anders als
+     * bei der Priorität braucht es hier auch keinen Rückfallwert, weil „keine Notiz" die richtige
+     * Antwort ist und nicht ein Ersatz für eine fehlende.
+     */
+    var notes: String? = null
 )
 
 /**
@@ -51,4 +59,5 @@ internal object TodoField {
     const val COMPLETED_BY = "completedBy"
     const val COMPLETED_AT = "completedAt"
     const val PRIORITY = "priority"
+    const val NOTES = "notes"
 }
