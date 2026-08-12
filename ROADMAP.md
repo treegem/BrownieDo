@@ -348,7 +348,10 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   `TodoEditActions` plus eine Zeile in `MainActivity`, siehe
   [ADR 0028](docs/decisions/0028-rueckrufe-in-actions-haltern.md). Als Aktionszeile **unter** den
   Feldern statt als dritter Knopf neben Löschen und Abbrechen; der Titel kommt aus dem Feld, und
-  der Dialog bleibt offen — es wird dabei nichts nach Firestore geschrieben
+  der Dialog bleibt offen — es wird dabei nichts nach Firestore geschrieben. (Seit
+  [ADR 0032](docs/decisions/0032-gefuellte-bestaetigung-und-loeschen-im-inhalt.md) steht Löschen
+  ebenfalls dort, und die Knopfzeile trägt nur noch Abbrechen und Speichern — aus dem Sonderfall ist
+  damit die Regel geworden)
 - [x] Test auf den Intent-Bau (Action, Data-Uri, Titel-Extra, kein Paket, kein Zeitpunkt) —
   `CalendarEventIntentTest`. **Steht in `androidTest`, nicht in `test`**, obwohl er weder Compose
   noch Gerätezustand braucht: `android.content.Intent` ist im reinen JVM-Test eine Attrappe und
@@ -428,8 +431,11 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 ### Phase 13 – Nacharbeit aus dem Best-Practice-Durchgang (2026-08-12)
 > Ergebnis eines Durchgangs durch Oberfläche und Code nach Phase 12, ohne Anlass in einem konkreten
 > Fehler. Bewusst **nicht** kleinteilig: Was Linter und Formatierer ohnehin finden, steht hier nicht.
-> Die Reihenfolge ist die nach Gewicht, nicht die der Umsetzung — die ersten drei Punkte hängen
-> zusammen und gehören in einen Zug.
+> Die Reihenfolge ist die nach Gewicht, nicht die der Umsetzung. Die ersten Punkte hängen zusammen,
+> sind aber bewusst in mehrere Züge zerfallen: erst das Rückgängig
+> ([ADR 0031](docs/decisions/0031-rueckgaengig-statt-rueckfrage-beim-loeschen.md)), dann die
+> Knopfzeile ([ADR 0032](docs/decisions/0032-gefuellte-bestaetigung-und-loeschen-im-inhalt.md)) —
+> die Wischschwelle bleibt offen, weil sie auf dem Gerät entschieden wird und nicht hier.
 
 **Was der Durchgang ausdrücklich nicht beanstandet hat**, damit hier niemand nachträglich
 „aufräumt": Die Schichtentrennung hält durchgehend, die `LazyColumn` hat `key = Todo::id` samt
@@ -494,32 +500,77 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   [ADR 0031](docs/decisions/0031-rueckgaengig-statt-rueckfrage-beim-loeschen.md) und
   [ADR 0016](docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md) verworfen haben. Rot gibt
   es beim Wischen ohnehin schon, dort trägt der Hintergrund die Farbe
-- [ ] Die **85-%-Wischschwelle** aus ADR 0016 auf den Material-Standard von 50 % senken — jetzt
-  möglich, weil das Rückgängig das Netz spannt, das die hohe Schwelle ersetzen sollte. Absichtlich
-  **nicht** in derselben Änderung: Das ist eine Entscheidung über das Gefühl der Geste und will auf
-  dem Gerät erprobt werden, nicht am Schreibtisch entschieden
-- [ ] **„Speichern" landet auf einer eigenen Zeile, und zwar aus einem benennbaren Grund.**
+- [ ] Die **85-%-Wischschwelle** aus ADR 0016 auf 50 % der Zeilenbreite senken — jetzt möglich, weil
+  das Rückgängig das Netz spannt, das die hohe Schwelle ersetzen sollte. Absichtlich **nicht** in
+  derselben Änderung: Das ist eine Entscheidung über das Gefühl der Geste und will auf dem Gerät
+  erprobt werden, nicht am Schreibtisch entschieden. Bleibt vorerst offen; wenn sie kommt, bekommt
+  sie einen eigenen ADR — [ADR 0031](docs/decisions/0031-rueckgaengig-statt-rueckfrage-beim-loeschen.md)
+  hat ihr den ausdrücklich versprochen.
+  **Hier stand „auf den Material-Standard von 50 %" — das war falsch und ist der Fallstrick des
+  Punktes:** `SwipeToDismissBoxDefaults.positionalThreshold` ist in Material 3 1.4.0 **kein Anteil,
+  sondern feste 56 dp**, auf einer 360 dp breiten Zeile also rund 15 %. Wer die eigene Lambda in
+  `TodoRow` einfach weglässt, macht die Geste nicht standardkonform, sondern dreimal empfindlicher
+  als hier gewollt. Der eigene Wert bleibt, nur die Zahl darin sinkt
+- [x] **„Speichern" landete auf einer eigenen Zeile, und zwar aus einem benennbaren Grund.**
   `AlertDialog` legt `dismissButton` und `confirmButton` in eine gemeinsame `AlertDialogFlowRow`.
-  Weil Löschen und Abbrechen in **einem** `Row` stecken, ist das dort ein *unteilbares* Element:
+  Weil Löschen und Abbrechen in **einem** `Row` steckten, war das dort ein *unteilbares* Element:
   Passt `[Löschen Abbrechen] [Speichern]` nicht in eine Zeile, bricht der FlowRow vor Speichern um.
-  Nimmt der Punkt darüber das Löschen aus der Knopfzeile heraus, löst sich das von selbst und es
-  bleibt die Standardanordnung `[Abbrechen] [Speichern]`
-- [ ] **„Speichern" sieht aus wie „Abbrechen"** — beide sind `TextButton`, nur Löschen hebt sich über
-  die Farbe ab. Bei drei Aktionen so unterschiedlicher Tragweite trägt die bestätigende zu wenig
-  Gewicht. M3 kennt dafür Abstufungen: `FilledTonalButton` oder `Button` für Speichern. Das gilt für
-  alle vier Dialoge, nicht nur diesen — dann aber überall gleich
+  Erledigt durch den Punkt darunter — **Löschen hat die Knopfzeile verlassen, damit löste es sich von
+  selbst**, es bleibt die Standardanordnung `[Abbrechen] [Speichern]`, siehe
+  [ADR 0032](docs/decisions/0032-gefuellte-bestaetigung-und-loeschen-im-inhalt.md). Die Erklärung
+  bleibt hier stehen, damit niemand wieder zwei Knöpfe in einen Slot legt
+- [x] **Löschen steht jetzt im Inhalt des Bearbeiten-Dialogs**, als zweite Aktionszeile unter „Termin
+  anlegen" — gestapelt, nicht daneben (nebeneinander passt nicht: zwei Beschriftungen mit Symbol
+  brauchen rund 270 dp, ein `AlertDialog` gibt auf einem 360-dp-Gerät etwa 256 dp Inhalt her, und
+  `Row` bricht nicht um). Damit gilt allgemein, was der Kalender-Knopf bisher nur für sich
+  beanspruchte: Die Knopfzeile trägt nur, was den Dialog beendet. Das schließt den Faden aus
+  [ADR 0031](docs/decisions/0031-rueckgaengig-statt-rueckfrage-beim-loeschen.md) ab — der Fehlgriff
+  neben „Speichern" ist nicht mehr möglich, und Löschen kostet trotzdem keinen Tipp mehr. Der Knopf
+  bleibt, weil ADR 0016 den Dialog als den mit TalkBack bedienbaren Löschweg verlangt
+- [x] **„Speichern" sah aus wie „Abbrechen"** — beide waren `TextButton`, nur Löschen hob sich über die
+  Farbe ab. Jetzt ist **Bestätigen in allen vier Dialogen ein gefüllter `Button`**, Abbrechen bleibt
+  `TextButton`. Die Gabel aus diesem Punkt ist entschieden: **`Button`, nicht `FilledTonalButton`** —
+  der tonale färbt `secondaryContainer`, also genau die Rollen der *gewählten* Segment-Stufe im
+  selben Dialog, „Speichern" und die gewählte Priorität sähen gleich aus.
+  „Liste löschen?" bestätigt **gefüllt in `error`/`onError`**: Dort ist das Löschen die Hauptaktion,
+  die Bremse ist der Dialog mit seiner Anzahl, und ein Listen-Löschen hat kein Rückgängig. Löschen im
+  Bearbeiten-Dialog bleibt dagegen ein Textknopf in Fehlerfarbe — ein zweiter gefüllter Knopf würde
+  mit „Speichern" um die Hauptaktion streiten. Alles in ADR 0032 begründet.
+  **Nebenbei:** Die Fehlerfarbe sitzt jetzt über `textButtonColors(contentColor = …)` am Knopf statt
+  am `Text` — nur so trägt das Symbol daneben dieselbe Farbe; der Druckeffekt ist damit ebenfalls rot
+- [x] Tests — **117 Unit-Tests grün** (unverändert: das neue Farbpaar `onError` auf `error` reitet in
+  den zwei bestehenden Schema-Tests von `ColorSchemeContrastTest` mit, es ist kein eigener Test) und
+  **28 instrumentierte am 2026-08-12 auf einem SM-S928B, alle grün** (vorher 25). Die drei neuen
+  füllen eine Lücke, die vorher keinem aufgefallen war: **kein einziger Test prüfte irgendeinen
+  Bestätigen-, Abbrechen- oder Löschen-Knopf** — jetzt melden Löschen und Speichern ihren Tipp, und
+  ein leerer Titel lässt „Speichern" abgeblendet und ungeklickt. Der Löschen-Test ist auf den Dialog
+  eingegrenzt, weil „Löschen" auch die Bestätigung von `DeleteListDialog` beschriftet.
+  Canary-Gegenprobe mitgemacht: auf einen erfundenen Text gedreht scheitert der Test mit „could not
+  find any node that satisfies: ((hasAnyAncestorThat(IsDialog is defined)) && (Text … contains
+  'CANARY …'))" — aufgelöster Matcher gegen einen echten Baum, nicht „No compose hierarchies found"
+- [ ] Auf dem Gerät prüfen — **der Umbruch ist weg** (`[Abbrechen] [Speichern]` in einer Zeile, auch
+  bei großer Schrift; ein gefüllter Knopf ist rund 24 dp breiter als ein Textknopf) · alle vier
+  Dialoge hell und dunkel, besonders die gefüllte Fläche im dunklen Schema — dort ist das Grün hell
+  und könnte als Block wirken · „Liste löschen?" in `error`/`onError` · Bearbeiten-Dialog **mit
+  offener Tastatur**: Löschen liegt jetzt im scrollenden Inhalt und kann aus dem Bild rutschen (für
+  TalkBack unkritisch, der Fokus scrollt mit — für Sehende ist das die eigentliche Frage) · einmal
+  TalkBack über den Löschen-Knopf
 
 #### Zuschnitt des Bearbeiten-Dialogs
 - [ ] **Bearbeiten als eigener Bildschirm statt als `AlertDialog` — zu entscheiden, nicht sofort zu
-  bauen.** Der Dialog trägt fünf Eingaben plus drei Knöpfe. Material 3 zieht die Linie bei
-  „Formular mit mehreren Eingaben → Full-Screen-Dialog"; das `verticalScroll` aus Phase 12 ist
-  selbst schon ein Symptom und nicht die Lösung. Einschätzung: **noch tragbar, aber am Anschlag** —
-  das nächste Feld kippt es, und mit offener Tastatur fällt es zuerst auf.
+  bauen.** Der Dialog trägt fünf Eingaben, **zwei Aktionszeilen im Inhalt** (Termin, Löschen) und die
+  Knopfzeile `[Abbrechen] [Speichern]`. Material 3 zieht die Linie bei „Formular mit mehreren
+  Eingaben → Full-Screen-Dialog"; das `verticalScroll` aus Phase 12 ist selbst schon ein Symptom und
+  nicht die Lösung. Einschätzung: **am Anschlag, und seit ADR 0032 eine Zeile darüber hinaus** — mit
+  offener Tastatur fällt es zuerst auf, und dort kann jetzt das Löschen aus dem Bild rutschen.
   Der Preis ist echt und der Grund, warum das hier eine Entscheidung und keine Aufgabe ist: Die App
   hat **keine Navigation**, nur `if (signedInUser == null)` in `MainActivity`. Ein eigener Bildschirm
   wäre der erste Navigationsschritt des Projekts — dafür bekäme er eine TopAppBar mit
-  „Abbrechen"/„Speichern" (wo die Knopfzeile-Probleme oben gar nicht erst entstehen), Platz für die
-  Notiz und ein eigenes ViewModel, was den Punkt weiter unten mitlöst
+  „Abbrechen"/„Speichern", Platz für die Notiz und ein eigenes ViewModel, was den Punkt weiter unten
+  mitlöst.
+  **Achtung, hier stand einmal „wo die Knopfzeile-Probleme oben gar nicht erst entstehen":** Die sind
+  inzwischen anders gelöst (ADR 0032), das Argument ist verbraucht. Die Frage nach dem eigenen
+  Bildschirm wird dadurch **nicht** kleiner, sondern dringlicher — sie ist offen, nicht erledigt
 - [ ] Die beiden `OutlinedTextField` im Dialog haben **kein `fillMaxWidth()`**, die Segment-Auswahl
   und das Zielliste-Feld schon. Die Textfelder stehen damit auf ihrer Vorgabebreite und der rechte
   Rand ist ausgefranst. Gilt genauso für `NewListDialog` und `RenameListDialog` — ein Einzeiler je

@@ -1,5 +1,6 @@
 package eu.sweetgeorgie.browniedo.ui.todo
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -30,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -76,7 +79,7 @@ internal fun NewListDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onConfirm, enabled = newList.name.isNotBlank()) {
+            Button(onClick = onConfirm, enabled = newList.name.isNotBlank()) {
                 Text(text = stringResource(R.string.todo_list_create))
             }
         },
@@ -134,7 +137,7 @@ internal fun RenameListDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = onConfirm, enabled = name.isNotBlank()) {
+            Button(onClick = onConfirm, enabled = name.isNotBlank()) {
                 Text(text = stringResource(R.string.todo_list_save))
             }
         },
@@ -176,11 +179,17 @@ internal fun DeleteListDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(
-                    text = stringResource(R.string.todo_list_delete),
-                    color = MaterialTheme.colorScheme.error
+            // Die einzige gefüllte Bestätigung in Fehlerfarbe: Hier *ist* das Löschen die Hauptaktion
+            // des Dialogs, und es gibt kein Rückgängig wie bei einer Aufgabe (ADR 0031 gilt nur für
+            // die). Die Bremse ist der Dialog selbst, nicht ein leiser Knopf — siehe ADR 0032.
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
                 )
+            ) {
+                Text(text = stringResource(R.string.todo_list_delete))
             }
         },
         dismissButton = {
@@ -205,7 +214,7 @@ internal fun EditTodoDialog(
         onDismissRequest = actions.onDismiss,
         title = { Text(text = stringResource(R.string.todo_list_edit_headline)) },
         text = {
-            // Der Dialog trägt fünf Dinge. Der text-Slot von AlertDialog begrenzt seine Höhe zwar,
+            // Der Dialog trägt viel. Der text-Slot von AlertDialog begrenzt seine Höhe zwar,
             // scrollt aber nicht von allein — mit offener Tastatur wäre der untere Teil sonst
             // abgeschnitten.
             Column(
@@ -251,43 +260,72 @@ internal fun EditTodoDialog(
                     targetListId = targetListId,
                     onTargetListChange = actions.onTargetListChange
                 )
-                // Die einzige Aktion des Dialogs, die nichts speichert — deshalb unter den Feldern
-                // und nicht in der Knopfzeile, die schon Löschen und Abbrechen trägt. Der Titel
-                // kommt aus dem Feld: Was auf dem Bildschirm steht, geht in den Kalender.
-                TextButton(onClick = { actions.onCalendarEventClick(title) }) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_event),
-                        // Die Beschriftung steht daneben; eine zweite Beschreibung würde TalkBack
-                        // dieselbe Aktion zweimal vorlesen.
-                        contentDescription = null,
-                        modifier = Modifier.size(ButtonDefaults.IconSize)
-                    )
-                    Text(
-                        text = stringResource(R.string.todo_list_create_calendar_event),
-                        modifier = Modifier.padding(start = ButtonDefaults.IconSpacing)
-                    )
-                }
+                // Die beiden Aktionen, die nichts speichern, stehen unter den Feldern: Die Knopfzeile
+                // trägt nur, was den Dialog beendet (ADR 0032). Beim Termin kommt der Titel aus dem
+                // Feld — was auf dem Bildschirm steht, geht in den Kalender.
+                DialogAction(
+                    iconResId = R.drawable.ic_event,
+                    label = stringResource(R.string.todo_list_create_calendar_event),
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    onClick = { actions.onCalendarEventClick(title) }
+                )
+                // Zuletzt und in Fehlerfarbe, aber nicht gefüllt: Ein zweiter gefüllter Knopf würde
+                // mit „Speichern" um die Hauptaktion streiten. Hier statt in der Knopfzeile, damit
+                // ein Fehlgriff neben „Speichern" nicht mehr möglich ist — der Knopf selbst bleibt,
+                // weil ADR 0016 den Dialog als den mit TalkBack bedienbaren Löschweg verlangt.
+                DialogAction(
+                    iconResId = R.drawable.ic_delete,
+                    label = stringResource(R.string.todo_list_delete),
+                    contentColor = MaterialTheme.colorScheme.error,
+                    onClick = actions.onDelete
+                )
             }
         },
         confirmButton = {
-            TextButton(onClick = actions.onConfirm, enabled = title.isNotBlank()) {
+            Button(onClick = actions.onConfirm, enabled = title.isNotBlank()) {
                 Text(text = stringResource(R.string.todo_list_save))
             }
         },
+        // Ein einzelner Knopf, kein eigenes Row: AlertDialog legt beide Slots in eine gemeinsame
+        // AlertDialogFlowRow, und ein Row wäre dort ein unteilbares Element — passte es mit
+        // „Speichern" nicht in eine Zeile, bräche der Umbruch vor „Speichern" (ADR 0032).
         dismissButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = actions.onDelete) {
-                    Text(
-                        text = stringResource(R.string.todo_list_delete),
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-                TextButton(onClick = actions.onDismiss) {
-                    Text(text = stringResource(R.string.todo_list_cancel))
-                }
+            TextButton(onClick = actions.onDismiss) {
+                Text(text = stringResource(R.string.todo_list_cancel))
             }
         }
     )
+}
+
+/**
+ * Eine Aktion im Inhalt eines Dialogs: Symbol, Beschriftung, und sie führt sofort aus, statt den
+ * Dialog zu bestätigen oder zu verwerfen. Zwei davon trägt der Bearbeiten-Dialog (Termin, Löschen),
+ * siehe docs/decisions/0032-gefuellte-bestaetigung-und-loeschen-im-inhalt.md.
+ *
+ * [contentColor] hat bewusst keinen Standardwert: Die Farbe ist hier die Aussage — grün für harmlos,
+ * Fehlerfarbe für destruktiv —, und ein Standard würde beim Hinzufügen der nächsten Aktion
+ * unbemerkt die falsche wählen.
+ */
+@Composable
+private fun DialogAction(
+    @DrawableRes iconResId: Int,
+    label: String,
+    contentColor: Color,
+    onClick: () -> Unit
+) {
+    TextButton(
+        onClick = onClick,
+        colors = ButtonDefaults.textButtonColors(contentColor = contentColor)
+    ) {
+        Icon(
+            painter = painterResource(iconResId),
+            // Die Beschriftung steht daneben; eine zweite Beschreibung würde TalkBack dieselbe
+            // Aktion zweimal vorlesen.
+            contentDescription = null,
+            modifier = Modifier.size(ButtonDefaults.IconSize)
+        )
+        Text(text = label, modifier = Modifier.padding(start = ButtonDefaults.IconSpacing))
+    }
 }
 
 /**

@@ -55,13 +55,16 @@ class ColorSchemeContrastTest {
             Triple("primary", scheme.primary, scheme.surfaceContainer),
             // Ladekreis und fokussiertes Eingabefeld.
             Triple("primary", scheme.primary, scheme.surface),
-            // Anmelde-Knopf und der Hinzufügen-Knopf in der Eingabeleiste.
+            // Anmelde-Knopf, der Hinzufügen-Knopf in der Eingabeleiste und seit ADR 0032 die
+            // gefüllten Bestätigungsknöpfe aller Dialoge — die brauchen deshalb kein eigenes Paar.
             Triple("onPrimary", scheme.onPrimary, scheme.primary),
             Triple("onSurface", scheme.onSurface, scheme.surface),
             // Trägt bei erledigten Aufgaben Bedeutung, nicht nur Schmuck.
             Triple("onSurfaceVariant", scheme.onSurfaceVariant, scheme.surface),
-            // Der Löschen-Knopf im Dialog.
+            // Der Löschen-Knopf im Bearbeiten-Dialog: Text in Fehlerfarbe im Inhalt, nicht gefüllt.
             Triple("error", scheme.error, scheme.surfaceContainerHigh),
+            // Der gefüllte Löschen-Knopf im Dialog „Liste löschen?" (ADR 0032).
+            Triple("onError", scheme.onError, scheme.error),
             // Die Markierung „hoch" am Ende einer offenen Zeile.
             Triple("error", scheme.error, scheme.surface),
             // Die gewählte Stufe in der Segment-Auswahl des Bearbeiten-Dialogs.

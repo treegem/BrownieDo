@@ -30,8 +30,16 @@ import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
 
 /**
  * Anteil der Zeilenbreite, über den eine erledigte Aufgabe gezogen werden muss, damit sie gelöscht
- * wird. Bewusst weit über dem Material-Standard von 50 %: Gelöscht ist endgültig, und ein Streifen
- * im Vorbeiscrollen soll nichts auslösen.
+ * wird. Bewusst hoch: Ein Streifen im Vorbeiscrollen soll nichts auslösen, siehe
+ * docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md. Seit ADR 0031 fängt zusätzlich eine
+ * Rückgängig-Snackbar den Fehlgriff — die Schwelle **könnte** deshalb sinken, das ist aber eine
+ * eigene Entscheidung und in der `ROADMAP.md` noch offen.
+ *
+ * **Der eigene Wert bleibt in jedem Fall nötig**, auch wenn die Schwelle einmal sinkt: Der
+ * Vorgabewert von `SwipeToDismissBoxDefaults.positionalThreshold` ist in Material 3 1.4.0 kein
+ * Anteil, sondern feste 56 dp — auf einer 360 dp breiten Zeile rund 15 %. Wer die Angabe unten
+ * weglässt, macht die Geste also nicht standardkonform, sondern dreimal empfindlicher als hier
+ * gewollt.
  */
 private const val DELETE_SWIPE_FRACTION = 0.85f
 
@@ -101,7 +109,9 @@ private fun DeleteBackground() {
         Icon(
             painter = painterResource(R.drawable.ic_delete),
             // Rein dekorativ: Der Hintergrund taucht nur während einer Geste auf, die sich mit
-            // TalkBack ohnehin nicht ausführen lässt. Dort führt der Bearbeiten-Dialog zum Löschen.
+            // TalkBack ohnehin nicht ausführen lässt. Dort führt der Löschen-Knopf unter den Feldern
+            // des Bearbeiten-Dialogs zum Ziel (ADR 0016 verlangt ihn genau dafür, ADR 0032 sagt,
+            // warum er dort steht und nicht in der Knopfzeile).
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onErrorContainer
         )

@@ -3,6 +3,7 @@ package eu.sweetgeorgie.browniedo.ui.todo
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
@@ -318,6 +319,65 @@ class TodoListScreenTest {
         // Der Titel kommt aus dem Feld, nicht aus dem gespeicherten Eintrag — der Dialog ist die
         // einzige Quelle, solange nichts gespeichert wurde.
         assertEquals(OPEN_TODO.title, reportedTitle)
+    }
+
+    /**
+     * Seit ADR 0032 steht Löschen im Inhalt des Dialogs und nicht mehr in der Knopfzeile. Der Test
+     * prüft, dass es dort erreichbar ist und meldet.
+     *
+     * **Auf den Dialog eingegrenzt:** „Löschen" ist auch die Beschriftung der Bestätigung in
+     * `DeleteListDialog`. Beide Dialoge stehen nie gleichzeitig offen, aber ein bloßes
+     * `onNodeWithText` würde bei zwei Treffern scheitern, statt sich einen auszusuchen — die Lehre
+     * aus dem zweiten Testlauf, siehe „Querlaufend" in der `ROADMAP.md`.
+     */
+    @Test
+    fun theDeleteButtonInTheEditDialogReportsTheTap() {
+        var deleteCount = 0
+        setScreenContent(
+            uiState = editingIn(LIST, lists = listOf(LIST)),
+            editActions = NO_EDIT_ACTIONS.copy(onDelete = { deleteCount++ })
+        )
+
+        val label = composeTestRule.activity.getString(R.string.todo_list_delete)
+        composeTestRule.onNode(hasAnyAncestor(isDialog()) and hasText(label)).performClick()
+
+        assertEquals(1, deleteCount)
+    }
+
+    @Test
+    fun theSaveButtonInTheEditDialogReportsTheTap() {
+        var confirmCount = 0
+        setScreenContent(
+            uiState = editingIn(LIST, lists = listOf(LIST)),
+            editActions = NO_EDIT_ACTIONS.copy(onConfirm = { confirmCount++ })
+        )
+
+        val label = composeTestRule.activity.getString(R.string.todo_list_save)
+        composeTestRule.onNode(hasAnyAncestor(isDialog()) and hasText(label)).performClick()
+
+        assertEquals(1, confirmCount)
+    }
+
+    /**
+     * Die Zusicherung, um die es beim gefüllten Knopf geht: Ein leerer Titel lässt sich nicht
+     * speichern, und das ist am Knopf zu sehen — bei zwei gleich aussehenden Textknöpfen war der
+     * Unterschied zwischen aktiv und deaktiviert nur eine zweite Grünnuance.
+     */
+    @Test
+    fun theSaveButtonIsDisabledWithoutATitle() {
+        var confirmCount = 0
+        val state = editingIn(LIST, lists = listOf(LIST))
+        setScreenContent(
+            uiState = state.copy(editedTodo = state.editedTodo?.copy(title = "")),
+            editActions = NO_EDIT_ACTIONS.copy(onConfirm = { confirmCount++ })
+        )
+
+        val label = composeTestRule.activity.getString(R.string.todo_list_save)
+        val saveButton = composeTestRule.onNode(hasAnyAncestor(isDialog()) and hasText(label))
+        saveButton.assertIsNotEnabled()
+        saveButton.performClick()
+
+        assertEquals(0, confirmCount)
     }
 
     @Test
