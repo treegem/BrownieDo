@@ -270,6 +270,22 @@ class TodoListScreenTest {
         composeTestRule.waitUntil(timeoutMillis = DISMISS_TIMEOUT_MILLIS) { shownCount == 1 }
     }
 
+    @Test
+    fun theCalendarButtonInTheEditDialogReportsTheTitle() {
+        var reportedTitle: String? = null
+        setScreenContent(
+            uiState = editingIn(LIST, lists = listOf(LIST)),
+            editActions = NO_EDIT_ACTIONS.copy(onCalendarEventClick = { reportedTitle = it })
+        )
+
+        val label = composeTestRule.activity.getString(R.string.todo_list_create_calendar_event)
+        composeTestRule.onNodeWithText(label).performClick()
+
+        // Der Titel kommt aus dem Feld, nicht aus dem gespeicherten Eintrag — der Dialog ist die
+        // einzige Quelle, solange nichts gespeichert wurde.
+        assertEquals(OPEN_TODO.title, reportedTitle)
+    }
+
     private fun editingIn(list: TodoList, lists: List<TodoList>) = TodoListUiState(
         lists = lists,
         selectedList = list,
@@ -358,6 +374,7 @@ class TodoListScreenTest {
             onTitleChange = {},
             onPriorityChange = {},
             onTargetListChange = {},
+            onCalendarEventClick = {},
             onConfirm = {},
             onDelete = {},
             onDismiss = {}

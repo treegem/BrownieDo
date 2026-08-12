@@ -13,7 +13,10 @@ enum class TodoListError {
     MOVE_FAILED,
     LIST_ADD_FAILED,
     LIST_UPDATE_FAILED,
-    LIST_DELETE_FAILED
+    LIST_DELETE_FAILED,
+
+    /** Kein Schreibfehler: Der Kalender-Intent fand keine App, siehe ADR 0027 und ADR 0029. */
+    CALENDAR_APP_MISSING
 }
 
 data class TodoListUiState(

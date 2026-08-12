@@ -65,12 +65,17 @@ data class TodoActions(
  *
  * Ohne `onEdited`-Präfix: Der Name des Halters trägt den Zusammenhang schon. Die ViewModel-Methoden
  * behalten ihre Namen, `MainActivity` verdrahtet `onTitleChange = viewModel::onEditedTitleChange`.
+ *
+ * [onCalendarEventClick] nimmt den Titel als Parameter entgegen, statt ihn im Halter einzufangen:
+ * Ein Halter, der sich bei jedem Tastendruck im Titelfeld ändert, hebt die Überspringbarkeit des
+ * Bildschirms auf. Vorbild ist [TodoActions.onEditTodoClick].
  */
 @Immutable
 data class TodoEditActions(
     val onTitleChange: (String) -> Unit,
     val onPriorityChange: (TodoPriority) -> Unit,
     val onTargetListChange: (TodoList) -> Unit,
+    val onCalendarEventClick: (String) -> Unit,
     val onConfirm: () -> Unit,
     val onDelete: () -> Unit,
     val onDismiss: () -> Unit

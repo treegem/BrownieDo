@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -231,6 +233,22 @@ internal fun EditTodoDialog(
                     targetListId = targetListId,
                     onTargetListChange = actions.onTargetListChange
                 )
+                // Die einzige Aktion des Dialogs, die nichts speichert — deshalb unter den Feldern
+                // und nicht in der Knopfzeile, die schon Löschen und Abbrechen trägt. Der Titel
+                // kommt aus dem Feld: Was auf dem Bildschirm steht, geht in den Kalender.
+                TextButton(onClick = { actions.onCalendarEventClick(title) }) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_event),
+                        // Die Beschriftung steht daneben; eine zweite Beschreibung würde TalkBack
+                        // dieselbe Aktion zweimal vorlesen.
+                        contentDescription = null,
+                        modifier = Modifier.size(ButtonDefaults.IconSize)
+                    )
+                    Text(
+                        text = stringResource(R.string.todo_list_create_calendar_event),
+                        modifier = Modifier.padding(start = ButtonDefaults.IconSpacing)
+                    )
+                }
             }
         },
         confirmButton = {

@@ -208,6 +208,7 @@ private fun TodoListError.messageResId() = when (this) {
     TodoListError.LIST_ADD_FAILED -> R.string.todo_list_error_list_add_failed
     TodoListError.LIST_UPDATE_FAILED -> R.string.todo_list_error_list_update_failed
     TodoListError.LIST_DELETE_FAILED -> R.string.todo_list_error_list_delete_failed
+    TodoListError.CALENDAR_APP_MISSING -> R.string.todo_list_error_calendar_app_missing
 }
 
 @Composable
@@ -387,6 +388,7 @@ private val PREVIEW_EDIT_ACTIONS = TodoEditActions(
     onTitleChange = {},
     onPriorityChange = {},
     onTargetListChange = {},
+    onCalendarEventClick = {},
     onConfirm = {},
     onDelete = {},
     onDismiss = {}

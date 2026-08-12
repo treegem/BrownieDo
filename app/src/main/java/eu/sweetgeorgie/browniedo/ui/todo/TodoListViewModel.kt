@@ -362,6 +362,16 @@ class TodoListViewModel(
 
     fun onMovedMessageShown() = mutableUiState.update { it.copy(movedToListName = null) }
 
+    /**
+     * Der einzige Fehler, der nicht aus einem Schreibvorgang kommt: Der Kalender-Intent hat keine
+     * App gefunden. Er läuft trotzdem über [TodoListUiState.error] statt über einen dritten
+     * Meldungskanal im Bildschirm, siehe
+     * docs/decisions/0029-kalender-fehler-ueber-todolisterror.md.
+     */
+    fun onCalendarAppMissing() = mutableUiState.update {
+        it.copy(error = TodoListError.CALENDAR_APP_MISSING)
+    }
+
     // LOAD_FAILED bleibt bewusst stehen: Firestore baut den Snapshot-Listener nach einem Fehler
     // ab, die Liste aktualisiert sich also nicht mehr. Ein Hinweis, der nach ein paar Sekunden
     // verschwindet, würde den Nutzer vor einer still veralteten Liste sitzen lassen.

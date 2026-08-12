@@ -17,6 +17,7 @@ import eu.sweetgeorgie.browniedo.ui.todo.TodoEditActions
 import eu.sweetgeorgie.browniedo.ui.todo.TodoListScreen
 import eu.sweetgeorgie.browniedo.ui.todo.TodoListTopBarActions
 import eu.sweetgeorgie.browniedo.ui.todo.TodoListViewModel
+import eu.sweetgeorgie.browniedo.ui.todo.startCalendarEventInsert
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -89,6 +90,14 @@ class MainActivity : ComponentActivity() {
                             onTitleChange = todoListViewModel::onEditedTitleChange,
                             onPriorityChange = todoListViewModel::onEditedPriorityChange,
                             onTargetListChange = todoListViewModel::onEditedTargetListChange,
+                            // Der Kalender-Intent lebt in der UI-Schicht (ADR 0027); nur sein
+                            // Fehlschlag geht ans ViewModel, damit er wie jeder andere Fehler als
+                            // Snackbar herauskommt (ADR 0029).
+                            onCalendarEventClick = { title ->
+                                if (!startCalendarEventInsert(this@MainActivity, title)) {
+                                    todoListViewModel.onCalendarAppMissing()
+                                }
+                            },
                             onConfirm = todoListViewModel::onEditConfirm,
                             onDelete = todoListViewModel::onDeleteTodoClick,
                             onDismiss = todoListViewModel::onEditDismiss

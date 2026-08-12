@@ -323,28 +323,50 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 > gespeicherter Zustand, keine Änderung an `firestore.rules` und **kein Schritt in der Firebase
 > Console**, siehe [ADR 0027](docs/decisions/0027-termine-per-kalender-intent.md). Damit die kleinste
 > Phase des Projekts.
-- [ ] Kalender-Intent in der UI-Schicht — `ACTION_INSERT` auf `CalendarContract.Events.CONTENT_URI`
-  mit dem Aufgabentitel als `Events.TITLE`. Gehört in `ui`, nicht ins ViewModel: Es gibt keinen
-  Zustand und keine Regel, und `Intent`/`CalendarContract` sind Android-Framework, das aus der
-  Logik-Schicht fernbleibt (siehe „Projektspezifische Vorgaben")
-- [ ] **Kein Datum vorbelegen** — eine Aufgabe trägt keinen Zeitpunkt, eine geratene Stunde würde
-  häufiger korrigiert als übernommen (ADR 0027)
-- [ ] Erst `setPackage("com.google.android.calendar")`, bei `ActivityNotFoundException` ohne Paket
+- [x] Kalender-Intent in der UI-Schicht — `ACTION_INSERT` auf `CalendarContract.Events.CONTENT_URI`
+  mit dem Aufgabentitel als `Events.TITLE`, in `ui/todo/CalendarEventIntent.kt`. Gehört in `ui`,
+  nicht ins ViewModel: Es gibt keinen Zustand und keine Regel, und `Intent`/`CalendarContract` sind
+  Android-Framework, das aus der Logik-Schicht fernbleibt (siehe „Projektspezifische Vorgaben")
+- [x] **Kein Datum vorbelegen** — eine Aufgabe trägt keinen Zeitpunkt, eine geratene Stunde würde
+  häufiger korrigiert als übernommen (ADR 0027). `theIntentCarriesNoTime` hält das fest
+- [x] Erst `setPackage("com.google.android.calendar")`, bei `ActivityNotFoundException` ohne Paket
   erneut — auf einem Galaxy bedienen zwei Apps diesen Intent, und der Samsung Kalender kann in ein
-  lokales Konto schreiben, das nie bei Google auftaucht
-- [ ] **Kein `resolveActivity`**, sondern `try`/`catch`: Seit Android 11 liefert das ohne
+  lokales Konto schreiben, das nie bei Google auftaucht. Der zweite Versuch baut einen **frischen**
+  Intent, statt das Paket wieder zu entfernen
+- [x] **Kein `resolveActivity`**, sondern `try`/`catch`: Seit Android 11 liefert das ohne
   `<queries>`-Eintrag im Manifest `null`, obwohl die Kalender-App da ist. Scheitert auch der zweite
-  Versuch, kommt eine Snackbar — neuer Wert in `TodoListError`
-- [ ] Bedienung im Bearbeiten-Dialog, wie Verschieben
+  Versuch, kommt eine Snackbar — `CALENDAR_APP_MISSING` in `TodoListError`. Der Fehler läuft dabei
+  doch über das ViewModel, anders als ADR 0027 schrieb: `error` wird nur dort geschrieben, und ein
+  eigener Zustand im Bildschirm wäre ohne Gerät nicht prüfbar, siehe
+  [ADR 0029](docs/decisions/0029-kalender-fehler-ueber-todolisterror.md)
+- [x] Bedienung im Bearbeiten-Dialog, wie Verschieben
   ([ADR 0022](docs/decisions/0022-verschieben-im-bearbeiten-dialog.md)). Der Dialog macht damit fünf
-  Dinge — die Entzerrung ist dafür vorgezogen und erledigt, der Rückruf ist also ein Eintrag in
+  Dinge — die Entzerrung war dafür vorgezogen, der Rückruf blieb wie versprochen ein Eintrag in
   `TodoEditActions` plus eine Zeile in `MainActivity`, siehe
-  [ADR 0028](docs/decisions/0028-rueckrufe-in-actions-haltern.md)
-- [ ] Unit-Test auf den Intent-Bau (Action, Data-Uri, Titel-Extra), ohne Gerät
-- [ ] Auf dem Gerät prüfen — Termin aus einer Aufgabe anlegen und im Gmail-Kalender wiederfinden ·
-  nachsehen, in **welchem** Kalenderkonto er gelandet ist (der eigentliche Fallstrick) · zurück in
-  die App und prüfen, dass die Aufgabe unverändert dasteht · und dass der Titel mit Umlauten und
-  langem Text ankommt
+  [ADR 0028](docs/decisions/0028-rueckrufe-in-actions-haltern.md). Als Aktionszeile **unter** den
+  Feldern statt als dritter Knopf neben Löschen und Abbrechen; der Titel kommt aus dem Feld, und
+  der Dialog bleibt offen — es wird dabei nichts nach Firestore geschrieben
+- [x] Test auf den Intent-Bau (Action, Data-Uri, Titel-Extra, kein Paket, kein Zeitpunkt) —
+  `CalendarEventIntentTest`. **Steht in `androidTest`, nicht in `test`**, obwohl er weder Compose
+  noch Gerätezustand braucht: `android.content.Intent` ist im reinen JVM-Test eine Attrappe und
+  wirft „Stub!". Der einzige Ausweg wäre Robolectric — eine Test-Abhängigkeit für genau eine Datei,
+  und damit gegen „Einfachheit vor Vollständigkeit". Der Fehlerweg selbst ist dagegen sehr wohl ohne
+  Gerät geprüft (zwei Tests im `TodoListViewModelTest`, 99 Unit-Tests grün)
+- [x] Instrumentierte Tests **am 2026-08-12 auf einem SM-S928B gelaufen, alle 21 grün** (vorher 16:
+  vier neue in `CalendarEventIntentTest`, einer im `TodoListScreenTest`). Die Canary-Gegenprobe ist
+  mitgemacht: `theCalendarButtonInTheEditDialogReportsTheTitle` auf einen erfundenen Text gedreht
+  scheitert mit „could not find any node that satisfies: (Text … contains …)" — der Matcher wird
+  also gegen einen echten Baum ausgewertet, nicht an „No compose hierarchies found" vorbei.
+  **Nebenbei gelernt:** Ein zweites, `offline` gemeldetes Gerät in `adb devices` überspringt Gradle
+  von allein („Skipping device … Device is OFFLINE"); `ANDROID_SERIAL` zu setzen half dagegen
+  nicht, sondern brach den Lauf mit „Connected device with serial … not found" ab
+- [x] Auf dem Gerät geprüft (2026-08-12, SM-S928B) — Termin aus einer Aufgabe angelegt und im
+  Gmail-Kalender wiedergefunden, der Intent landet also im richtigen Konto (das war der eigentliche
+  Fallstrick, weil auf einem Galaxy zwei Apps ihn bedienen) · zurück in der App steht der Dialog
+  noch offen und die Aufgabe unverändert da · Titel mit Umlauten kommen vollständig an.
+  **Nicht angesehen: hell und dunkel.** Auf Wunsch trotzdem abgehakt — die Aktionszeile nimmt ihre
+  Farben aus `TextButton` und `ColorSchemeContrastTest` deckt die Schemata ab, ein Blick darauf
+  bleibt aber nachzuholen
 
 ### Phase 12 – Notiz an einer Aufgabe
 > Ein Backlog-Eintrag lebt Wochen. Ein Titel allein hat dann oft verloren, was eigentlich gemeint
@@ -422,7 +444,10 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   (Begründung im ADR). Standardwerte auf den Haltern gibt es aus demselben Grund nicht.
   Reiner Umbau: **97 Unit-Tests und 16 instrumentierte grün, ohne eine einzige angepasste
   Zusicherung**, dazu die Canary-Gegenprobe. `TodoListViewModel` und `TodoListUiState` blieben
-  unangetastet
+  unangetastet.
+  **Auf dem Gerät gegengeprüft:** Liste wechseln, Aufgabe anlegen, abhaken, wischen, Dialog öffnen
+  und speichern — alles unverändert. Das war der Punkt, den kein Test abdeckt: Ein falsch gebauter
+  Halter fällt nicht als roter Test auf, sondern als Ruckeln
 
 ---
 

@@ -732,6 +732,26 @@ class TodoListViewModelTest {
         assertEquals(TodoListError.LOAD_FAILED, viewModel.uiState.value.error)
         assertTrue(viewModel.uiState.value.todos.isEmpty())
     }
+
+    @Test
+    fun `a missing calendar app becomes an error`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+
+        viewModel.onCalendarAppMissing()
+
+        assertEquals(TodoListError.CALENDAR_APP_MISSING, viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `a shown calendar error is cleared`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+        viewModel.onCalendarAppMissing()
+
+        viewModel.onErrorShown()
+
+        // Anders als LOAD_FAILED klebt er nicht: Die Liste ist danach wieder in Ordnung.
+        assertNull(viewModel.uiState.value.error)
+    }
 }
 
 private val SIGNED_IN_USER = SignedInUser(uid = "uid-1", displayName = "Georg", email = null)
