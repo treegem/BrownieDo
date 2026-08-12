@@ -1,7 +1,7 @@
 # BrownieDo – Kontext für Claude Code
 
 Diese Datei enthält bewusst keine Inhalte, sondern nur Importe. Der Projekt-Einstieg steht in
-[`AGENTS.md`](AGENTS.md), die Regeln in [`.github/instructions/`](.github/instructions/) — beide
+[`AGENTS.md`](AGENTS.md), die Regeln in [`.github/instructions/`](.github/instructions) — beide
 werden von allen Werkzeugen geteilt. Hier steht nur, was Claude Code davon lädt.
 
 **Nichts hierher kopieren.** Wächst eine Regel, wächst sie in ihrer Datei; hier kommt höchstens eine

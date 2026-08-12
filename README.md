@@ -19,5 +19,5 @@ kommt, steht in [`AGENTS.md`](AGENTS.md).
 |---|---|
 | [`AGENTS.md`](AGENTS.md) | Einstieg: Setup, Build- und Testbefehle, Sprache, Secrets |
 | [`ROADMAP.md`](ROADMAP.md) | Vision, Stack, Fortschritt |
-| [`.github/instructions/`](.github/instructions/) | Verbindliche Coding-, Architektur- und Naming-Regeln |
+| [`.github/instructions/`](.github/instructions) | Verbindliche Coding-, Architektur- und Naming-Regeln |
 | [`docs/decisions/`](docs/decisions/README.md) | ADRs: warum eine Option gewonnen hat |

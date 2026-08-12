@@ -9,7 +9,7 @@ selbst keine Coding-Regeln.
 | Wo | Was |
 |---|---|
 | [`ROADMAP.md`](ROADMAP.md) | Vision, Stack, Fortschritt — das **Was** und **Warum überhaupt** |
-| [`.github/instructions/`](.github/instructions/) | Verbindliche Coding-, Architektur- und Naming-Regeln — das **Wie** |
+| [`.github/instructions/`](.github/instructions) | Verbindliche Coding-, Architektur- und Naming-Regeln — das **Wie** |
 | [`docs/decisions/`](docs/decisions/README.md) | ADRs: warum eine Option gewonnen hat — das **Warum so** |
 
 Die Regeln tragen Schweregrade (`MUST FIX`, `SHOULD FIX`, `CONSIDER`) — die sind ernst gemeint.
@@ -91,7 +91,7 @@ Danach je Release:
 
 | Schritt | Befehl |
 |---|---|
-| Bauen | `./gradlew.bat :app:assembleRelease` (Ergebnis: `app/build/outputs/apk/release/app-release.apk`) |
+| Bauen | `./gradlew.bat :app:assembleRelease` (Ergebnis: `app/build/outputs/apk/release/app-release.apk`); in Android Studio die eingecheckte Run-Configuration „assembleRelease (signierte APK)" aus `.run/` |
 | Installieren | `adb install -r app/build/outputs/apk/release/app-release.apk` |
 | Prüfen | Google-Login auf dem Gerät durchspielen — der Build sagt darüber nichts aus |
 

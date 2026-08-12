@@ -569,6 +569,17 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   **Auf dem Gerät gegengeprüft:** Liste wechseln, Aufgabe anlegen, abhaken, wischen, Dialog öffnen
   und speichern — alles unverändert. Das war der Punkt, den kein Test abdeckt: Ein falsch gebauter
   Halter fällt nicht als roter Test auf, sondern als Ruckeln
+- [x] Geteilte Run-Configuration für `:app:assembleRelease` — `.run/assembleRelease.run.xml`, damit
+  der Release-Build in Android Studio ein Klick ist statt einer Kommandozeile. **Kein eigener
+  Gradle-Task:** `assembleRelease` gibt es schon, ein `dependsOn`-Wrapper darauf wäre genau der
+  Fall, den `avoid-unnecessary-wrappers` verbietet. Der Ordner heißt `.run/` und nicht
+  `.idea/runConfigurations/`, weil `/.idea` in `.gitignore` steht — dort wäre die Konfiguration nur
+  lokal vorhanden. Die Signatur-Zugangsdaten kommen unverändert aus `keystore.properties`
+  ([ADR 0017](docs/decisions/0017-signatur-zugangsdaten-aus-keystore-properties.md)); fehlt die
+  Datei, liefert auch dieser Klick eine unsignierte APK
+- [x] Link-Ziele auf `.github/instructions` ohne Schrägstrich am Ende — mit ihm ist das letzte
+  Pfadsegment leer, und Android Studio warnte „Cannot resolve file ''". Betraf `AGENTS.md`,
+  `CLAUDE.md` und `README.md`; die Beschriftung behält den Schrägstrich, weil sie einen Ordner meint
 
 ---
 
