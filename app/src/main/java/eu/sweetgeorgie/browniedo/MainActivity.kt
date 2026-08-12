@@ -12,6 +12,7 @@ import eu.sweetgeorgie.browniedo.ui.auth.LoginScreen
 import eu.sweetgeorgie.browniedo.ui.auth.LoginViewModel
 import eu.sweetgeorgie.browniedo.ui.theme.BrownieDoTheme
 import eu.sweetgeorgie.browniedo.ui.todo.ListDialogActions
+import eu.sweetgeorgie.browniedo.ui.todo.SnackbarActions
 import eu.sweetgeorgie.browniedo.ui.todo.TodoActions
 import eu.sweetgeorgie.browniedo.ui.todo.TodoEditActions
 import eu.sweetgeorgie.browniedo.ui.todo.TodoListScreen
@@ -104,6 +105,14 @@ class MainActivity : ComponentActivity() {
                             onDismiss = todoListViewModel::onEditDismiss
                         )
                     }
+                    val snackbarActions = remember(todoListViewModel) {
+                        SnackbarActions(
+                            onErrorShown = todoListViewModel::onErrorShown,
+                            onMovedMessageShown = todoListViewModel::onMovedMessageShown,
+                            onUndoDelete = todoListViewModel::onUndoDelete,
+                            onDeletedMessageShown = todoListViewModel::onDeletedMessageShown
+                        )
+                    }
 
                     TodoListScreen(
                         uiState = todoListUiState,
@@ -111,8 +120,7 @@ class MainActivity : ComponentActivity() {
                         listDialogActions = listDialogActions,
                         todoActions = todoActions,
                         editActions = editActions,
-                        onErrorShown = todoListViewModel::onErrorShown,
-                        onMovedMessageShown = todoListViewModel::onMovedMessageShown
+                        snackbarActions = snackbarActions
                     )
                 }
             }

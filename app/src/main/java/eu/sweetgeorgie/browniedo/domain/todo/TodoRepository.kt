@@ -73,4 +73,22 @@ interface TodoRepository {
     fun moveTodo(fromListId: String, toListId: String, todo: Todo): Result<Unit>
 
     fun deleteTodo(listId: String, todoId: String): Result<Unit>
+
+    /**
+     * Legt eine gelöschte Aufgabe wieder an — das „Rückgängig" der Snackbar nach dem Löschen, siehe
+     * docs/decisions/0031-rueckgaengig-statt-rueckfrage-beim-loeschen.md.
+     *
+     * **Unter ihrer alten Dokument-id**, nicht unter einer neuen: Nur so ist „rückgängig" die
+     * Wahrheit und nicht ein neuer Eintrag, der dem alten gleicht. Möglich ist das, weil die id aus
+     * [todo] kommt und der Pfad damit bekannt ist — anders als beim Verschieben, wo das Ziel
+     * bauartbedingt eine neue id braucht (ADR 0024).
+     *
+     * [todo] ist der letzte Stand aus dem Snapshot, nicht der Inhalt eines offenen Dialogs. Alle
+     * fachlichen Felder kehren unverändert zurück, `updatedAt` kommt neu vom Server — dieselbe
+     * Aufteilung wie beim Verschieben (ADR 0026).
+     *
+     * Wie [addTodo] nicht abgewartet, das Rückgängig funktioniert also offline
+     * (docs/decisions/0011-schreibvorgaenge-nicht-abwarten.md).
+     */
+    fun restoreTodo(listId: String, todo: Todo): Result<Unit>
 }

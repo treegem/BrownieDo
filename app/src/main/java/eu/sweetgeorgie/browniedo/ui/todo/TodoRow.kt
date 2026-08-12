@@ -60,6 +60,19 @@ internal fun SwipeableTodoRow(
         }
     }
 
+    // Dasselbe Aufräumen für den zweiten Weg, auf dem eine weggewischte Zeile zurückkehrt: das
+    // Rückgängig zum Löschen (ADR 0031). Die Aufgabe kommt unter **derselben** Dokument-id zurück,
+    // und `rememberSwipeToDismissBoxState` merkt sich seinen Zustand über `rememberSaveable` — die
+    // LazyColumn bewahrt den pro Item-Key auf. Die Zeile erschiene dann in der Stellung, in der sie
+    // hinausgewischt wurde, also als leere Fläche.
+    //
+    // Vorsorge, kein beobachteter Fehler: ob die LazyColumn den Zustand eines *entfernten* Eintrags
+    // wirklich aufbewahrt, hängt an Compose-Interna. Ein No-op, falls nicht — beim ersten Erscheinen
+    // steht der Zustand ohnehin auf Settled.
+    LaunchedEffect(todo.id) {
+        if (swipeState.currentValue != SwipeToDismissBoxValue.Settled) swipeState.reset()
+    }
+
     SwipeToDismissBox(
         state = swipeState,
         backgroundContent = { DeleteBackground() },

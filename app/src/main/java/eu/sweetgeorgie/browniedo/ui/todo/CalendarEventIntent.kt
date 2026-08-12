@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.provider.CalendarContract
 
-/**
+/*
  * Aus einer Aufgabe einen Termin machen — der ganze Vorgang, siehe
  * docs/decisions/0027-termine-per-kalender-intent.md.
  *

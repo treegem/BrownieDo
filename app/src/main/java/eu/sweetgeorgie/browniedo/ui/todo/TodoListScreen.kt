@@ -1,6 +1,8 @@
 package eu.sweetgeorgie.browniedo.ui.todo
 
 import android.content.res.Configuration.UI_MODE_NIGHT_YES
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,8 +25,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,8 +57,8 @@ import java.time.Instant
  * docs/decisions/0028-rueckrufe-in-actions-haltern.md — vorher waren es 27 Parameter, und jedes neue
  * Feld am Bearbeiten-Dialog kostete drei Stellen.
  *
- * [onErrorShown] und [onMovedMessageShown] stehen absichtlich einzeln: Sie gehören dem
- * [SnackbarHostState] dieses Scaffolds und keinem der vier Bereiche.
+ * Die Rückrufe des [SnackbarHostState] stehen in einem eigenen Halter [SnackbarActions] — sie
+ * gehören diesem Scaffold und keinem der vier sichtbaren Bereiche.
  */
 @Composable
 fun TodoListScreen(
@@ -63,8 +67,7 @@ fun TodoListScreen(
     listDialogActions: ListDialogActions,
     todoActions: TodoActions,
     editActions: TodoEditActions,
-    onErrorShown: () -> Unit,
-    onMovedMessageShown: () -> Unit,
+    snackbarActions: SnackbarActions,
     modifier: Modifier = Modifier
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -79,7 +82,7 @@ fun TodoListScreen(
             // showSnackbar wartet, bis die Snackbar wieder weg ist — erst danach den Fehler
             // löschen, sonst kippt der Key auf null und die Snackbar verschwindet sofort.
             snackbarHostState.showSnackbar(writeErrorMessage)
-            onErrorShown()
+            snackbarActions.onErrorShown()
         }
     }
 
@@ -92,7 +95,39 @@ fun TodoListScreen(
     LaunchedEffect(moveConfirmation) {
         if (moveConfirmation != null) {
             snackbarHostState.showSnackbar(moveConfirmation)
-            onMovedMessageShown()
+            snackbarActions.onMovedMessageShown()
+        }
+    }
+
+    /*
+     * Der dritte Kanal: gelöscht mit Rückgängig (ADR 0031). Er weicht in zwei Punkten von den beiden
+     * darüber ab, und beide Male mit Grund.
+     *
+     * Gekeyt wird auf die **Aufgabe**, nicht auf die aufgelöste Meldung: Der Text ist für jede
+     * Löschung derselbe, ein Meldungs-Key änderte sich also nicht und die zweite Löschung in Folge
+     * bekäme keine Snackbar. Die Aufgabe unterscheidet sich immer — und trüge sie zufällig gleiche
+     * Werte, liegt zwischen beiden Löschungen ohnehin ein null.
+     *
+     * Und der Rückgabewert wird ausgewertet: Ein Tipp auf „Rückgängig" ist ActionPerformed, alles
+     * andere heißt, das Angebot ist abgelaufen. Genau einer der beiden Rückrufe läuft.
+     */
+    val deletedMessage = stringResource(R.string.todo_list_deleted)
+    val undoLabel = stringResource(R.string.todo_list_undo)
+
+    LaunchedEffect(uiState.deletedTodo) {
+        if (uiState.deletedTodo != null) {
+            val result = snackbarHostState.showSnackbar(
+                message = deletedMessage,
+                actionLabel = undoLabel,
+                // Länger als die Vorgabe: Vier Sekunden sind knapp, um ein Versehen zu bemerken,
+                // die Snackbar zu lesen und zu tippen — und das Rückgängig ist der ganze Zweck.
+                duration = SnackbarDuration.Long
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                snackbarActions.onUndoDelete()
+            } else {
+                snackbarActions.onDeletedMessageShown()
+            }
         }
     }
 
@@ -149,7 +184,18 @@ fun TodoListScreen(
                         onSwipedAway = { todoActions.onTodoSwipedAway(todo) },
                         // Abgehakte Einträge sinken sofort nach unten. Ohne Bewegung sähe das
                         // aus, als wäre die Liste gesprungen — die Animation zeigt, wohin.
-                        modifier = Modifier.animateItem()
+                        //
+                        // Nur das Ausblenden bekommt eine eigene Dauer, Einblenden und Verschieben
+                        // behalten ihre Vorgabe-Federn. Grund: Die Vorgabe für das Ausblenden ist so
+                        // kurz, dass eine gelöschte Aufgabe schlicht weg ist — und weil das Löschen
+                        // jetzt umkehrbar ist (ADR 0031), soll man sehen, *dass* da etwas
+                        // verschwindet, um überhaupt nach dem „Rückgängig" zu greifen.
+                        modifier = Modifier.animateItem(
+                            fadeOutSpec = tween(
+                                durationMillis = REMOVAL_FADE_MILLIS,
+                                easing = REMOVAL_FADE_EASING
+                            )
+                        )
                     )
                 }
             }
@@ -200,11 +246,30 @@ fun TodoListScreen(
 /** Der Ladefehler ist kein Todo und braucht daher einen eigenen, kollisionsfreien Item-Key. */
 private const val LOAD_ERROR_KEY = "load-error"
 
+/**
+ * Dauer, in der eine verschwindende Zeile ausblendet. Lang genug, dass die Bewegung auffällt, und
+ * kurz genug, dass sie beim Aufräumen mehrerer Einträge nicht bremst.
+ *
+ * Die verblassende Zeile belegt dabei keinen Platz mehr — die Einträge darunter rücken schon auf,
+ * während sie noch zu sehen ist.
+ */
+private const val REMOVAL_FADE_MILLIS = 800
+
+/**
+ * **Linear und nicht die Vorgabe `FastOutSlowInEasing`.** Die beschleunigt am Anfang: Nach einem
+ * Fünftel der Zeit stünde die Deckkraft schon bei etwa der Hälfte, und der Rest der Dauer verstreicht
+ * an einer praktisch unsichtbaren Zeile. Genau das ließ die erste Fassung „kaum sichtbar" aussehen,
+ * obwohl die Dauer stimmte. Bei einer Deckkraft, die gleichmäßig fällt, sagt die Zahl oben, wie lange
+ * man wirklich etwas sieht.
+ */
+private val REMOVAL_FADE_EASING = LinearEasing
+
 private fun TodoListError.messageResId() = when (this) {
     TodoListError.LOAD_FAILED -> R.string.todo_list_error_load_failed
     TodoListError.ADD_FAILED -> R.string.todo_list_error_add_failed
     TodoListError.UPDATE_FAILED -> R.string.todo_list_error_update_failed
     TodoListError.DELETE_FAILED -> R.string.todo_list_error_delete_failed
+    TodoListError.RESTORE_FAILED -> R.string.todo_list_error_restore_failed
     TodoListError.MOVE_FAILED -> R.string.todo_list_error_move_failed
     TodoListError.LIST_ADD_FAILED -> R.string.todo_list_error_list_add_failed
     TodoListError.LIST_UPDATE_FAILED -> R.string.todo_list_error_list_update_failed
@@ -323,8 +388,7 @@ private fun TodoListScreenPreview() {
             listDialogActions = PREVIEW_LIST_DIALOG_ACTIONS,
             todoActions = PREVIEW_TODO_ACTIONS,
             editActions = PREVIEW_EDIT_ACTIONS,
-            onErrorShown = {},
-            onMovedMessageShown = {}
+            snackbarActions = PREVIEW_SNACKBAR_ACTIONS
         )
     }
 }
@@ -345,8 +409,7 @@ private fun TodoListScreenEmptyPreview() {
             listDialogActions = PREVIEW_LIST_DIALOG_ACTIONS,
             todoActions = PREVIEW_TODO_ACTIONS,
             editActions = PREVIEW_EDIT_ACTIONS,
-            onErrorShown = {},
-            onMovedMessageShown = {}
+            snackbarActions = PREVIEW_SNACKBAR_ACTIONS
         )
     }
 }
@@ -383,6 +446,13 @@ private val PREVIEW_TODO_ACTIONS = TodoActions(
     onTodoDoneChange = { _, _ -> },
     onTodoSwipedAway = {},
     onEditTodoClick = {}
+)
+
+private val PREVIEW_SNACKBAR_ACTIONS = SnackbarActions(
+    onErrorShown = {},
+    onMovedMessageShown = {},
+    onUndoDelete = {},
+    onDeletedMessageShown = {}
 )
 
 private val PREVIEW_EDIT_ACTIONS = TodoEditActions(

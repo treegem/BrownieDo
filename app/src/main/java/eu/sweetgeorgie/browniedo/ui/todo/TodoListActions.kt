@@ -81,3 +81,25 @@ data class TodoEditActions(
     val onDelete: () -> Unit,
     val onDismiss: () -> Unit
 )
+
+/**
+ * Was die Snackbars auslösen — der fünfte Halter, und der einzige, dessen „Bereich" kein sichtbares
+ * Element des Bildschirms ist, sondern der `SnackbarHostState` des Scaffolds.
+ *
+ * Vorher standen [onErrorShown] und [onMovedMessageShown] als einzelne Parameter am Bildschirm, mit
+ * der Begründung, sie gehörten keinem der vier Bereiche. Mit dem Rückgängig zum Löschen (ADR 0031)
+ * wären es vier einzelne geworden — genug für einen eigenen Bereich, und der Bildschirm bleibt bei
+ * acht Parametern statt auf zehn zu wachsen (ADR 0028).
+ *
+ * [onUndoDelete] und [onDeletedMessageShown] schließen sich gegenseitig aus: Der Bildschirm ruft je
+ * nach [androidx.compose.material3.SnackbarResult] genau einen von beiden. Beide leeren
+ * [TodoListUiState.deletedTodo] — der eine, weil die Aufgabe zurück ist, der andere, weil das
+ * Angebot abgelaufen ist.
+ */
+@Immutable
+data class SnackbarActions(
+    val onErrorShown: () -> Unit,
+    val onMovedMessageShown: () -> Unit,
+    val onUndoDelete: () -> Unit,
+    val onDeletedMessageShown: () -> Unit
+)

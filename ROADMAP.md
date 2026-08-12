@@ -437,17 +437,67 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt keinen Android-Typ.
 
 #### Löschen und die Knopfzeile des Bearbeiten-Dialogs
-- [ ] **Löschen ist der am schwächsten geschützte Weg — und das ist ein Widerspruch in der eigenen
-  Logik.** Wischen löscht nur *erledigte* Aufgaben und verlangt 85 % der Zeilenbreite, ausdrücklich
-  weil „gelöscht ist endgültig" ([ADR 0016](docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md));
+- [x] **Löschen war der am schwächsten geschützte Weg — ein Widerspruch in der eigenen Logik.**
+  Wischen löscht nur *erledigte* Aufgaben und verlangt 85 % der Zeilenbreite, ausdrücklich weil
+  „gelöscht ist endgültig" ([ADR 0016](docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md));
   eine *Liste* zu löschen hat einen Bestätigungsdialog mit Anzahl. Eine *Aufgabe* aus dem
-  Bearbeiten-Dialog zu löschen kostet dagegen **einen Tipp ohne Rückfrage, direkt neben Speichern**,
-  und funktioniert auch für offene Aufgaben. Der bequemste Weg ist der ungeschützteste.
-  Zwei Auflösungen stehen zur Wahl, und die Entscheidung braucht einen ADR: **(a) Undo-Snackbar** —
-  passt zu Material, der Meldungskanal steht schon zweifach, und sie würde nebenbei die
-  85-%-Schwelle entspannen; Kosten: „rückgängig" heißt bei Firestore *neu anlegen*, die Aufgabe
-  bekommt eine neue Dokument-id und rutscht ohne mitgegebenes `createdAt` in der Sortierung nach
-  oben. Oder **(b) Bestätigungsschritt** wie bei Listen — billiger, aber ein Dialog über einem Dialog
+  Bearbeiten-Dialog zu löschen kostete dagegen **einen Tipp ohne Rückfrage, direkt neben Speichern**,
+  und funktionierte auch für offene Aufgaben. Der bequemste Weg war der ungeschützteste.
+  **Umgesetzt ist (a): Snackbar „Aufgabe gelöscht" mit „Rückgängig"**, siehe
+  [ADR 0031](docs/decisions/0031-rueckgaengig-statt-rueckfrage-beim-loeschen.md) — auf **beiden**
+  Löschwegen, Dialog wie Wischgeste. Damit ist ADR 0016 in einem Punkt überholt („Kein Rückgängig.
+  Dafür die hohe Schwelle."); es gibt jetzt beides.
+  **Der befürchtete Preis fiel weg:** „Rückgängig" heißt bei Firestore neu anlegen — aber `set()`
+  schreibt auf **dieselbe Dokument-id**, die im aufbewahrten `Todo` steht, und `Todo.toDocument()`
+  gab es schon fürs Verschieben. Die Aufgabe kehrt mit `createdAt`, `completedAt`, Priorität und
+  Notiz an ihre alte Stelle zurück; neu ist nur `updatedAt`, das vom Server kommt. Die Ausnahme aus
+  [ADR 0026](docs/decisions/0026-verschieben-schreibt-createdat-selbst.md) ist damit nicht mehr auf
+  das Verschieben beschränkt.
+  Bewusst so und nicht anders: sofort schreiben statt verzögert (kein Timer, keine schwebende
+  Löschung — die Maschinerie, die ADR 0016 verworfen hat) · zurückgelegt wird der **Snapshot**, nicht
+  der Inhalt des offenen Dialogs · **Einzelslot**, nur die letzte Löschung ist umkehrbar · das
+  Angebot **überlebt keinen Listenwechsel**, sonst schriebe es in die falsche Liste.
+  Nebenbei: Die Snackbar-Rückrufe sind zum fünften Actions-Halter `SnackbarActions` geworden, statt
+  als vier einzelne Parameter am Bildschirm zu stehen (ADR 0028 bleibt damit bei acht)
+- [x] Unit-Tests zum Rückgängig — **117 grün** (vorher 108): das Angebot nach dem Löschen im Dialog
+  und nach dem Wischen · dass es den **Snapshot** trägt und nicht den ungespeicherten Dialog-Inhalt ·
+  Wiederherstellen unter der alten id · der Fehlschlag (`RESTORE_FAILED`, Angebot verfällt) · kein
+  Angebot nach einem gescheiterten Löschen · kein Angebot, wenn der Partner den Eintrag schon
+  entfernt hatte · und dass ein Listenwechsel das Angebot verwirft
+- [x] Instrumentierte Tests **am 2026-08-12 auf einem SM-S928B gelaufen, alle 25 grün** (vorher 24:
+  einer neu, `theUndoActionOfTheDeleteSnackbarReportsTheTap` — Snackbar da, der Tipp kommt als
+  „Rückgängig" an, und der andere Rückruf läuft dabei *nicht*). Canary-Gegenprobe mitgemacht: auf
+  einen erfundenen Text gedreht scheitert der Test mit „Assert failed: The component with Text +
+  InputText + EditableText contains 'CANARY …' is not displayed!" — ein aufgelöster Matcher gegen
+  einen echten Baum, nicht „No compose hierarchies found". Danach zurückgedreht und erneut 25 grün
+- [x] Auf dem Gerät geprüft (2026-08-12, SM-S928B) — löschen und zurückholen, im Dialog **und** per
+  Wischgeste · beim Partner nachgesehen, dass die Aufgabe an derselben Stelle wieder auftaucht (nicht
+  oben) · eine **erledigte** Aufgabe zurückgeholt · zwei Löschungen schnell hintereinander · Liste
+  gewechselt, während die Snackbar stand · offline gelöscht und zurückgeholt · Anzeigedauer,
+  hell und dunkel.
+  **Die vorsorgliche Rücksetzung des Wischzustands in `TodoRow` hat sich damit bewährt:** Eine
+  weggewischte und zurückgeholte Zeile steht an ihrem Platz, keine leere Fläche. Ob es die Vorsorge
+  wirklich gebraucht hätte, sagt der Lauf nicht — sie bleibt, weil der Fehlerfall unsichtbar wäre
+- [x] **Das Verschwinden sichtbar machen** — aufgefallen beim Durchspielen: Die Zeile war *instantan*
+  weg, was zu einem umkehrbaren Löschen nicht passt; wer nichts verschwinden sieht, greift auch nicht
+  nach dem „Rückgängig". Jetzt blendet sie in 800 ms **linear** aus
+  (`animateItem(fadeOutSpec = tween(...))`, eigene Dauer nur fürs Ausblenden — Einblenden und
+  Verschieben behalten ihre Vorgabe-Federn).
+  **Die Kurve war dabei wichtiger als die Zahl:** Mit 400 ms und der Vorgabe `FastOutSlowInEasing`
+  blieb es „kaum sichtbar", weil diese Kurve am Anfang beschleunigt — nach einem Fünftel der Zeit
+  stand die Deckkraft schon bei etwa der Hälfte, der Rest verstrich an einer unsichtbaren Zeile. Bei
+  `LinearEasing` sagt die Dauer, wie lange man wirklich etwas sieht.
+  **Kein Rot-Aufblitzen**, obwohl das die erste Idee war: Die verschwindende Zeile wird von der
+  `LazyColumn` nur noch *gezeichnet*, nicht neu zusammengesetzt — eine Farbe ließe sich also nur
+  ändern, indem die Aufgabe künstlich in der Liste gehalten und erst verzögert gelöscht wird. Das ist
+  genau die schwebende Löschung samt Timer, die
+  [ADR 0031](docs/decisions/0031-rueckgaengig-statt-rueckfrage-beim-loeschen.md) und
+  [ADR 0016](docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md) verworfen haben. Rot gibt
+  es beim Wischen ohnehin schon, dort trägt der Hintergrund die Farbe
+- [ ] Die **85-%-Wischschwelle** aus ADR 0016 auf den Material-Standard von 50 % senken — jetzt
+  möglich, weil das Rückgängig das Netz spannt, das die hohe Schwelle ersetzen sollte. Absichtlich
+  **nicht** in derselben Änderung: Das ist eine Entscheidung über das Gefühl der Geste und will auf
+  dem Gerät erprobt werden, nicht am Schreibtisch entschieden
 - [ ] **„Speichern" landet auf einer eigenen Zeile, und zwar aus einem benennbaren Grund.**
   `AlertDialog` legt `dismissButton` und `confirmButton` in eine gemeinsame `AlertDialogFlowRow`.
   Weil Löschen und Abbrechen in **einem** `Row` stecken, ist das dort ein *unteilbares* Element:

@@ -56,3 +56,4 @@ der den alten als „abgelöst" markiert.
 | [0028](0028-rueckrufe-in-actions-haltern.md) | Rückrufe des Aufgaben-Bildschirms in Actions-Haltern bündeln | akzeptiert |
 | [0029](0029-kalender-fehler-ueber-todolisterror.md) | Der Kalender-Fehler läuft über `TodoListError` | akzeptiert |
 | [0030](0030-notiz-als-zweite-zeile.md) | Die Notiz erscheint als gekürzte zweite Zeile, nicht als Symbol | akzeptiert |
+| [0031](0031-rueckgaengig-statt-rueckfrage-beim-loeschen.md) | Rückgängig statt Rückfrage beim Löschen einer Aufgabe | akzeptiert |

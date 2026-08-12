@@ -59,7 +59,7 @@ ins Repo — nicht umgehen. Beide müssen deshalb lokal beschafft werden:
 |---|---|
 | ViewModel-, Repository-, Mapper-Logik | `./gradlew.bat :app:testDebugUnitTest` |
 | Compose-UI, Ressourcen, Manifest, Gradle | `./gradlew.bat :app:assembleDebug :app:lintDebug` |
-| UI-Verhalten auf dem Gerät | `./gradlew.bat :app:connectedDebugAndroidTest` (Gerät oder laufender Emulator nötig) |
+| UI-Verhalten auf dem Gerät | `./gradlew.bat :app:connectedDebugAndroidTest` (Gerät oder laufender Emulator nötig; **räumt die App danach wieder ab** — wer sie anschließend von Hand ausprobieren will, installiert sie erneut: `adb install -r app/build/outputs/apk/debug/app-debug.apk`) |
 | `firestore.rules` | **kein Befehl** — von Hand über die Firebase Console veröffentlichen |
 
 Warum die Security Rules von Hand veröffentlicht werden und `firestore.rules` im Repo-Root trotzdem

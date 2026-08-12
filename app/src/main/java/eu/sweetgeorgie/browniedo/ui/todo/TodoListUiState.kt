@@ -10,6 +10,9 @@ enum class TodoListError {
     ADD_FAILED,
     UPDATE_FAILED,
     DELETE_FAILED,
+
+    /** Das „Rückgängig" nach dem Löschen ist gescheitert — die Aufgabe bleibt weg (ADR 0031). */
+    RESTORE_FAILED,
     MOVE_FAILED,
     LIST_ADD_FAILED,
     LIST_UPDATE_FAILED,
@@ -41,7 +44,22 @@ data class TodoListUiState(
      * genau wie ein Löschen aus. Der Name statt der Liste, weil die Meldung nichts weiter braucht —
      * und statt einer Ressourcen-id, weil das ViewModel keine Android-Ressourcen kennt.
      */
-    val movedToListName: String? = null
+    val movedToListName: String? = null,
+    /**
+     * Die zuletzt gelöschte Aufgabe, solange ihr „Rückgängig" noch angeboten wird — null, sobald die
+     * Snackbar weg ist oder wiederhergestellt wurde. Siehe
+     * docs/decisions/0031-rueckgaengig-statt-rueckfrage-beim-loeschen.md.
+     *
+     * Der dritte Meldungskanal neben [error] und [movedToListName], und der einzige, der eine Last
+     * trägt: Die ganze Aufgabe steht hier, weil das Wiederherstellen sie vollständig braucht — aus
+     * Firestore ist sie nach dem Löschen nicht mehr zu holen.
+     *
+     * **Ein Einzelslot, und das ist eine Entscheidung:** Löscht man zwei Aufgaben schnell
+     * hintereinander, lässt sich nur die zweite zurückholen. Eine Warteschlange wäre die
+     * vollständige Antwort, aber „Rückgängig" bezieht sich in jeder App auf den letzten Schritt —
+     * mehrere gleichzeitig offene Angebote wären eher verwirrend als hilfreich.
+     */
+    val deletedTodo: Todo? = null
 )
 
 /**

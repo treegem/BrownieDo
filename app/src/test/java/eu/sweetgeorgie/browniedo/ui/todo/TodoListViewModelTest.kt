@@ -801,6 +801,124 @@ class TodoListViewModelTest {
         assertEquals(TodoListError.DELETE_FAILED, viewModel.uiState.value.error)
     }
 
+    // --- Rückgängig nach dem Löschen (ADR 0031) ---
+
+    @Test
+    fun `deleting an entry from the dialog offers to undo it`() = runTest(testDispatcher) {
+        seedEntryInFirstList()
+
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onDeleteTodoClick()
+
+        assertEquals(TODO_ENTRY, viewModel.uiState.value.deletedTodo)
+    }
+
+    @Test
+    fun `swiping a finished entry away offers to undo it`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+
+        viewModel.onTodoSwipedAway(FINISHED_TODO_ENTRY)
+
+        assertEquals(FINISHED_TODO_ENTRY, viewModel.uiState.value.deletedTodo)
+    }
+
+    /**
+     * Der Dialog kann Getipptes tragen, das nie gespeichert wurde. Rückgängig stellt den Stand von
+     * vor dem Löschen her — nicht einen, den es in Firestore nie gab.
+     */
+    @Test
+    fun `the undo offer carries the stored entry and not the unsaved dialog input`() =
+        runTest(testDispatcher) {
+            seedEntryInFirstList()
+
+            viewModel.onEditTodoClick(TODO_ENTRY)
+            viewModel.onEditedTitleChange("Etwas ganz anderes")
+            viewModel.onEditedNotesChange("Nie gespeichert")
+            viewModel.onDeleteTodoClick()
+
+            assertEquals(TODO_ENTRY, viewModel.uiState.value.deletedTodo)
+        }
+
+    @Test
+    fun `undoing a delete restores the entry under its old id`() = runTest(testDispatcher) {
+        seedEntryInFirstList()
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onDeleteTodoClick()
+
+        viewModel.onUndoDelete()
+
+        assertEquals(RestoreTodoCall(LIST_A.id, TODO_ENTRY), todoRepository.lastRestoreTodoCall)
+        assertNull(viewModel.uiState.value.deletedTodo)
+        assertNull(viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `a failing undo reports a restore error and drops the offer`() = runTest(testDispatcher) {
+        seedEntryInFirstList()
+        todoRepository.restoreTodoResult = Result.failure(IllegalStateException("no permission"))
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onDeleteTodoClick()
+
+        viewModel.onUndoDelete()
+
+        assertEquals(TodoListError.RESTORE_FAILED, viewModel.uiState.value.error)
+        // Ein zweites Angebot hieße, die Snackbar über sich selbst zu stapeln.
+        assertNull(viewModel.uiState.value.deletedTodo)
+    }
+
+    @Test
+    fun `a failing delete offers no undo`() = runTest(testDispatcher) {
+        seedEntryInFirstList()
+        todoRepository.deleteResult = Result.failure(IllegalStateException("no permission"))
+
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onDeleteTodoClick()
+
+        assertNull(viewModel.uiState.value.deletedTodo)
+    }
+
+    /** Der Partner war schneller: Zu löschen ist noch etwas, zurückzuholen nichts mehr. */
+    @Test
+    fun `deleting an entry that is no longer in the list offers no undo`() =
+        runTest(testDispatcher) {
+            advanceUntilIdle()
+
+            viewModel.onEditTodoClick(TODO_ENTRY)
+            viewModel.onDeleteTodoClick()
+
+            assertEquals(DeleteCall(LIST_A.id, TODO_ENTRY.id), todoRepository.lastDeleteCall)
+            assertNull(viewModel.uiState.value.deletedTodo)
+        }
+
+    @Test
+    fun `a shown delete message drops the undo offer`() = runTest(testDispatcher) {
+        seedEntryInFirstList()
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onDeleteTodoClick()
+
+        viewModel.onDeletedMessageShown()
+
+        assertNull(viewModel.uiState.value.deletedTodo)
+    }
+
+    /**
+     * Anders als die Verschiebe-Bestätigung überlebt das Angebot keinen Listenwechsel: Es würde
+     * sonst in die neu gewählte Liste zurücklegen.
+     */
+    @Test
+    fun `switching lists drops the undo offer`() = runTest(testDispatcher) {
+        seedEntryInFirstList()
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onDeleteTodoClick()
+
+        viewModel.onListSelected(LIST_B)
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.deletedTodo)
+        viewModel.onUndoDelete()
+        assertNull(todoRepository.lastRestoreTodoCall)
+    }
+
     @Test
     fun `a shown write error is cleared`() = runTest(testDispatcher) {
         advanceUntilIdle()
@@ -892,12 +1010,15 @@ private data class MoveTodoCall(val fromListId: String, val toListId: String, va
 
 private data class DeleteCall(val listId: String, val todoId: String)
 
+private data class RestoreTodoCall(val listId: String, val todo: Todo)
+
 private class FakeTodoRepository : TodoRepository {
     var addResult: Result<Unit> = Result.success(Unit)
     var setDoneResult: Result<Unit> = Result.success(Unit)
     var updateTodoResult: Result<Unit> = Result.success(Unit)
     var moveTodoResult: Result<Unit> = Result.success(Unit)
     var deleteResult: Result<Unit> = Result.success(Unit)
+    var restoreTodoResult: Result<Unit> = Result.success(Unit)
     var addCallCount = 0
         private set
     var lastAddCall: AddCall? = null
@@ -909,6 +1030,8 @@ private class FakeTodoRepository : TodoRepository {
     var lastMoveTodoCall: MoveTodoCall? = null
         private set
     var lastDeleteCall: DeleteCall? = null
+        private set
+    var lastRestoreTodoCall: RestoreTodoCall? = null
         private set
 
     /** Lists a flow was requested for, in order — that is what a list switch has to change. */
@@ -963,6 +1086,11 @@ private class FakeTodoRepository : TodoRepository {
     override fun deleteTodo(listId: String, todoId: String): Result<Unit> {
         lastDeleteCall = DeleteCall(listId, todoId)
         return deleteResult
+    }
+
+    override fun restoreTodo(listId: String, todo: Todo): Result<Unit> {
+        lastRestoreTodoCall = RestoreTodoCall(listId, todo)
+        return restoreTodoResult
     }
 }
 

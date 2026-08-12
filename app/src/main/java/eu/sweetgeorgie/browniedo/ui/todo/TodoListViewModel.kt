@@ -124,6 +124,11 @@ class TodoListViewModel(
                             // movedToListName gehört bewusst NICHT hierher: Die Bestätigung
                             // betrifft eine abgeschlossene Aktion und bleibt wahr. Sie hier zu
                             // löschen risse eine laufende Snackbar mittendrin ab.
+                            //
+                            // deletedTodo dagegen schon: Es ist kein Rückblick, sondern ein
+                            // Angebot, und [onUndoDelete] schreibt in die *gewählte* Liste. Bliebe
+                            // es stehen, legte ein Rückgängig nach dem Wechsel die Aufgabe in der
+                            // falschen Liste an.
                             it.copy(
                                 todos = emptyList(),
                                 isLoading = true,
@@ -131,7 +136,8 @@ class TodoListViewModel(
                                 editedTodo = null,
                                 newList = null,
                                 renamedList = null,
-                                listPendingDeletion = null
+                                listPendingDeletion = null,
+                                deletedTodo = null
                             )
                         }
                     }
@@ -396,11 +402,30 @@ class TodoListViewModel(
         if (it.error == TodoListError.LOAD_FAILED) it else it.copy(error = null)
     }
 
+    /**
+     * Löschen bleibt ein Tipp ohne Rückfrage — das Netz spannt sich danach auf, siehe
+     * docs/decisions/0031-rueckgaengig-statt-rueckfrage-beim-loeschen.md.
+     *
+     * Zurückgelegt wird der Stand aus dem Snapshot, **nicht** der des offenen Dialogs: Was dort
+     * getippt und nicht gespeichert wurde, stand nie in Firestore, und ein Rückgängig soll den
+     * Zustand von vor dem Löschen wiederherstellen, nicht einen, den es nie gab. Dieselbe
+     * Überlegung wie beim Verschieben in [onEditConfirm], nur mit der umgekehrten Antwort — dort
+     * *will* der Dialog gewinnen, weil sein Inhalt gerade gespeichert wird.
+     *
+     * Fehlt der Eintrag im Snapshot, wird trotzdem gelöscht und nur das Rückgängig entfällt: Der
+     * Partner hat ihn dann bereits entfernt, und die Aufgabe ist ohnehin weg.
+     */
     fun onDeleteTodoClick() {
         val listId = selectedListId.value ?: return
-        val editedTodo = mutableUiState.value.editedTodo ?: return
+        val state = mutableUiState.value
+        val editedTodo = state.editedTodo ?: return
+        val snapshot = state.todos.firstOrNull { it.id == editedTodo.todoId }
         todoRepository.deleteTodo(listId, editedTodo.todoId).fold(
-            onSuccess = { mutableUiState.update { it.copy(editedTodo = null, error = null) } },
+            onSuccess = {
+                mutableUiState.update {
+                    it.copy(editedTodo = null, error = null, deletedTodo = snapshot)
+                }
+            },
             onFailure = { mutableUiState.update { it.copy(error = TodoListError.DELETE_FAILED) } }
         )
     }
@@ -411,12 +436,36 @@ class TodoListViewModel(
      * Die Prüfung auf [Todo.isDone] ist die eigentliche Regel und steht bewusst hier statt nur in
      * der Oberfläche: So ist sie ohne Gerät prüfbar und übersteht eine Unachtsamkeit im Bildschirm,
      * siehe docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md.
+     *
+     * Das Rückgängig gibt es hier ebenso wie im Dialog. Die Wischstrecke von 85 % bleibt davon
+     * unberührt, siehe ADR 0031.
      */
     fun onTodoSwipedAway(todo: Todo) {
         if (!todo.isDone) return
         val listId = selectedListId.value ?: return
-        todoRepository.deleteTodo(listId, todo.id).onFailure {
-            mutableUiState.update { it.copy(error = TodoListError.DELETE_FAILED) }
-        }
+        todoRepository.deleteTodo(listId, todo.id).fold(
+            onSuccess = { mutableUiState.update { it.copy(deletedTodo = todo, error = null) } },
+            onFailure = { mutableUiState.update { it.copy(error = TodoListError.DELETE_FAILED) } }
+        )
     }
+
+    /**
+     * Legt die zuletzt gelöschte Aufgabe wieder an. Der Slot wird in beiden Fällen geleert: Nach
+     * einem Fehlschlag ein zweites Mal anzubieten hieße, die Snackbar über sich selbst zu stapeln —
+     * der Fehler sagt bereits, dass die Aufgabe weg bleibt.
+     */
+    fun onUndoDelete() {
+        val listId = selectedListId.value ?: return
+        val deletedTodo = mutableUiState.value.deletedTodo ?: return
+        todoRepository.restoreTodo(listId, deletedTodo).fold(
+            onSuccess = { mutableUiState.update { it.copy(deletedTodo = null, error = null) } },
+            onFailure = {
+                mutableUiState.update {
+                    it.copy(deletedTodo = null, error = TodoListError.RESTORE_FAILED)
+                }
+            }
+        )
+    }
+
+    fun onDeletedMessageShown() = mutableUiState.update { it.copy(deletedTodo = null) }
 }

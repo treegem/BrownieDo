@@ -80,6 +80,35 @@ class TodoListScreenTest {
         assertEquals(0, errorShownCount)
     }
 
+    /**
+     * Die Snackbar zum Löschen ist die einzige mit einer Aktion — geprüft wird deshalb, dass der
+     * Knopf da ist und der Tipp als „Rückgängig" ankommt und nicht als Wegwischen (ADR 0031).
+     */
+    @Test
+    fun theUndoActionOfTheDeleteSnackbarReportsTheTap() {
+        var undoCount = 0
+        var messageShownCount = 0
+        setScreenContent(
+            uiState = TodoListUiState(
+                selectedList = LIST,
+                isLoading = false,
+                deletedTodo = FINISHED_TODO
+            ),
+            onUndoDelete = { undoCount++ },
+            onDeletedMessageShown = { messageShownCount++ }
+        )
+
+        val message = composeTestRule.activity.getString(R.string.todo_list_deleted)
+        composeTestRule.onNodeWithText(message).assertIsDisplayed()
+        composeTestRule
+            .onNodeWithText(composeTestRule.activity.getString(R.string.todo_list_undo))
+            .performClick()
+
+        composeTestRule.waitUntil(timeoutMillis = DISMISS_TIMEOUT_MILLIS) { undoCount == 1 }
+        // Genau einer der beiden Rückrufe läuft, sonst wäre das Angebot doppelt beantwortet.
+        assertEquals(0, messageShownCount)
+    }
+
     @Test
     fun theProgressIndicatorIsShownWhileTheListIsLoading() {
         setScreenContent(uiState = TodoListUiState(selectedList = LIST, isLoading = true))
@@ -359,13 +388,19 @@ class TodoListScreenTest {
      * Der Bildschirm nimmt die Rückrufe gebündelt (ADR 0028). Wer einen davon beobachten will,
      * übergibt `NO_TODO_ACTIONS.copy(…)` bzw. `NO_EDIT_ACTIONS.copy(…)` — dafür sind die Halter
      * `data class`.
+     *
+     * Die Snackbar-Rückrufe bleiben hier dagegen einzelne Parameter: Ein Test, der einen davon
+     * beobachtet, soll nicht die anderen drei mit aufschreiben müssen. Der Halter entsteht daraus an
+     * einer Stelle.
      */
     private fun setScreenContent(
         uiState: TodoListUiState,
         onErrorShown: () -> Unit = {},
         todoActions: TodoActions = NO_TODO_ACTIONS,
         editActions: TodoEditActions = NO_EDIT_ACTIONS,
-        onMovedMessageShown: () -> Unit = {}
+        onMovedMessageShown: () -> Unit = {},
+        onUndoDelete: () -> Unit = {},
+        onDeletedMessageShown: () -> Unit = {}
     ) {
         composeTestRule.setContent {
             BrownieDoTheme {
@@ -375,8 +410,12 @@ class TodoListScreenTest {
                     listDialogActions = NO_LIST_DIALOG_ACTIONS,
                     todoActions = todoActions,
                     editActions = editActions,
-                    onErrorShown = onErrorShown,
-                    onMovedMessageShown = onMovedMessageShown
+                    snackbarActions = SnackbarActions(
+                        onErrorShown = onErrorShown,
+                        onMovedMessageShown = onMovedMessageShown,
+                        onUndoDelete = onUndoDelete,
+                        onDeletedMessageShown = onDeletedMessageShown
+                    )
                 )
             }
         }

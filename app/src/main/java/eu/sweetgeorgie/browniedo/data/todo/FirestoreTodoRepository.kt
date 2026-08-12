@@ -140,6 +140,19 @@ class FirestoreTodoRepository(private val firestore: FirebaseFirestore) : TodoRe
 
     override fun deleteTodo(listId: String, todoId: String): Result<Unit> =
         runCatching { todoCollection(listId).document(todoId).delete() }.map { }
+
+    /**
+     * `set()` auf denselben Pfad, den [deleteTodo] gerade geleert hat — die alte id kommt aus
+     * [Todo.id]. Firestore stört es nicht, dass das Dokument dort eben noch stand: Offline reihen
+     * sich Löschen und Anlegen in derselben lokalen Warteschlange, und der Endzustand ist ein
+     * vorhandenes Dokument.
+     *
+     * Das ganze Dokument statt einzelner Felder — es gibt keine, die man ändern könnte. Damit greift
+     * `@ServerTimestamp` wie beim Verschieben: `updatedAt` ist in [toDocument] null und wird vom
+     * Server gesetzt, `createdAt` reist mit (ADR 0026).
+     */
+    override fun restoreTodo(listId: String, todo: Todo): Result<Unit> =
+        runCatching { todoCollection(listId).document(todo.id).set(todo.toDocument()) }.map { }
 }
 
 /**
