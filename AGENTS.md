@@ -25,6 +25,16 @@ jede Datei im Repo ([ADR 0014](docs/decisions/0014-regeldateien-always-on.md)).
 - Entscheidungen, die schwer rückgängig zu machen sind oder eine ernsthafte Alternative verwerfen,
   bekommen einen neuen ADR in `docs/decisions/` plus eine Zeile in dessen Übersichtstabelle.
 - Jede Entscheidung wird genau einmal beschrieben und sonst verlinkt — nicht wiederholen.
+- **Bei jeder mittleren oder größeren Änderung den `versionCode` in `app/build.gradle.kts` um eins
+  erhöhen** — zusammen mit der Änderung, nicht erst beim Verteilen. Sonst tragen zwei
+  unterscheidbare Fassungen dieselbe Nummer, und auf dem Gerät ist nicht mehr zu sehen, welche
+  installiert ist.
+  - **Erhöhen**, sobald etwas in der APK landet, das man auf dem Gerät merken würde: ein Feature,
+    eine Fehlerbehebung, eine Änderung an Oberfläche, Ressourcen, Manifest oder Gradle-Konfiguration.
+  - **Nicht erhöhen** bei Änderungen, die die App nicht verändern: `ROADMAP.md`, ADRs, Regeldateien,
+    Kommentare, reine Umbenennungen, Tests.
+  - Der `versionName` ist davon unabhängig und bleibt eine bewusste Entscheidung — er steigt, wenn
+    die Fassung einen eigenen Namen verdient, nicht mechanisch.
 
 ## Sprache
 
@@ -85,7 +95,10 @@ Danach je Release:
 | Installieren | `adb install -r app/build/outputs/apk/release/app-release.apk` |
 | Prüfen | Google-Login auf dem Gerät durchspielen — der Build sagt darüber nichts aus |
 
-**Jede weitere verteilte Fassung braucht einen höheren `versionCode`** in `app/build.gradle.kts`.
+**Vor dem Bauen prüfen, dass der `versionCode` höher ist als der der verteilten Fassung** — wer die
+Regel unter „Erwartungen an eine Änderung" einhält, hat das schon erledigt; hier steht nur der
+letzte Blick darauf.
+
 Verteilt wird eine APK, kein App Bundle: Ein AAB lässt sich ohne `bundletool` nicht per Sideload
 installieren.
 

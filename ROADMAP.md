@@ -158,9 +158,12 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   Gerät bestätigt: `google-services.json` trägt jetzt beide Fingerabdrücke (Debug und Release),
   der Google-Login in der signierten APK funktioniert
 - [x] Direkt auf beide Geräte installieren (Sideload)
-- [ ] **Beim nächsten verteilten Build den `versionCode` heben** — die verteilte APK trägt noch `1`,
-  und `app/build.gradle.kts` steht unverändert darauf. Die Regel steht in `AGENTS.md`; der Punkt steht
-  hier, weil sie beim ersten Nachschub greift und dann leicht übersehen wird
+- [x] **`versionCode` gehoben** — auf `2` (`versionName` „1.1"), zusammen mit dem Release, das Phase 11
+  und 12 auf das zweite Handy bringt. Damit dieser Punkt nicht wiederkehrt, ist die Regel
+  **verschärft und in die Erwartungen an *jede* Änderung gewandert**: Der `versionCode` steigt bei
+  jeder mittleren oder größeren Änderung, nicht erst beim Verteilen — samt Abgrenzung, was zählt
+  (Feature, Fehlerbehebung, Oberfläche, Ressourcen, Manifest, Gradle) und was nicht (Doku, ADRs,
+  Regeldateien, Kommentare, Tests). Steht in `AGENTS.md`, hier nur der Verweis
 
 ### Phase 8 – Mehrere Listen (geteilt & privat)
 > Die Datenstruktur steht seit Phase 3
@@ -421,6 +424,87 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   offen und erledigt, hell und dunkel · alte Aufgabe ohne das Feld bearbeitet und ihr eine Notiz
   gegeben · Notiz gelöscht und beim Partner nachgesehen · Aufgabe mit Notiz verschoben, ohne und mit
   gleichzeitiger Änderung. **Damit ist auch die aus Phase 11 offene Hell/Dunkel-Sicht nachgeholt**
+
+### Phase 13 – Nacharbeit aus dem Best-Practice-Durchgang (2026-08-12)
+> Ergebnis eines Durchgangs durch Oberfläche und Code nach Phase 12, ohne Anlass in einem konkreten
+> Fehler. Bewusst **nicht** kleinteilig: Was Linter und Formatierer ohnehin finden, steht hier nicht.
+> Die Reihenfolge ist die nach Gewicht, nicht die der Umsetzung — die ersten drei Punkte hängen
+> zusammen und gehören in einen Zug.
+
+**Was der Durchgang ausdrücklich nicht beanstandet hat**, damit hier niemand nachträglich
+„aufräumt": Die Schichtentrennung hält durchgehend, die `LazyColumn` hat `key = Todo::id` samt
+`animateItem`, die Insets der Eingabeleiste sind sauber gelöst, jedes bedeutungstragende Symbol hat
+eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt keinen Android-Typ.
+
+#### Löschen und die Knopfzeile des Bearbeiten-Dialogs
+- [ ] **Löschen ist der am schwächsten geschützte Weg — und das ist ein Widerspruch in der eigenen
+  Logik.** Wischen löscht nur *erledigte* Aufgaben und verlangt 85 % der Zeilenbreite, ausdrücklich
+  weil „gelöscht ist endgültig" ([ADR 0016](docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md));
+  eine *Liste* zu löschen hat einen Bestätigungsdialog mit Anzahl. Eine *Aufgabe* aus dem
+  Bearbeiten-Dialog zu löschen kostet dagegen **einen Tipp ohne Rückfrage, direkt neben Speichern**,
+  und funktioniert auch für offene Aufgaben. Der bequemste Weg ist der ungeschützteste.
+  Zwei Auflösungen stehen zur Wahl, und die Entscheidung braucht einen ADR: **(a) Undo-Snackbar** —
+  passt zu Material, der Meldungskanal steht schon zweifach, und sie würde nebenbei die
+  85-%-Schwelle entspannen; Kosten: „rückgängig" heißt bei Firestore *neu anlegen*, die Aufgabe
+  bekommt eine neue Dokument-id und rutscht ohne mitgegebenes `createdAt` in der Sortierung nach
+  oben. Oder **(b) Bestätigungsschritt** wie bei Listen — billiger, aber ein Dialog über einem Dialog
+- [ ] **„Speichern" landet auf einer eigenen Zeile, und zwar aus einem benennbaren Grund.**
+  `AlertDialog` legt `dismissButton` und `confirmButton` in eine gemeinsame `AlertDialogFlowRow`.
+  Weil Löschen und Abbrechen in **einem** `Row` stecken, ist das dort ein *unteilbares* Element:
+  Passt `[Löschen Abbrechen] [Speichern]` nicht in eine Zeile, bricht der FlowRow vor Speichern um.
+  Nimmt der Punkt darüber das Löschen aus der Knopfzeile heraus, löst sich das von selbst und es
+  bleibt die Standardanordnung `[Abbrechen] [Speichern]`
+- [ ] **„Speichern" sieht aus wie „Abbrechen"** — beide sind `TextButton`, nur Löschen hebt sich über
+  die Farbe ab. Bei drei Aktionen so unterschiedlicher Tragweite trägt die bestätigende zu wenig
+  Gewicht. M3 kennt dafür Abstufungen: `FilledTonalButton` oder `Button` für Speichern. Das gilt für
+  alle vier Dialoge, nicht nur diesen — dann aber überall gleich
+
+#### Zuschnitt des Bearbeiten-Dialogs
+- [ ] **Bearbeiten als eigener Bildschirm statt als `AlertDialog` — zu entscheiden, nicht sofort zu
+  bauen.** Der Dialog trägt fünf Eingaben plus drei Knöpfe. Material 3 zieht die Linie bei
+  „Formular mit mehreren Eingaben → Full-Screen-Dialog"; das `verticalScroll` aus Phase 12 ist
+  selbst schon ein Symptom und nicht die Lösung. Einschätzung: **noch tragbar, aber am Anschlag** —
+  das nächste Feld kippt es, und mit offener Tastatur fällt es zuerst auf.
+  Der Preis ist echt und der Grund, warum das hier eine Entscheidung und keine Aufgabe ist: Die App
+  hat **keine Navigation**, nur `if (signedInUser == null)` in `MainActivity`. Ein eigener Bildschirm
+  wäre der erste Navigationsschritt des Projekts — dafür bekäme er eine TopAppBar mit
+  „Abbrechen"/„Speichern" (wo die Knopfzeile-Probleme oben gar nicht erst entstehen), Platz für die
+  Notiz und ein eigenes ViewModel, was den Punkt weiter unten mitlöst
+- [ ] Die beiden `OutlinedTextField` im Dialog haben **kein `fillMaxWidth()`**, die Segment-Auswahl
+  und das Zielliste-Feld schon. Die Textfelder stehen damit auf ihrer Vorgabebreite und der rechte
+  Rand ist ausgefranst. Gilt genauso für `NewListDialog` und `RenameListDialog` — ein Einzeiler je
+  Feld
+- [ ] **Drei Beschriftungsstile in einem Dialog:** Titel und Notiz tragen ein `label` im Textfeld,
+  Priorität und Zielliste je einen nackten `Text` darüber. Sichtbar als unterschiedliche
+  Schriftgröße und Ausrichtung derselben Sache
+- [ ] Das Titelfeld im Bearbeiten-Dialog hat **keine `keyboardOptions`**, die Eingabeleiste dagegen
+  `KeyboardCapitalization.Sentences`. Eine neu getippte Aufgabe wird großgeschrieben, dieselbe
+  Aufgabe beim Bearbeiten nicht
+
+#### Kleinere Oberflächen-Punkte
+- [ ] **Klick-Semantik fehlt an zwei antippbaren Texten:** Der TopAppBar-Titel und das
+  Zielliste-Feld benutzen `Modifier.clickable` ohne `Role.Button` und ohne `onClickLabel`. Für
+  TalkBack sind sie damit „Text, antippbar" ohne Rolle. Die Klickfläche des Titels ist zudem nur so
+  hoch wie der Text — in der TopAppBar praktisch groß genug, aber nicht durch
+  `minimumInteractiveComponentSize` abgesichert
+
+#### Code
+- [ ] **`TodoListUiState.error` ist ein Einzelslot.** Treffen zwei Fehler kurz hintereinander ein,
+  überschreibt der zweite den ersten, bevor die Snackbar ihn gezeigt hat. Bei zwei Nutzern selten,
+  aber echt — eine Warteschlange wäre die saubere Antwort, ein bewusstes „reicht uns" der billigere
+  Weg. Dann aber als Kommentar am Feld, nicht als Zufall
+- [ ] **`TodoListViewModel` ist bei ~410 Zeilen und trägt drei Themen** (Listenwahl, Aufgaben-CRUD,
+  Dialogzustände). Der Bildschirm wurde in Phase 11 entzerrt, das ViewModel nicht. Kein Fehler, aber
+  der nächste Ort, an dem Wachstum wehtut. **Vor einem eigenen Umbau erst den Bildschirm-Punkt oben
+  entscheiden** — ein eigener Bearbeiten-Bildschirm brächte sein eigenes ViewModel mit und nähme
+  diesem ein Drittel ab
+- [ ] `updateTodo` hat mit der Notiz **fünf Parameter, zwei davon `String`**. Die Aufrufstellen
+  arbeiten benannt, das trägt. Kommt ein weiteres Feld dazu, ist ein Wertobjekt fällig statt eines
+  sechsten Parameters
+- [ ] **Abstände stehen als Literale** (`8.dp`, `16.dp`, `24.dp`, `32.dp`) über mehrere Dateien
+  verteilt. `standards.instructions.md` nennt „duplicated dimensions instead of resources"
+  ausdrücklich als SHOULD FIX. In Compose ist ein eigenes `Spacing`-Objekt im Theme üblicher als
+  `dimens.xml`
 
 ### Querlaufend – Werkzeuge & Doku
 > Läuft neben den Phasen und gehört zu keiner.

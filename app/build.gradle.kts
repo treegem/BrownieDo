@@ -35,8 +35,10 @@ android {
         applicationId = "eu.sweetgeorgie.browniedo"
         minSdk = 24
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        // Steigt bei jeder mittleren oder größeren Änderung, nicht erst beim Verteilen — die Regel
+        // samt Abgrenzung steht in AGENTS.md unter „Erwartungen an eine Änderung".
+        versionCode = 2
+        versionName = "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
