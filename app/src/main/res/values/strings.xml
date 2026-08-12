@@ -42,7 +42,6 @@
     <string name="todo_list_priority_high">Hoch</string>
     <string name="todo_list_priority_content_description">Priorität: %1$s</string>
     <string name="todo_list_target_list_label">Liste</string>
-    <string name="todo_list_choose_target_list">Zielliste wählen</string>
     <string name="todo_list_create_calendar_event">Termin anlegen</string>
     <string name="todo_list_moved_to">Nach „%1$s“ verschoben</string>
     <string name="todo_list_deleted">Aufgabe gelöscht</string>

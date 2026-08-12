@@ -58,3 +58,4 @@ der den alten als „abgelöst" markiert.
 | [0030](0030-notiz-als-zweite-zeile.md) | Die Notiz erscheint als gekürzte zweite Zeile, nicht als Symbol | akzeptiert |
 | [0031](0031-rueckgaengig-statt-rueckfrage-beim-loeschen.md) | Rückgängig statt Rückfrage beim Löschen einer Aufgabe | akzeptiert |
 | [0032](0032-gefuellte-bestaetigung-und-loeschen-im-inhalt.md) | Gefüllte Bestätigung in allen Dialogen, Löschen aus der Knopfzeile | akzeptiert |
+| [0033](0033-bearbeiten-bleibt-ein-dialog.md) | Bearbeiten bleibt ein Dialog, bis ein Auslöser greift | akzeptiert |

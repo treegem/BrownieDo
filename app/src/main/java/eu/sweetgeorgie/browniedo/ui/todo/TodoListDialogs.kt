@@ -3,7 +3,6 @@ package eu.sweetgeorgie.browniedo.ui.todo
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,11 +10,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -32,15 +33,53 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import eu.sweetgeorgie.browniedo.R
 import eu.sweetgeorgie.browniedo.domain.list.TodoList
 import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
 import eu.sweetgeorgie.browniedo.domain.user.Partner
+
+/**
+ * Für die einzeiligen Felder der Dialoge. Großschreibung wie in der Eingabeleiste, damit dieselbe
+ * Aufgabe beim Bearbeiten nicht anders behandelt wird als beim Anlegen — **`Sentences` und nicht
+ * `Words`**: Im Deutschen würde `Words` auch Präpositionen groß schreiben („Zeug Für Oma").
+ *
+ * `Done` steht bewusst **ohne** `keyboardActions` da: Die Taste schließt damit nur die Tastatur und
+ * speichert nicht. Den Dialog beendet allein die Knopfzeile, siehe
+ * docs/decisions/0032-gefuellte-bestaetigung-und-loeschen-im-inhalt.md. Angegeben wird die Aktion
+ * trotzdem, weil Tastaturen bei `Unspecified` unterschiedliche Tasten zeigen.
+ */
+private val DIALOG_TEXT_KEYBOARD_OPTIONS = KeyboardOptions(
+    capitalization = KeyboardCapitalization.Sentences,
+    imeAction = ImeAction.Done
+)
+
+/**
+ * Für die Notiz. Wie [DIALOG_TEXT_KEYBOARD_OPTIONS], aber **ohne `imeAction`**: In einem
+ * mehrzeiligen Feld verdrängt eine erzwungene Aktion die Zeilenumbruch-Taste — und genau die braucht
+ * eine Notiz.
+ */
+private val DIALOG_MULTILINE_KEYBOARD_OPTIONS =
+    KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
+
+/**
+ * Der Schriftstil für die Eingabe in einem Dialogfeld.
+ *
+ * Muss angegeben werden: `OutlinedTextField` erbt seinen `textStyle` von `LocalTextStyle`, und der
+ * `text`-Slot von `AlertDialog` setzt dort `bodyMedium` (`DialogTokens.SupportingTextFont`). Ohne
+ * diese Angabe tippt man in den Dialogen also in 14 sp, während dasselbe Feld in der Eingabeleiste
+ * 16 sp hat — und im leeren Feld wäre die Beschriftung größer als der Text, den man dann tippt.
+ */
+private val dialogTextStyle: TextStyle
+    @Composable get() = MaterialTheme.typography.bodyLarge
 
 @Composable
 internal fun NewListDialog(
@@ -60,7 +99,10 @@ internal fun NewListDialog(
                     value = newList.name,
                     onValueChange = onNameChange,
                     label = { Text(text = stringResource(R.string.todo_list_list_name_label)) },
-                    singleLine = true
+                    singleLine = true,
+                    keyboardOptions = DIALOG_TEXT_KEYBOARD_OPTIONS,
+                    textStyle = dialogTextStyle,
+                    modifier = Modifier.fillMaxWidth()
                 )
                 ListKindOption(
                     label = stringResource(R.string.todo_list_keep_private),
@@ -106,14 +148,17 @@ private fun ListKindOption(
         verticalAlignment = Alignment.CenterVertically
     ) {
         RadioButton(selected = selected, onClick = onClick, enabled = enabled)
+        // Die Farbe bleibt von Hand gesetzt, obwohl der text-Slot des Dialogs schon eine liefert:
+        // Das hier ist Wert-Text und soll sich aus der Stützfarbe herausheben — und ein nackter
+        // `Text` hat keinen enabled-Zustand, der das von allein könnte. Eine `style`-Angabe wäre
+        // dagegen redundant, der Slot setzt bereits `bodyMedium`.
         Text(
             text = label,
             color = if (enabled) {
                 MaterialTheme.colorScheme.onSurface
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            style = MaterialTheme.typography.bodyMedium
+            }
         )
     }
 }
@@ -133,7 +178,10 @@ internal fun RenameListDialog(
                 value = name,
                 onValueChange = onNameChange,
                 label = { Text(text = stringResource(R.string.todo_list_list_name_label)) },
-                singleLine = true
+                singleLine = true,
+                keyboardOptions = DIALOG_TEXT_KEYBOARD_OPTIONS,
+                textStyle = dialogTextStyle,
+                modifier = Modifier.fillMaxWidth()
             )
         },
         confirmButton = {
@@ -200,6 +248,8 @@ internal fun DeleteListDialog(
     )
 }
 
+// Für die Segment-Auswahl der Priorität; das Zielliste-Feld braucht denselben Opt-in noch einmal für
+// `ExposedDropdownMenuBox` und trägt ihn selbst.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun EditTodoDialog(
@@ -225,7 +275,10 @@ internal fun EditTodoDialog(
                     value = title,
                     onValueChange = actions.onTitleChange,
                     label = { Text(text = stringResource(R.string.todo_list_title_label)) },
-                    singleLine = true
+                    singleLine = true,
+                    keyboardOptions = DIALOG_TEXT_KEYBOARD_OPTIONS,
+                    textStyle = dialogTextStyle,
+                    modifier = Modifier.fillMaxWidth()
                 )
                 // Mehrzeilig, weil ein Backlog-Eintrag nach Wochen mehr braucht als eine Zeile —
                 // und mit Obergrenze, damit eine lange Notiz den Dialog nicht auffrisst.
@@ -234,25 +287,39 @@ internal fun EditTodoDialog(
                     onValueChange = actions.onNotesChange,
                     label = { Text(text = stringResource(R.string.todo_list_notes_label)) },
                     minLines = 3,
-                    maxLines = 5
+                    maxLines = 5,
+                    keyboardOptions = DIALOG_MULTILINE_KEYBOARD_OPTIONS,
+                    textStyle = dialogTextStyle,
+                    modifier = Modifier.fillMaxWidth()
                 )
-                Text(
-                    text = stringResource(R.string.todo_list_priority_label),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                // Drei feste Stufen, genau eine gewählt — dafür ist die Segment-Auswahl gemacht.
-                // Radio-Zeilen wie in NewListDialog bräuchten hier drei volle Zeilen.
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    TodoPriority.entries.forEachIndexed { index, entry ->
-                        SegmentedButton(
-                            selected = entry == priority,
-                            onClick = { actions.onPriorityChange(entry) },
-                            shape = SegmentedButtonDefaults.itemShape(
-                                index = index,
-                                count = TodoPriority.entries.size
-                            ),
-                            label = { Text(text = stringResource(entry.labelResId())) }
-                        )
+                // Beschriftung und Steuerung sind ein Element: 4 dp innerhalb der Gruppe, die 8 dp
+                // des äußeren Column zwischen den Gruppen. Dieselbe Geometrie benutzt Material für
+                // eine Beschriftung über einem Feld (AboveLabelBottomPadding).
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = stringResource(R.string.todo_list_priority_label),
+                        // Wie die verkleinerte Beschriftung eines Textfelds, damit die
+                        // Segment-Auswahl beschriftet wirkt wie Titel und Notiz. **Bewusst ohne
+                        // Farbe:** Der text-Slot von AlertDialog liefert onSurfaceVariant, und das
+                        // ist genau die Label-Farbe eines Textfelds — eine eigene Angabe wäre eine
+                        // zweite Quelle für denselben Wert.
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                    // Drei feste Stufen, genau eine gewählt — dafür ist die Segment-Auswahl gemacht.
+                    // Radio-Zeilen wie in NewListDialog bräuchten hier drei volle Zeilen.
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        TodoPriority.entries.forEachIndexed { index, entry ->
+                            SegmentedButton(
+                                selected = entry == priority,
+                                onClick = { actions.onPriorityChange(entry) },
+                                shape = SegmentedButtonDefaults.itemShape(
+                                    index = index,
+                                    count = TodoPriority.entries.size
+                                ),
+                                label = { Text(text = stringResource(entry.labelResId())) }
+                            )
+                        }
                     }
                 }
                 TargetListField(
@@ -329,12 +396,20 @@ private fun DialogAction(
 }
 
 /**
- * Die Zielliste ist ein Feld wie Titel und Priorität, kein eigener Auslöser: Erst „Speichern" führt
- * aus, was hier gewählt wurde, siehe docs/decisions/0022-verschieben-im-bearbeiten-dialog.md.
+ * Die Zielliste ist ein Feld wie Titel und Notiz, kein eigener Auslöser: Erst „Speichern" führt aus,
+ * was hier gewählt wurde, siehe docs/decisions/0022-verschieben-im-bearbeiten-dialog.md. Seit
+ * docs/decisions/0033-bearbeiten-bleibt-ein-dialog.md ist es auch buchstäblich ein Feld — ein
+ * schreibgeschütztes `OutlinedTextField` in einer `ExposedDropdownMenuBox`, also die Material-Komponente
+ * für „eines aus N", statt eines selbstgebauten `Row` mit `clickable`.
  *
  * Die aktuelle Liste steht mit im Menü und ist vorausgewählt — sonst gäbe es nach einem Fehlgriff
  * keinen Weg zurück zu „bleibt, wo sie ist", außer den Dialog abzubrechen.
+ *
+ * **Kein `leadingIcon` mit dem Symbol für geteilt/privat:** Dessen `contentDescription` verschmilzt in
+ * die Semantik des Felds, und `theListCannotBePickedWhileItIsTheOnlyOne` prüft genau, dass es die bei
+ * nur einer Liste *nicht* gibt.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TargetListField(
     lists: List<TodoList>,
@@ -348,52 +423,44 @@ private fun TargetListField(
     val enabled = lists.size > 1
     val target = lists.firstOrNull { it.id == targetListId }
 
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = stringResource(R.string.todo_list_target_list_label),
-            style = MaterialTheme.typography.bodyMedium
-        )
-        Box {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    // enabled = false nimmt auch die Klick-Semantik weg, TalkBack bietet die
-                    // Aktion dann gar nicht erst an.
-                    .clickable(enabled = enabled) { expanded = true }
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = target?.name.orEmpty(),
-                    color = if (enabled) {
-                        MaterialTheme.colorScheme.onSurface
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                )
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            value = target?.name.orEmpty(),
+            // Der Wert kommt aus der Auswahl, nicht aus der Tastatur.
+            onValueChange = {},
+            readOnly = true,
+            enabled = enabled,
+            label = { Text(text = stringResource(R.string.todo_list_target_list_label)) },
+            trailingIcon = {
                 Icon(
                     painter = painterResource(R.drawable.ic_arrow_drop_down),
-                    contentDescription = stringResource(R.string.todo_list_choose_target_list),
-                    tint = if (enabled) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.outline
+                    // Ohne Beschreibung: Die Steuerung ist das Feld selbst, nicht der Pfeil.
+                    // `menuAnchor` gibt ihm Rolle und Klick-Semantik, TalkBack liest damit
+                    // „Liste, <Name>, Dropdown-Liste" — eine Beschreibung am Pfeil käme doppelt.
+                    contentDescription = null,
+                    modifier = Modifier.rotate(if (expanded) 180f else 0f)
+                )
+            },
+            textStyle = dialogTextStyle,
+            modifier = Modifier
+                // `enabled = false` hängt hier gar keine Menü-Semantik an (im Material-Quelltext
+                // `if (!enabled) Modifier`) — Bedienhilfen sehen die Aufklapp-Aktion also nicht
+                // einmal. Der `onClick` des Felds bleibt, ist aber als `disabled` markiert; deshalb
+                // prüft der Test `assertIsNotEnabled` und nicht `assertHasNoClickAction`.
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = enabled)
+                .fillMaxWidth()
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            lists.forEach { list ->
+                ListMenuItem(
+                    list = list,
+                    // Hier heißt „ausgewählt": da landet sie beim Speichern.
+                    isSelected = list.id == targetListId,
+                    onClick = {
+                        expanded = false
+                        onTargetListChange(list)
                     }
                 )
-            }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                lists.forEach { list ->
-                    ListMenuItem(
-                        list = list,
-                        // Hier heißt „ausgewählt": da landet sie beim Speichern.
-                        isSelected = list.id == targetListId,
-                        onClick = {
-                            expanded = false
-                            onTargetListChange(list)
-                        }
-                    )
-                }
             }
         }
     }

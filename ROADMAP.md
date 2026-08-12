@@ -548,7 +548,7 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   Canary-Gegenprobe mitgemacht: auf einen erfundenen Text gedreht scheitert der Test mit „could not
   find any node that satisfies: ((hasAnyAncestorThat(IsDialog is defined)) && (Text … contains
   'CANARY …'))" — aufgelöster Matcher gegen einen echten Baum, nicht „No compose hierarchies found"
-- [ ] Auf dem Gerät prüfen — **der Umbruch ist weg** (`[Abbrechen] [Speichern]` in einer Zeile, auch
+- [x] Auf dem Gerät prüfen — **der Umbruch ist weg** (`[Abbrechen] [Speichern]` in einer Zeile, auch
   bei großer Schrift; ein gefüllter Knopf ist rund 24 dp breiter als ein Textknopf) · alle vier
   Dialoge hell und dunkel, besonders die gefüllte Fläche im dunklen Schema — dort ist das Grün hell
   und könnte als Block wirken · „Liste löschen?" in `error`/`onError` · Bearbeiten-Dialog **mit
@@ -557,48 +557,95 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   TalkBack über den Löschen-Knopf
 
 #### Zuschnitt des Bearbeiten-Dialogs
-- [ ] **Bearbeiten als eigener Bildschirm statt als `AlertDialog` — zu entscheiden, nicht sofort zu
-  bauen.** Der Dialog trägt fünf Eingaben, **zwei Aktionszeilen im Inhalt** (Termin, Löschen) und die
-  Knopfzeile `[Abbrechen] [Speichern]`. Material 3 zieht die Linie bei „Formular mit mehreren
-  Eingaben → Full-Screen-Dialog"; das `verticalScroll` aus Phase 12 ist selbst schon ein Symptom und
-  nicht die Lösung. Einschätzung: **am Anschlag, und seit ADR 0032 eine Zeile darüber hinaus** — mit
-  offener Tastatur fällt es zuerst auf, und dort kann jetzt das Löschen aus dem Bild rutschen.
-  Der Preis ist echt und der Grund, warum das hier eine Entscheidung und keine Aufgabe ist: Die App
-  hat **keine Navigation**, nur `if (signedInUser == null)` in `MainActivity`. Ein eigener Bildschirm
-  wäre der erste Navigationsschritt des Projekts — dafür bekäme er eine TopAppBar mit
-  „Abbrechen"/„Speichern", Platz für die Notiz und ein eigenes ViewModel, was den Punkt weiter unten
-  mitlöst.
-  **Achtung, hier stand einmal „wo die Knopfzeile-Probleme oben gar nicht erst entstehen":** Die sind
-  inzwischen anders gelöst (ADR 0032), das Argument ist verbraucht. Die Frage nach dem eigenen
-  Bildschirm wird dadurch **nicht** kleiner, sondern dringlicher — sie ist offen, nicht erledigt
-- [ ] Die beiden `OutlinedTextField` im Dialog haben **kein `fillMaxWidth()`**, die Segment-Auswahl
-  und das Zielliste-Feld schon. Die Textfelder stehen damit auf ihrer Vorgabebreite und der rechte
-  Rand ist ausgefranst. Gilt genauso für `NewListDialog` und `RenameListDialog` — ein Einzeiler je
-  Feld
-- [ ] **Drei Beschriftungsstile in einem Dialog:** Titel und Notiz tragen ein `label` im Textfeld,
-  Priorität und Zielliste je einen nackten `Text` darüber. Sichtbar als unterschiedliche
-  Schriftgröße und Ausrichtung derselben Sache
-- [ ] Das Titelfeld im Bearbeiten-Dialog hat **keine `keyboardOptions`**, die Eingabeleiste dagegen
-  `KeyboardCapitalization.Sentences`. Eine neu getippte Aufgabe wird großgeschrieben, dieselbe
-  Aufgabe beim Bearbeiten nicht
+- [x] **Bearbeiten als eigener Bildschirm — entschieden: bleibt ein Dialog**, mit benannten Auslösern,
+  bei denen gebaut wird. Die Abwägung steht in
+  [ADR 0033](docs/decisions/0033-bearbeiten-bleibt-ein-dialog.md) und wird hier nicht wiederholt; kurz:
+  ~133 Zeilen ViewModel-Umzug, drei neu zu entwerfende bildschirmübergreifende Kopplungen, **38
+  angefasste Tests** und zwei im Repo präzedenzlose Mechanismen (`BackHandler`, `rememberSaveable`) —
+  gegen ein Scrollen weniger. Die vier Mängel dieses Unterabschnitts lagen ohnehin *im* Dialog und
+  kosteten rund 15 Zeilen
+- [-] Den Bearbeiten-Bildschirm **bauen** — zurückgestellt, vorab genehmigt bei jedem einzelnen dieser
+  Auslöser (Begründung je Punkt in ADR 0033): sechstes Eingabefeld · dritte Aktion im Inhalt ·
+  `maxLines` an der Notiz muss steigen · der Geräteblick scheitert bei Schriftskalierung ≥ 1,3 mit
+  offener Tastatur · ein zweiter Weg in den Editor (Deep-Link, Benachrichtigung, Widget) ·
+  `TodoListViewModel` über ~600 Zeilen oder ein viertes Thema · die App bekommt aus anderem Grund
+  Navigation
+- [x] **`fillMaxWidth()` an allen vier Dialog-Textfeldern** — es waren vier über drei Dialoge, nicht
+  „die beiden im Dialog": Titel und Notiz im Bearbeiten-Dialog, dazu die Namensfelder von
+  `NewListDialog` und `RenameListDialog`. Der Vergleichspunkt „das Zielliste-Feld schon" ist übrigens
+  entfallen — das war das selbstgebaute `Row`, das es nicht mehr gibt
+- [x] **Die Beschriftungen sind vereinheitlicht — und die Diagnose hier war teilweise falsch.**
+  Nachgemessen in den Material-Quellen 1.4.0: `AlertDialog` liefert im `text`-Slot bereits
+  `bodyMedium` + `onSurfaceVariant` (`DialogTokens.SupportingTextFont`/`SupportingTextColor`). Das
+  `style = bodyMedium` an „Priorität", „Liste" und den Radio-Zeilen war also **redundant**, und die
+  Farbe hat sich *nie* unterschieden — es waren **zwei Größen, nicht drei Stile** (Kopf-Text 14 sp
+  gegen verkleinerte Feld-Beschriftung 12 sp).
+  Umgesetzt: Die **Zielliste ist jetzt ein echtes M3-Feld** (`ExposedDropdownMenuBox` mit
+  schreibgeschütztem `OutlinedTextField` und `label`), damit bleibt „Priorität" der einzige Kopf-Text —
+  und der trägt jetzt `bodySmall` samt 4-dp-Einzug, also die Geometrie, die Material selbst für eine
+  Beschriftung über einem Feld benutzt. Die Gruppe Kopf + Steuerung ist ein `Column` mit 4 dp, die
+  8 dp des äußeren `Column` trennen die Gruppen: Das löst den 4-gegen-8-dp-Vorwurf, ohne ein neues
+  `dp`-Literal.
+  **Nebenbei mitgenommen:** Das Feld bringt `Role.DropdownList`, eine 56-dp-Trefferfläche und einen
+  stärkeren Riegel im Ein-Listen-Fall mit — `menuAnchor(enabled = false)` hängt gar keine
+  Menü-Semantik an. Der Pfeil verliert seine `contentDescription` (die Steuerung ist das Feld), damit
+  entfällt der String `todo_list_choose_target_list`
+- [x] **`keyboardOptions` an allen vier Dialogfeldern**, nach einer Regel: `Sentences` überall
+  (**nicht** `Words` — im Deutschen würde das Präpositionen großschreiben: „Zeug Für Oma"),
+  `ImeAction.Done` an den drei einzeiligen Feldern, **keines** an der Notiz (dort verdrängt eine
+  erzwungene Aktion die Zeilenumbruch-Taste). **Kein `keyboardActions`:** Die Enter-Taste schließt nur
+  die Tastatur und speichert nicht — den Dialog beendet allein die Knopfzeile (ADR 0032). Die
+  Eingabeleiste bleibt die bewusste Ausnahme, ihr Kommentar begründet das
+- [x] Tests — **117 Unit-Tests grün** (unverändert, keiner betrifft Dialoglayout) und **29
+  instrumentierte am 2026-08-12 auf einem SM-S928B, alle grün** (vorher 28: einer neu,
+  `theTargetListFieldCarriesItsLabelAndTheCurrentList`; zwei umgezielt, weil sie das Feld jetzt über
+  seine Beschriftung anfassen statt über den Pfeil, und `theListCannotBePickedWhileItIsTheOnlyOne`
+  zusichert zusätzlich `assertIsNotEnabled` — **nicht** `assertHasNoClickAction`: Ein abgeblendetes
+  Textfeld behält seinen `onClick` absichtlich und markiert ihn als `disabled`).
+  **Die Canary-Gegenprobe hat hier mehr gezeigt als eine Gegenprobe:** Sie druckt die Semantik des
+  Knotens, und die belegt den Entwurf auf dem Gerät — `Text = '[Liste]'` und `EditableText =
+  'Einkauf'` in **einem** verschmolzenen Knoten, `IsEditable = 'false'`, und `Role = 'DropdownList'`.
+  Damit ist die Barrierefreiheits-Verbesserung nachgewiesen und nicht bloß behauptet
+- [x] **Nebenbefund beim Nachmessen, gleich mit behoben:** `OutlinedTextField` erbt seinen `textStyle`
+  von `LocalTextStyle`, und im `text`-Slot eines Dialogs ist das `bodyMedium` — man tippte in den
+  Dialogen also in **14 sp**, während dasselbe Feld in der Eingabeleiste 16 sp hat; im leeren Feld war
+  die Beschriftung damit *größer* als der Text, den man dann tippt. Alle vier Felder setzen jetzt
+  `bodyLarge`
+- [ ] Auf dem Gerät prüfen — **das Aufklappmenü der Zielliste** ist das Neue: öffnet über dem Dialog,
+  nicht abgeschnitten, auf Feldbreite, mit offener und geschlossener Tastatur. Besonders: **ein Tipp
+  auf „Speichern" bei offenem Menü** — das `ExposedDropdownMenu` ist anders als das bisherige
+  `DropdownMenu` **nicht berührungsmodal**, schließt der Tipp also nur das Menü oder speichert er
+  zugleich? (Ausweg wäre `properties = PopupProperties(focusable = true)`) · der Fall „nur eine Liste"
+  im **dunklen** Schema, wo ein abgeblendetes M3-Feld mit 38 % Alpha arbeitet, während das Projekt
+  sonst deckendes `onSurfaceVariant` benutzt · Tastatur: erster Buchstabe groß in Titel und Notiz, die
+  Enter-Taste im Titel heißt „Fertig" und **speichert nicht**, und **Enter in der Notiz erzeugt
+  weiterhin einen Zeilenumbruch** — das ist die Regression, die diese Änderung einführen könnte · alle
+  vier Dialoge bei Schriftskalierung 1,0 und größter, hell und dunkel.
+  **Der letzte Punkt ist gleichzeitig Auslöser 4 aus ADR 0033** — hier fällt das Urteil, ob der Dialog
+  weiter trägt
 
 #### Kleinere Oberflächen-Punkte
-- [ ] **Klick-Semantik fehlt an zwei antippbaren Texten:** Der TopAppBar-Titel und das
-  Zielliste-Feld benutzen `Modifier.clickable` ohne `Role.Button` und ohne `onClickLabel`. Für
-  TalkBack sind sie damit „Text, antippbar" ohne Rolle. Die Klickfläche des Titels ist zudem nur so
-  hoch wie der Text — in der TopAppBar praktisch groß genug, aber nicht durch
-  `minimumInteractiveComponentSize` abgesichert
+- [ ] **Klick-Semantik fehlt am TopAppBar-Titel:** Er benutzt `Modifier.clickable` ohne `Role.Button`
+  und ohne `onClickLabel`. Für TalkBack ist er damit „Text, antippbar" ohne Rolle. Die Klickfläche ist
+  zudem nur so hoch wie der Text — in der TopAppBar praktisch groß genug, aber nicht durch
+  `minimumInteractiveComponentSize` abgesichert.
+  **Hier stand einmal „an zwei antippbaren Texten":** Das Zielliste-Feld ist der zweite gewesen und
+  erledigt — als `ExposedDropdownMenuBox`-Feld bringt es Rolle, Klick-Semantik und 56 dp mit
+  ([ADR 0033](docs/decisions/0033-bearbeiten-bleibt-ein-dialog.md))
 
 #### Code
 - [ ] **`TodoListUiState.error` ist ein Einzelslot.** Treffen zwei Fehler kurz hintereinander ein,
   überschreibt der zweite den ersten, bevor die Snackbar ihn gezeigt hat. Bei zwei Nutzern selten,
   aber echt — eine Warteschlange wäre die saubere Antwort, ein bewusstes „reicht uns" der billigere
   Weg. Dann aber als Kommentar am Feld, nicht als Zufall
-- [ ] **`TodoListViewModel` ist bei ~410 Zeilen und trägt drei Themen** (Listenwahl, Aufgaben-CRUD,
-  Dialogzustände). Der Bildschirm wurde in Phase 11 entzerrt, das ViewModel nicht. Kein Fehler, aber
-  der nächste Ort, an dem Wachstum wehtut. **Vor einem eigenen Umbau erst den Bildschirm-Punkt oben
-  entscheiden** — ein eigener Bearbeiten-Bildschirm brächte sein eigenes ViewModel mit und nähme
-  diesem ein Drittel ab
+- [ ] **`TodoListViewModel` ist bei 471 Zeilen und trägt drei Themen** (Listenwahl: ~211 Zeilen,
+  Aufgaben-CRUD: ~56, Dialogzustände: ~133). Der Bildschirm wurde in Phase 11 entzerrt, das ViewModel
+  nicht. Kein Fehler, aber der nächste Ort, an dem Wachstum wehtut.
+  **Das Tor ist offen:** Hier stand „vor einem eigenen Umbau erst den Bildschirm-Punkt entscheiden" —
+  der ist mit [ADR 0033](docs/decisions/0033-bearbeiten-bleibt-ein-dialog.md) entschieden. Der Punkt
+  ist damit bearbeitbar, nimmt aber **kein** Drittel mit: Sortiert wird innerhalb eines ViewModels,
+  nicht auf zwei verteilt. Umgekehrt ist „über ~600 Zeilen" jetzt selbst ein Auslöser für den
+  Bildschirm
 - [ ] `updateTodo` hat mit der Notiz **fünf Parameter, zwei davon `String`**. Die Aufrufstellen
   arbeiten benannt, das trägt. Kommt ein weiteres Feld dazu, ist ein Wertobjekt fällig statt eines
   sechsten Parameters

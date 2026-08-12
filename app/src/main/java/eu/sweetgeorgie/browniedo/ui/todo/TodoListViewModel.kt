@@ -340,7 +340,8 @@ class TodoListViewModel(
                 priority = editedTodo.priority,
                 notes = notes
             ).fold(
-                // The dialog stays open on failure so the typed title is not lost.
+                // Bei einem Fehlschlag bleibt der Dialog offen, damit der getippte Titel nicht
+                // verloren geht.
                 onSuccess = { mutableUiState.update { it.copy(editedTodo = null, error = null) } },
                 onFailure = {
                     mutableUiState.update { it.copy(error = TodoListError.UPDATE_FAILED) }

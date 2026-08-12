@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
@@ -252,8 +253,26 @@ class TodoListScreenTest {
         // Auf den Knoten *im Dialog* eingegrenzt: Der Name der aktuellen Liste steht auch im
         // TopAppBar-Titel, ein bloßes onNodeWithText fände zwei Knoten und scheiterte daran —
         // dieselbe Mehrdeutigkeit, vor der der Test unten bei offenem Menü warnt.
+        //
+        // Der Knoten ist seit ADR 0033 das schreibgeschützte Feld; `hasText` findet es, weil der
+        // Matcher auch `EditableText` liest. Die Gefahr eines zweiten Treffers liegt damit nicht
+        // mehr bei einem Geschwister-`Text`, sondern bei einem Symbol oder `supportingText` am Feld.
         composeTestRule.onNode(hasAnyAncestor(isDialog()) and hasText(LIST.name))
             .assertIsDisplayed()
+    }
+
+    /**
+     * Beschriftung und Wert stehen in **einem** verschmolzenen Knoten — das ist der Vertrag, den das
+     * Feld für TalkBack erfüllt („Liste, Einkauf, Dropdown-Liste"). Der Test fängt genau den Fehler,
+     * den ein `leadingIcon` oder ein `supportingText` einführen würde: Er spaltet den Knoten auf.
+     */
+    @Test
+    fun theTargetListFieldCarriesItsLabelAndTheCurrentList() {
+        setScreenContent(uiState = editingIn(LIST, lists = listOf(LIST, OTHER_LIST)))
+
+        val label = composeTestRule.activity.getString(R.string.todo_list_target_list_label)
+        composeTestRule.onNode(hasAnyAncestor(isDialog()) and hasText(label))
+            .assertTextContains(LIST.name)
     }
 
     @Test
@@ -264,8 +283,10 @@ class TodoListScreenTest {
             editActions = NO_EDIT_ACTIONS.copy(onTargetListChange = { picked = it })
         )
 
-        val chooseLabel = composeTestRule.activity.getString(R.string.todo_list_choose_target_list)
-        composeTestRule.onNodeWithContentDescription(chooseLabel).performClick()
+        // Angetippt wird das Feld über seine Beschriftung, nicht der Pfeil daneben: Seit ADR 0033
+        // ist das Feld die Steuerung, der Pfeil trägt keine eigene Beschreibung mehr.
+        composeTestRule.onNode(hasAnyAncestor(isDialog()) and hasText(targetListLabel()))
+            .performClick()
         // Gegen den Namen der *anderen* Liste prüfen: Der Name der aktuellen steht bei offenem
         // Menü zweimal auf dem Bildschirm — im Feld und im Menü — und wäre mehrdeutig.
         composeTestRule.onNodeWithText(OTHER_LIST.name).performClick()
@@ -277,8 +298,12 @@ class TodoListScreenTest {
     fun theListCannotBePickedWhileItIsTheOnlyOne() {
         setScreenContent(uiState = editingIn(LIST, lists = listOf(LIST)))
 
-        val chooseLabel = composeTestRule.activity.getString(R.string.todo_list_choose_target_list)
-        composeTestRule.onNodeWithContentDescription(chooseLabel).performClick()
+        val field = composeTestRule.onNode(hasAnyAncestor(isDialog()) and hasText(targetListLabel()))
+        // Die direkte Zusicherung: Das Feld ist abgeblendet. **Nicht** assertHasNoClickAction — ein
+        // abgeblendetes Textfeld behält seinen onClick absichtlich und markiert ihn als `disabled`;
+        // TalkBack unterdrückt die Aktion daraufhin selbst.
+        field.assertIsNotEnabled()
+        field.performClick()
 
         // Das Menü bleibt zu: Das Symbol für die geteilte Liste gibt es nur im Menüeintrag.
         val sharedLabel = composeTestRule.activity.getString(R.string.todo_list_shared_list)
@@ -417,6 +442,11 @@ class TodoListScreenTest {
             editActions = NO_EDIT_ACTIONS.copy(onNotesChange = { typed = it })
         )
 
+        // Gefunden wird hier das **Feld**, nicht seine Beschriftung: Ein Textfeld verschmilzt die
+        // Semantik seiner Beschriftung mit hinein. Deshalb muss die Notiz-Beschriftung im `label`
+        // des Felds bleiben — sie zu einem Kopf-Text über dem Feld zu machen, wie bei der
+        // Priorität, würde diesen Test unbrauchbar machen: `hasText` fände dann den Kopf-Text,
+        // und der kann keinen Text annehmen.
         val label = composeTestRule.activity.getString(R.string.todo_list_notes_label)
         composeTestRule.onNode(hasAnyAncestor(isDialog()) and hasText(label))
             .performTextInput("Die haltbare")
@@ -437,6 +467,10 @@ class TodoListScreenTest {
             notes = ""
         )
     )
+
+    /** Die Beschriftung des Zielliste-Felds — der Griff, an dem drei Tests es anfassen. */
+    private fun targetListLabel(): String =
+        composeTestRule.activity.getString(R.string.todo_list_target_list_label)
 
     private fun priorityDescription(labelResId: Int): String =
         composeTestRule.activity.getString(
