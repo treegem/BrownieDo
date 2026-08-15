@@ -654,6 +654,136 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   ausdrücklich als SHOULD FIX. In Compose ist ein eigenes `Spacing`-Objekt im Theme üblicher als
   `dimens.xml`
 
+### Phase 14 – Vorlagen für Listen
+> Manches wiederholt sich: Was man für einen Urlaubstag packt, was zu einem Wocheneinkauf gehört,
+> was vor einer Reise erledigt sein muss. Eine **Vorlage** hält das einmal fest; daraus entsteht bei
+> Bedarf eine **konkrete Liste**, in der abgehakt wird — und beim nächsten Mal die nächste, aus
+> derselben Vorlage. Vorlagen und die daraus entstandenen Listen sind beide ganz normal bearbeitbar.
+>
+> **Vier Entscheidungen sind vorab getroffen** und tragen die ganze Phase; sie bekommen bei der
+> Umsetzung zwei ADRs (siehe unten), hier steht nur, was sie bedeuten:
+> 1. **Eine Vorlage *ist* eine Liste** — dasselbe Dokument in `lists`, nur mit `isTemplate: true`.
+> 2. **Skaliert wird über ein Mengenfeld am Eintrag** — gesetzt heißt „skaliert", leer heißt „bleibt".
+> 3. **Gerechnet wird exakt**, Nachkommastellen erscheinen nur, wenn sie gebraucht werden.
+> 4. **Instanziieren erzeugt eine neue Liste**, über einen Dialog wie „Neue Liste" plus Faktor.
+>
+> Aufgeteilt in einen Teil, der für sich schon nützlich ist (**14a**: Vorlagen anlegen, bearbeiten,
+> daraus eine Liste erzeugen), und den Faktor (**14b**). Wie in Phase 9 und 12 bleiben die Security
+> Rules unberührt: `create` auf `lists` prüft `members` und `name`, aber **keine Feldmenge**,
+> `update` erlaubt alles außer `members`, und auf `todos` gilt `read, write` ohne Feldprüfung.
+> **Kein Schritt in der Firebase Console, kein Nachziehen bestehender Dokumente.**
+
+#### Phase 14a – Vorlagen anlegen, bearbeiten und instanziieren
+- [ ] `ListDocument` und `TodoList` um `isTemplate` erweitern, dazu `ListField` — nicht-nullable mit
+  Vorgabe `false`. Bestehende Listen tragen das Feld nicht und werden damit zu „keine Vorlage"
+  gelesen, genau wie in Phase 12 bei der Notiz. `createList` bekommt das Flag als dritten Parameter;
+  `LIST_ORDER` bleibt unangetastet und sortiert beide Arten mit demselben Vergleich nach Namen
+- [ ] **Vorlagen leben im Listen-Menü der TopAppBar, als zweiter Abschnitt unter einem Trenner** —
+  mit eigenem Symbol, `ListMenuItem` wird wiederverwendet. Daneben „Neue Vorlage" neben dem
+  vorhandenen „Neue Liste". Eine Vorlage zu öffnen führt in **denselben Bildschirm im
+  Vorlagen-Modus**, nicht in einen zweiten Bildschirm: Ein eigener Vorlagen-Bildschirm wäre
+  Navigation und damit **Auslöser 7 aus [ADR 0033](docs/decisions/0033-bearbeiten-bleibt-ein-dialog.md)**
+  — er zöge den Bearbeiten-Bildschirm mit, den ADR 0033 gerade erst zurückgestellt hat. Der Modus
+  kostet dagegen ein Feld im UiState
+- [ ] Was der Vorlagen-Modus anders macht, und sonst nichts: **kein Abhaken** (die Checkbox
+  entfällt — eine Vorlage hat keinen Erledigt-Zustand) · **damit auch kein Wischen**, weil
+  [ADR 0016](docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md) nur erledigte Aufgaben
+  wischen lässt und es hier keine gibt; gelöscht wird über den Bearbeiten-Dialog, den ADR 0016
+  ohnehin als den mit TalkBack bedienbaren Weg verlangt · eigener Leerzustand-Text · der
+  Listenname in der TopAppBar bekommt die Vorlagen-Markierung. `TODO_ORDER` bleibt unberührt:
+  ohne erledigte Einträge greift bereits heute Priorität, dann `createdAt`
+- [ ] **Verschieben trennt die beiden Welten** — das Zielliste-Feld im Bearbeiten-Dialog zeigt
+  Gleichartiges: in einer Liste nur Listen, in einer Vorlage nur Vorlagen. Eine Aufgabe in eine
+  Vorlage zu schieben wäre kein Ablegen, sondern ein Verlust aus der Wochenliste. Der vorhandene
+  Ein-Element-Fall (Feld sichtbar, aber deaktiviert) greift damit auch für Vorlagen
+- [ ] **Der Bearbeiten-Dialog zeigt „Termin anlegen" im Vorlagen-Modus nicht** — ein Vorlagen-Eintrag
+  hat keinen konkreten Tag, und [ADR 0027](docs/decisions/0027-termine-per-kalender-intent.md) hat
+  ein geratenes Datum ausdrücklich verworfen. Das ist zugleich der Platz, den 14b für die Menge
+  braucht: So trägt **kein Modus mehr Eingaben als heute**, und Auslöser 1 aus ADR 0033 („ein
+  sechstes Eingabefeld") greift nicht. Beim Bauen nachzählen — daran hängt, ob die Phase im Dialog
+  bleiben darf
+- [ ] Liste aus einer Vorlage erzeugen — Dialog mit Name (vorbelegt aus dem Vorlagennamen),
+  geteilt/privat wie beim normalen Anlegen, ausgelöst aus dem Überlauf-Menü, wenn eine Vorlage offen
+  ist. Danach springt die App in die neue Liste. **Die Vorlage bleibt unverändert stehen** — sie ist
+  der Stempel, nicht der Abdruck
+- [ ] Als **ein `WriteBatch`**: Listen-Dokument und alle Aufgaben zusammen, mit lokal vergebener
+  Listen-id (`document()`). Dasselbe Muster wie beim Verschieben und beim Löschen einer Liste
+  ([ADR 0019](docs/decisions/0019-schreibrechte-auf-listen-dokumente.md)), und aus demselben Grund:
+  Es soll keine halbe Liste geben. Nur der Partner-Nachschlag beim geteilten Fall bleibt `suspend`,
+  der Rest funktioniert offline
+- [ ] **`createdAt` wird aus der Vorlage übernommen, nicht neu vergeben** — sonst bekämen alle
+  Aufgaben eines Batches praktisch denselben Zeitpunkt und die Reihenfolge der Vorlage ginge
+  verloren; `TODO_ORDER` sortiert offene Einträge gleicher Priorität danach. Die Ausnahme aus
+  [ADR 0026](docs/decisions/0026-verschieben-schreibt-createdat-selbst.md) gilt damit auch hier.
+  Erledigt-Zustand, `completedBy` und `completedAt` entstehen dagegen **nicht** mit: Eine frische
+  Liste ist offen
+- [ ] Der Rückfall auf „die erste Liste" (aus 8a) darf **nicht in einer Vorlage landen** — wird die
+  offene Liste gelöscht, fällt die App auf die erste echte Liste zurück. Eine Vorlage bleibt eine
+  bewusste Wahl. Im DataStore darf ihre id trotzdem stehen: Wer eine Vorlage offen hatte, findet sie
+  nach dem Neustart wieder ([ADR 0018](docs/decisions/0018-datastore-fuer-die-zuletzt-gewaehlte-liste.md))
+- [ ] ADR: **Vorlagen sind Listen mit einem Flag** — mit den verworfenen Alternativen (eigene
+  `templates`-Collection samt eigenen Rules und eigenem Bildschirm) und der Begründung für den Modus
+  statt eines zweiten Bildschirms
+
+#### Phase 14b – Menge und Faktor
+> Der Sinn der Vorlage für eine Reise: Man schreibt sie für **einen Tag** (Faktor 1) und
+> instanziiert sie für drei. Skaliert wird der **Text eines Eintrags** („1 T-Shirt" → „3 T-Shirt"),
+> nicht die Anzahl der Einträge — nur so gehen Kommazahlen.
+- [ ] `Todo` und `TodoDocument` um `quantity: Double?` erweitern, dazu `TodoField`. **Nullable, und
+  das Vorhandensein ist der Schalter:** Ein Eintrag mit Menge skaliert, einer ohne bleibt, wie er
+  ist — Shampoo wird nicht dreifach eingepackt. Damit braucht es kein zweites Feld „skaliert" und
+  keinen Schalter im Dialog. Fehlt das Feld, ist es null; wie bei der Notiz (Phase 12) ist null
+  bereits die richtige Antwort und kein Rückfallwert nötig
+  ([ADR 0023](docs/decisions/0023-prioritaet-migration-und-sortierung.md) zum Gegenbeispiel)
+- [ ] Mengenfeld im Bearbeiten-Dialog, **nur im Vorlagen-Modus** — an dem Platz, den „Termin
+  anlegen" dort nicht belegt (14a). `KeyboardType.Decimal`, und **Komma wie Punkt werden
+  angenommen**: Die deutsche Tastatur liefert das Komma, `toDouble()` versteht nur den Punkt
+- [ ] Faktor-Feld im Instanziieren-Dialog, Vorgabe 1, dieselbe Eingaberegel. Bei Faktor 1 kommt
+  dasselbe heraus wie in der Vorlage — der Normalfall bleibt der billigste
+- [ ] **Die Skalierung ist eine reine Funktion in `domain/todo`**, kein Use-Case und kein
+  Repository-Zusatz: Menge mal Faktor, Ergebnis als Präfix vor den Titel („3 T-Shirt"). Ohne
+  Android-Typ, ohne Firestore, für sich testbar — und damit die Stelle, an der die drei Regeln
+  unten genau einmal stehen. Das ViewModel skaliert, bevor es das Repository ruft; das Repository
+  schreibt nur, was es bekommt
+- [ ] **Die Menge landet im Titel und nicht als Feld in der erzeugten Liste** — was entsteht, ist
+  eine ganz gewöhnliche Liste ohne Sonderregeln, und „aus 3 mach 2" ist dort eine Textänderung.
+  Deshalb trägt auch nur die Vorlage das Feld
+- [ ] **Exakt rechnen, Nachkommastellen nur wenn nötig**: „3 T-Shirt" statt „3,0 T-Shirt", aber
+  „1,5 Rolle" bleibt 1,5. Ausgabe mit deutschem Komma. **Der Fallstrick ist das Binärformat:**
+  `0.1 * 3` ist in `Double` 0,30000000000000004, und das darf nicht in einem Titel landen — vor der
+  Ausgabe auf wenige Stellen runden (oder gleich mit `BigDecimal` rechnen). Der Fall gehört in die
+  Tests, nicht in die Hoffnung
+- [ ] `quantity` wandert beim Verschieben und beim Rückgängig mit — das verlangt
+  [ADR 0024](docs/decisions/0024-verschieben-behaelt-zustand.md) für jedes neue Feld. Es hängt an
+  **zwei** Stellen, und die zweite ist der Fallstrick aus Phase 12: `toDocument()` nimmt es mit
+  (das sichert der Hin-und-zurück-Test), **und `onEditConfirm` muss die Menge aus dem Dialog auf den
+  Snapshot überschreiben** — sonst reist beim gleichzeitigen Verschieben und Ändern die alte Menge
+  mit. Eigener ViewModel-Test, kein Mapper-Test findet das
+- [ ] **`updateTodo` bekäme damit einen sechsten Parameter — jetzt ist das Wertobjekt fällig.** Der
+  offene Punkt unter „Code" in Phase 13 hat genau diesen Auslöser benannt; er wird hier eingelöst
+  und nicht umgangen
+- [ ] ADR: **Menge am Eintrag statt Zahl im Titel**, mit der Skalierungs- und Rundungsregel und den
+  verworfenen Alternativen (führende Zahl parsen samt Schalter; Menge als dauerhaftes Feld auch in
+  der erzeugten Liste)
+
+#### Tests und Geräteblick für beide Teile
+- [ ] Unit-Tests — Mapper mit und ohne die neuen Felder plus Hin-und-zurück fürs Verschieben ·
+  die Skalierung für sich (ganze Zahl · Kommazahl · Faktor 1 · Eintrag ohne Menge bleibt unberührt ·
+  der Fließkomma-Fall oben · Komma- und Punkt-Eingabe) · `LIST_ORDER` mit gemischten Arten · im
+  ViewModel die Aufteilung des Menüs, der Rückfall, der nicht in einer Vorlage landen darf, und das
+  Instanziieren
+- [ ] Instrumentierte Tests — Vorlagen-Abschnitt im Listen-Menü · Vorlagen-Modus zeigt keine
+  Checkbox · Mengenfeld nur dort und meldet seine Eingabe · das Zielliste-Feld zeigt Gleichartiges ·
+  der Instanziieren-Dialog. **Die Canary-Gegenprobe gehört dazu** (siehe „Querlaufend"), und
+  Listennamen werden auf den Dialog eingegrenzt, weil derselbe Name in der TopAppBar steht
+- [ ] Auf dem Gerät prüfen — Vorlage anlegen, füllen und daraus eine Liste erzeugen · dieselbe
+  Vorlage ein zweites Mal instanziieren, beide Listen stehen nebeneinander · Reihenfolge der
+  Einträge stimmt mit der Vorlage überein · Faktor 3 und Faktor 2,5 · ein Eintrag ohne Menge bleibt
+  unverändert · geteilt erzeugen und beim Partner nachsehen · offline instanziieren und wieder
+  verbinden · Vorlage löschen, während eine daraus erzeugte Liste offen ist (die Liste muss bleiben)
+  · hell und dunkel · und der Blick auf den Bearbeiten-Dialog bei Schriftskalierung ≥ 1,3 mit
+  offener Tastatur, der zugleich **Auslöser 4 aus ADR 0033** beantwortet
+
 ### Querlaufend – Werkzeuge & Doku
 > Läuft neben den Phasen und gehört zu keiner.
 - [x] `AGENTS.md` als gemeinsamen Einstieg für alle Coding-Agents anlegen; `CLAUDE.md` auf die
