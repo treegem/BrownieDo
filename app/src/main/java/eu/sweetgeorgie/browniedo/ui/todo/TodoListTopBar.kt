@@ -1,8 +1,11 @@
 package eu.sweetgeorgie.browniedo.ui.todo
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -22,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import eu.sweetgeorgie.browniedo.R
 import eu.sweetgeorgie.browniedo.domain.list.TodoList
 
@@ -31,11 +35,16 @@ import eu.sweetgeorgie.browniedo.domain.list.TodoList
 @Composable
 internal fun TodoListTopBar(
     lists: List<TodoList>,
+    templates: List<TodoList>,
     selectedList: TodoList?,
     actions: TodoListTopBarActions
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     var listMenuExpanded by remember { mutableStateOf(false) }
+    val isTemplateOpen = selectedList?.isTemplate == true
+    // Überschriften gibt es erst, wenn es zwei Abschnitte zu unterscheiden gibt. Wer nie eine
+    // Vorlage anlegt, sieht dasselbe Menü wie vor Phase 14.
+    val hasSections = templates.isNotEmpty()
 
     TopAppBar(
         title = {
@@ -48,6 +57,17 @@ internal fun TodoListTopBar(
                     modifier = Modifier.clickable { listMenuExpanded = true },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Ohne die Markierung sähe eine offene Vorlage aus wie eine Liste, in der sich
+                    // nur nichts abhaken lässt.
+                    if (isTemplateOpen) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_template),
+                            contentDescription = stringResource(R.string.todo_list_template),
+                            modifier = Modifier
+                                .padding(end = 4.dp)
+                                .size(20.dp)
+                        )
+                    }
                     Text(text = selectedList?.name ?: stringResource(R.string.app_name))
                     Icon(
                         painter = painterResource(R.drawable.ic_arrow_drop_down),
@@ -58,6 +78,11 @@ internal fun TodoListTopBar(
                     expanded = listMenuExpanded,
                     onDismissRequest = { listMenuExpanded = false }
                 ) {
+                    // Eine Überschrift ohne Einträge darunter wäre schlimmer als keine: Wer nur
+                    // Vorlagen hat, bekommt kein leeres „Listen" zu sehen.
+                    if (hasSections && lists.isNotEmpty()) {
+                        SectionLabel(R.string.todo_list_lists_section)
+                    }
                     lists.forEach { list ->
                         ListMenuItem(
                             list = list,
@@ -68,18 +93,33 @@ internal fun TodoListTopBar(
                             }
                         )
                     }
-                    if (lists.isNotEmpty()) HorizontalDivider()
-                    DropdownMenuItem(
-                        text = { Text(text = stringResource(R.string.todo_list_new_list)) },
+                    if (hasSections) {
+                        if (lists.isNotEmpty()) HorizontalDivider()
+                        SectionLabel(R.string.todo_list_templates_section)
+                        templates.forEach { template ->
+                            ListMenuItem(
+                                list = template,
+                                isSelected = template.id == selectedList?.id,
+                                onClick = {
+                                    listMenuExpanded = false
+                                    actions.onListSelected(template)
+                                }
+                            )
+                        }
+                    }
+                    if (lists.isNotEmpty() || hasSections) HorizontalDivider()
+                    AddMenuItem(
+                        labelResId = R.string.todo_list_new_list,
                         onClick = {
                             listMenuExpanded = false
                             actions.onNewListClick()
-                        },
-                        leadingIcon = {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_add),
-                                contentDescription = null
-                            )
+                        }
+                    )
+                    AddMenuItem(
+                        labelResId = R.string.todo_list_new_template,
+                        onClick = {
+                            listMenuExpanded = false
+                            actions.onNewTemplateClick()
                         }
                     )
                 }
@@ -94,10 +134,38 @@ internal fun TodoListTopBar(
             }
             DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                 // Umbenennen und Löschen beziehen sich immer auf die offene Liste — ohne eine gibt
-                // es nichts zu tun.
+                // es nichts zu tun. Beide gelten für Vorlagen genauso, nur heißen sie dort anders:
+                // Eine Vorlage ist eine Liste, aber niemand nennt sie so (ADR 0034).
                 if (selectedList != null) {
+                    // Der Zweck einer Vorlage steht als erstes im Menü.
+                    if (isTemplateOpen) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = stringResource(
+                                        R.string.todo_list_create_list_from_template
+                                    )
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                actions.onCreateListFromTemplateClick()
+                            }
+                        )
+                        HorizontalDivider()
+                    }
                     DropdownMenuItem(
-                        text = { Text(text = stringResource(R.string.todo_list_rename_list)) },
+                        text = {
+                            Text(
+                                text = stringResource(
+                                    if (isTemplateOpen) {
+                                        R.string.todo_list_rename_template
+                                    } else {
+                                        R.string.todo_list_rename_list
+                                    }
+                                )
+                            )
+                        },
                         onClick = {
                             menuExpanded = false
                             actions.onRenameListClick()
@@ -106,7 +174,13 @@ internal fun TodoListTopBar(
                     DropdownMenuItem(
                         text = {
                             Text(
-                                text = stringResource(R.string.todo_list_delete_list),
+                                text = stringResource(
+                                    if (isTemplateOpen) {
+                                        R.string.todo_list_delete_template
+                                    } else {
+                                        R.string.todo_list_delete_list
+                                    }
+                                ),
                                 color = MaterialTheme.colorScheme.error
                             )
                         },
@@ -125,6 +199,32 @@ internal fun TodoListTopBar(
                     }
                 )
             }
+        }
+    )
+}
+
+/**
+ * Überschrift eines Menü-Abschnitts. Kein [DropdownMenuItem] — die Zeile ist Beschriftung und nicht
+ * antippbar, und ein deaktivierter Eintrag sähe aus wie eine Aktion, die gerade nicht geht.
+ */
+@Composable
+private fun SectionLabel(@StringRes labelResId: Int) {
+    Text(
+        text = stringResource(labelResId),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+    )
+}
+
+/** „Neue Liste …" und „Neue Vorlage …" — gleicher Bau, gleiches Symbol, nur die Beschriftung wechselt. */
+@Composable
+private fun AddMenuItem(@StringRes labelResId: Int, onClick: () -> Unit) {
+    DropdownMenuItem(
+        text = { Text(text = stringResource(labelResId)) },
+        onClick = onClick,
+        leadingIcon = {
+            Icon(painter = painterResource(R.drawable.ic_add), contentDescription = null)
         }
     )
 }

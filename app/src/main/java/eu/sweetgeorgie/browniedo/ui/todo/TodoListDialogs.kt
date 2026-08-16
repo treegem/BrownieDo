@@ -1,6 +1,7 @@
 package eu.sweetgeorgie.browniedo.ui.todo
 
 import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -81,6 +82,11 @@ private val DIALOG_MULTILINE_KEYBOARD_OPTIONS =
 private val dialogTextStyle: TextStyle
     @Composable get() = MaterialTheme.typography.bodyLarge
 
+/**
+ * Der Dialog für alle drei Wege, auf denen ein Dokument in `lists` entsteht — neue Liste, neue
+ * Vorlage, Liste aus einer Vorlage. Sie haben dieselben zwei Eingaben, es wechselt nur die
+ * Überschrift, siehe docs/decisions/0034-vorlagen-sind-listen-mit-einem-flag.md.
+ */
 @Composable
 internal fun NewListDialog(
     newList: NewList,
@@ -92,7 +98,7 @@ internal fun NewListDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(text = stringResource(R.string.todo_list_new_list_headline)) },
+        title = { Text(text = stringResource(newList.kind.headlineResId())) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
@@ -131,6 +137,13 @@ internal fun NewListDialog(
             }
         }
     )
+}
+
+@StringRes
+private fun NewListKind.headlineResId(): Int = when (this) {
+    NewListKind.LIST -> R.string.todo_list_new_list_headline
+    NewListKind.TEMPLATE -> R.string.todo_list_new_template_headline
+    NewListKind.FROM_TEMPLATE -> R.string.todo_list_create_list_from_template_headline
 }
 
 @Composable
@@ -211,7 +224,17 @@ internal fun DeleteListDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(text = stringResource(R.string.todo_list_delete_list_headline)) },
+        title = {
+            Text(
+                text = stringResource(
+                    if (list.isTemplate) {
+                        R.string.todo_list_delete_template_headline
+                    } else {
+                        R.string.todo_list_delete_list_headline
+                    }
+                )
+            )
+        },
         text = {
             Text(
                 text = if (todoCount == 0) {
@@ -258,6 +281,7 @@ internal fun EditTodoDialog(
     priority: TodoPriority,
     lists: List<TodoList>,
     targetListId: String,
+    isTemplateEntry: Boolean,
     actions: TodoEditActions
 ) {
     AlertDialog(
@@ -327,15 +351,21 @@ internal fun EditTodoDialog(
                     targetListId = targetListId,
                     onTargetListChange = actions.onTargetListChange
                 )
-                // Die beiden Aktionen, die nichts speichern, stehen unter den Feldern: Die Knopfzeile
+                // Die Aktionen, die nichts speichern, stehen unter den Feldern: Die Knopfzeile
                 // trägt nur, was den Dialog beendet (ADR 0032). Beim Termin kommt der Titel aus dem
                 // Feld — was auf dem Bildschirm steht, geht in den Kalender.
-                DialogAction(
-                    iconResId = R.drawable.ic_event,
-                    label = stringResource(R.string.todo_list_create_calendar_event),
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    onClick = { actions.onCalendarEventClick(title) }
-                )
+                //
+                // In einer Vorlage entfällt er: Ein Vorlagen-Eintrag hat keinen konkreten Tag, und
+                // ein geratenes Datum hat ADR 0027 ausdrücklich verworfen. Damit trägt auch kein
+                // Modus dieses Dialogs mehr Eingaben als vor Phase 14 (ADR 0033, Auslöser 1).
+                if (!isTemplateEntry) {
+                    DialogAction(
+                        iconResId = R.drawable.ic_event,
+                        label = stringResource(R.string.todo_list_create_calendar_event),
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        onClick = { actions.onCalendarEventClick(title) }
+                    )
+                }
                 // Zuletzt und in Fehlerfarbe, aber nicht gefüllt: Ein zweiter gefüllter Knopf würde
                 // mit „Speichern" um die Hauptaktion streiten. Hier statt in der Knopfzeile, damit
                 // ein Fehlgriff neben „Speichern" nicht mehr möglich ist — der Knopf selbst bleibt,
@@ -366,8 +396,9 @@ internal fun EditTodoDialog(
 
 /**
  * Eine Aktion im Inhalt eines Dialogs: Symbol, Beschriftung, und sie führt sofort aus, statt den
- * Dialog zu bestätigen oder zu verwerfen. Zwei davon trägt der Bearbeiten-Dialog (Termin, Löschen),
- * siehe docs/decisions/0032-gefuellte-bestaetigung-und-loeschen-im-inhalt.md.
+ * Dialog zu bestätigen oder zu verwerfen. Der Bearbeiten-Dialog trägt Löschen immer und den Termin
+ * nur außerhalb einer Vorlage, siehe
+ * docs/decisions/0032-gefuellte-bestaetigung-und-loeschen-im-inhalt.md.
  *
  * [contentColor] hat bewusst keinen Standardwert: Die Farbe ist hier die Aussage — grün für harmlos,
  * Fehlerfarbe für destruktiv —, und ein Standard würde beim Hinzufügen der nächsten Aktion

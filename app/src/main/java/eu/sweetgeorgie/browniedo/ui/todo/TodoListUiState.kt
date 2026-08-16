@@ -23,8 +23,18 @@ enum class TodoListError {
 }
 
 data class TodoListUiState(
+    /** Die Arbeitslisten — **ohne** die Vorlagen, die stehen in [templates]. */
     val lists: List<TodoList> = emptyList(),
-    /** Null while the lists are still loading, or when the user belongs to none at all. */
+    /**
+     * Die Vorlagen, nach demselben Namen sortiert wie [lists]. Getrennt gehalten statt beim Ablesen
+     * gefiltert: Beide Abschnitte der Auswahl lesen sie, und die Aufteilung ist eine Aussage über
+     * die Daten, keine über die Darstellung.
+     */
+    val templates: List<TodoList> = emptyList(),
+    /**
+     * Die geöffnete Liste — eine aus [lists] oder aus [templates]. Null, solange die Listen laden
+     * oder der Nutzer zu keiner gehört.
+     */
     val selectedList: TodoList? = null,
     /** Null when nobody is on file in `users`; only then a shared list cannot be offered. */
     val partner: Partner? = null,
@@ -60,7 +70,17 @@ data class TodoListUiState(
      * mehrere gleichzeitig offene Angebote wären eher verwirrend als hilfreich.
      */
     val deletedTodo: Todo? = null
-)
+) {
+    /** Ob gerade eine Vorlage offen ist. Der Bildschirm verhält sich dann in drei Punkten anders. */
+    val isTemplateOpen: Boolean get() = selectedList?.isTemplate == true
+
+    /**
+     * Wohin eine Aufgabe von hier aus verschoben werden kann: Gleiches zu Gleichem. Eine Aufgabe in
+     * eine Vorlage zu schieben wäre kein Ablegen, sondern ein Verlust aus der Arbeitsliste — und
+     * umgekehrt genauso, siehe docs/decisions/0034-vorlagen-sind-listen-mit-einem-flag.md.
+     */
+    val targetLists: List<TodoList> get() = if (isTemplateOpen) templates else lists
+}
 
 /**
  * The entry currently open in the edit dialog, together with what has been typed and picked so far.
@@ -84,11 +104,29 @@ data class TodoEdit(
     val notes: String
 )
 
-/** The list being created, together with what has been typed and picked so far. */
+/**
+ * The list being created, together with what has been typed and picked so far.
+ *
+ * Trägt alle drei Wege, auf denen ein Dokument in `lists` entsteht — [kind] sagt welcher. Ein
+ * gemeinsamer Zustand und ein gemeinsamer Dialog, weil alle drei dieselben zwei Eingaben haben:
+ * Name und geteilt/privat. Auch eine Vorlage ist eine Liste, siehe
+ * docs/decisions/0034-vorlagen-sind-listen-mit-einem-flag.md.
+ */
 data class NewList(
     val name: String = "",
-    val shared: Boolean = false
+    val shared: Boolean = false,
+    val kind: NewListKind = NewListKind.LIST
 )
+
+/**
+ * Was gerade angelegt wird. Entscheidet über Überschrift und Beschriftung des Dialogs — und darüber,
+ * was beim Bestätigen geschrieben wird.
+ *
+ * [FROM_TEMPLATE] braucht keine Quell-id: Angeboten wird der Weg nur, während die Vorlage offen ist,
+ * und ein Listenwechsel schließt jeden offenen Dialog. Die Einträge kommen deshalb aus dem
+ * angezeigten Stand, genau wie beim Verschieben.
+ */
+enum class NewListKind { LIST, TEMPLATE, FROM_TEMPLATE }
 
 /** The list being renamed. [listId] is kept so the write cannot drift to another list. */
 data class RenamedList(

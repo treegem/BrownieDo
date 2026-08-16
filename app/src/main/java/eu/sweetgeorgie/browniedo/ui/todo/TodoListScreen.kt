@@ -136,6 +136,7 @@ fun TodoListScreen(
         topBar = {
             TodoListTopBar(
                 lists = uiState.lists,
+                templates = uiState.templates,
                 selectedList = uiState.selectedList,
                 actions = topBarActions
             )
@@ -159,8 +160,10 @@ fun TodoListScreen(
 
             // Ein Ladefehler verdrängt den Leerzustand: „Noch keine Aufgaben" wäre eine Aussage
             // über die Liste, die wir gerade nicht treffen können.
-            uiState.todos.isEmpty() && !hasLoadError ->
-                EmptyState(modifier = Modifier.padding(innerPadding))
+            uiState.todos.isEmpty() && !hasLoadError -> EmptyState(
+                isTemplate = uiState.isTemplateOpen,
+                modifier = Modifier.padding(innerPadding)
+            )
 
             else -> LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = innerPadding) {
                 if (hasLoadError) {
@@ -179,6 +182,7 @@ fun TodoListScreen(
                     SwipeableTodoRow(
                         todo = todo,
                         deleteFailed = uiState.error == TodoListError.DELETE_FAILED,
+                        isTemplateEntry = uiState.isTemplateOpen,
                         onDoneChange = { isDone -> todoActions.onTodoDoneChange(todo, isDone) },
                         onClick = { todoActions.onEditTodoClick(todo) },
                         onSwipedAway = { todoActions.onTodoSwipedAway(todo) },
@@ -236,8 +240,10 @@ fun TodoListScreen(
             title = editedTodo.title,
             notes = editedTodo.notes,
             priority = editedTodo.priority,
-            lists = uiState.lists,
+            // Nur Gleichartiges als Ziel — die Regel steht im UiState, nicht hier.
+            lists = uiState.targetLists,
             targetListId = editedTodo.targetListId,
+            isTemplateEntry = uiState.isTemplateOpen,
             actions = editActions
         )
     }
@@ -332,10 +338,18 @@ private fun LoadingState(modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * Die Überschrift ist für beide dieselbe — in einer Vorlage stehen **Aufgaben** wie überall sonst,
+ * und ein zweites Wort dafür wäre genau das Synonym, das `consistent-domain-terminology` verbietet.
+ * Nur der Hinweis darunter wechselt: In einer Vorlage tippt man nicht ein, was zu tun ist, sondern
+ * was jedes Mal dazugehört (ADR 0034).
+ */
 @Composable
-private fun EmptyState(modifier: Modifier = Modifier) = CenteredMessage(
+private fun EmptyState(isTemplate: Boolean, modifier: Modifier = Modifier) = CenteredMessage(
     headline = stringResource(R.string.todo_list_empty_headline),
-    hint = stringResource(R.string.todo_list_empty_hint),
+    hint = stringResource(
+        if (isTemplate) R.string.todo_list_empty_template_hint else R.string.todo_list_empty_hint
+    ),
     modifier = modifier
 )
 
@@ -393,6 +407,29 @@ private fun TodoListScreenPreview() {
     }
 }
 
+// Eine offene Vorlage: Markierung im Titel, keine Checkboxen, sonst derselbe Bildschirm (ADR 0034).
+@Preview(showBackground = true)
+@Preview(showBackground = true, uiMode = UI_MODE_NIGHT_YES)
+@Composable
+private fun TodoListScreenTemplatePreview() {
+    BrownieDoTheme {
+        TodoListScreen(
+            uiState = TodoListUiState(
+                lists = PREVIEW_LISTS,
+                templates = PREVIEW_TEMPLATES,
+                selectedList = PREVIEW_TEMPLATES.first(),
+                todos = PREVIEW_TODOS.filterNot(Todo::isDone),
+                isLoading = false
+            ),
+            topBarActions = PREVIEW_TOP_BAR_ACTIONS,
+            listDialogActions = PREVIEW_LIST_DIALOG_ACTIONS,
+            todoActions = PREVIEW_TODO_ACTIONS,
+            editActions = PREVIEW_EDIT_ACTIONS,
+            snackbarActions = PREVIEW_SNACKBAR_ACTIONS
+        )
+    }
+}
+
 // Der Leerzustand ist der Bildschirm beim allerersten Start — er verdient eine eigene Vorschau.
 @Preview(showBackground = true)
 @Preview(showBackground = true, uiMode = UI_MODE_NIGHT_YES)
@@ -423,6 +460,8 @@ private fun TodoListScreenEmptyPreview() {
 private val PREVIEW_TOP_BAR_ACTIONS = TodoListTopBarActions(
     onListSelected = {},
     onNewListClick = {},
+    onNewTemplateClick = {},
+    onCreateListFromTemplateClick = {},
     onRenameListClick = {},
     onDeleteListClick = {},
     onSignOutClick = {}
@@ -469,8 +508,12 @@ private val PREVIEW_EDIT_ACTIONS = TodoEditActions(
 private val PREVIEW_TIMESTAMP: Instant = Instant.parse("2026-08-07T20:00:00Z")
 
 private val PREVIEW_LISTS = listOf(
-    TodoList(id = "list-shared", name = "Einkauf", isShared = true),
-    TodoList(id = "list-private", name = "Meine Erledigungen", isShared = false)
+    TodoList(id = "list-shared", name = "Einkauf", isShared = true, isTemplate = false),
+    TodoList(id = "list-private", name = "Meine Erledigungen", isShared = false, isTemplate = false)
+)
+
+private val PREVIEW_TEMPLATES = listOf(
+    TodoList(id = "template-trip", name = "Urlaub packen", isShared = true, isTemplate = true)
 )
 
 // Alle drei Stufen, damit die Vorschau die Markierung und ihr Fehlen zeigt — und genau eine Notiz,

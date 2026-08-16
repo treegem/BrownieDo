@@ -58,6 +58,12 @@ class TodoListViewModel(
      *
      * The fallback to the first list covers two cases with one rule: nothing was ever picked, and
      * the remembered list is gone. Lists arrive sorted by name, so "first" is deterministic.
+     *
+     * **Der Rückfall bevorzugt eine Arbeitsliste**, obwohl eine Vorlage genauso zu öffnen ist: Wer
+     * gerade eine Liste verloren hat, will weiterarbeiten und nicht in einer Vorlage landen. Erst
+     * wenn es keine Arbeitsliste gibt, greift die erste Vorlage — ein leerer Bildschirm neben einer
+     * vorhandenen Vorlage wäre die schlechtere Antwort. Die *gemerkte* Liste gewinnt in jedem Fall,
+     * die darf eine Vorlage sein (ADR 0018).
      */
     private fun observeLists() {
         viewModelScope.launch {
@@ -68,12 +74,15 @@ class TodoListViewModel(
                 .collect { (listsResult, rememberedId) ->
                     listsResult.fold(
                         onSuccess = { lists ->
+                            val (templates, workingLists) = lists.partition { it.isTemplate }
                             val selected = lists.firstOrNull { it.id == rememberedId }
-                                ?: lists.firstOrNull()
+                                ?: workingLists.firstOrNull()
+                                ?: templates.firstOrNull()
                             selectedListId.value = selected?.id
                             mutableUiState.update {
                                 it.copy(
-                                    lists = lists,
+                                    lists = workingLists,
+                                    templates = templates,
                                     selectedList = selected,
                                     // Gibt es gar keine Liste mehr, ist ein hängendes LOAD_FAILED
                                     // eine veraltete Aussage: Wir wissen jetzt positiv, dass nichts
@@ -172,9 +181,31 @@ class TodoListViewModel(
         viewModelScope.launch { selectedListRepository.select(list.id) }
     }
 
-    // --- Liste anlegen ---
+    // --- Liste, Vorlage oder Liste aus einer Vorlage anlegen ---
 
     fun onNewListClick() = mutableUiState.update { it.copy(newList = NewList(), error = null) }
+
+    fun onNewTemplateClick() = mutableUiState.update {
+        it.copy(newList = NewList(kind = NewListKind.TEMPLATE), error = null)
+    }
+
+    /**
+     * Öffnet denselben Dialog für den Weg von der Vorlage zur Arbeitsliste, vorbelegt aus der
+     * Vorlage: ihr Name als Vorschlag, und geteilt bleibt geteilt — eine gemeinsame Packliste ergibt
+     * eine gemeinsame Reise. Ohne hinterlegten Partner fällt das auf „nur für mich" zurück, sonst
+     * scheiterte das Anlegen an einer Option, die die Oberfläche gar nicht anbietet.
+     */
+    fun onCreateListFromTemplateClick() = mutableUiState.update { state ->
+        val template = state.selectedList?.takeIf { it.isTemplate } ?: return@update state
+        state.copy(
+            newList = NewList(
+                name = template.name,
+                shared = template.isShared && state.partner != null,
+                kind = NewListKind.FROM_TEMPLATE
+            ),
+            error = null
+        )
+    }
 
     fun onNewListNameChange(name: String) = mutableUiState.update {
         it.copy(newList = it.newList?.copy(name = name))
@@ -191,12 +222,52 @@ class TodoListViewModel(
         val newList = mutableUiState.value.newList ?: return
         val name = newList.name.trim()
         if (name.isEmpty()) return
+        if (newList.kind == NewListKind.FROM_TEMPLATE) {
+            confirmListFromTemplate(name = name, shared = newList.shared)
+            return
+        }
         viewModelScope.launch {
-            listRepository.createList(name = name, shared = newList.shared).fold(
+            listRepository.createList(
+                name = name,
+                shared = newList.shared,
+                isTemplate = newList.kind == NewListKind.TEMPLATE
+            ).fold(
                 // Die neue Liste wird nicht selbst ausgewählt: Sie taucht über den Listen-Snapshot
                 // auf, und wer sie sofort öffnen will, tippt sie im Menü an.
                 onSuccess = { mutableUiState.update { it.copy(newList = null, error = null) } },
                 // Der Dialog bleibt offen, damit der eingetippte Name nicht verloren geht.
+                onFailure = {
+                    mutableUiState.update { it.copy(error = TodoListError.LIST_ADD_FAILED) }
+                }
+            )
+        }
+    }
+
+    /**
+     * Der einzige Anlegeweg, der die neue Liste auch öffnet — anders als beim Anlegen einer leeren:
+     * Wer eine Vorlage instanziiert, will genau dort weiterarbeiten. Ausgewählt wird über den
+     * gemerkten Stand, damit Auswahl und Rückfall denselben Weg nehmen wie sonst.
+     *
+     * Die Einträge kommen aus dem angezeigten Stand der Vorlage, nicht aus einer eigenen Abfrage —
+     * dieselbe Quelle wie beim Verschieben, und die einzige, die auch offline etwas liefert.
+     */
+    private fun confirmListFromTemplate(name: String, shared: Boolean) {
+        // Eine frische Liste ist offen. Vorlagen kennen kein Abhaken, das ist also Vorsorge für
+        // einen Bestand, der von Hand entstanden sein kann — und es sagt, was eine Instanz erbt und
+        // was nicht.
+        val entries = mutableUiState.value.todos.map {
+            it.copy(isDone = false, completedBy = null, completedAt = null)
+        }
+        viewModelScope.launch {
+            listRepository.createListFromTemplate(
+                name = name,
+                shared = shared,
+                todos = entries
+            ).fold(
+                onSuccess = { listId ->
+                    mutableUiState.update { it.copy(newList = null, error = null) }
+                    selectedListRepository.select(listId)
+                },
                 onFailure = {
                     mutableUiState.update { it.copy(error = TodoListError.LIST_ADD_FAILED) }
                 }
@@ -356,7 +427,8 @@ class TodoListViewModel(
         // ist auch der Erledigt-Zustand so frisch wie der letzte Snapshot und nicht so alt wie der
         // Dialog.
         val todo = state.todos.firstOrNull { it.id == editedTodo.todoId }
-        val target = state.lists.firstOrNull { it.id == editedTodo.targetListId }
+        // Nur unter Gleichartigem gesucht — dieselbe Menge, die das Feld im Dialog anbietet.
+        val target = state.targetLists.firstOrNull { it.id == editedTodo.targetListId }
         if (todo == null || target == null) {
             // Der Eintrag oder die Zielliste ist verschwunden, während der Dialog offen stand — der
             // Partner hat gelöscht. Anders als die übrigen Wächter hier wird das gemeldet statt

@@ -59,6 +59,9 @@ class MainActivity : ComponentActivity() {
                         TodoListTopBarActions(
                             onListSelected = todoListViewModel::onListSelected,
                             onNewListClick = todoListViewModel::onNewListClick,
+                            onNewTemplateClick = todoListViewModel::onNewTemplateClick,
+                            onCreateListFromTemplateClick =
+                                todoListViewModel::onCreateListFromTemplateClick,
                             onRenameListClick = todoListViewModel::onRenameListClick,
                             onDeleteListClick = todoListViewModel::onDeleteListClick,
                             onSignOutClick = { appContainer.authRepository.signOut() }

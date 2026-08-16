@@ -154,7 +154,10 @@ class TodoListViewModelTest {
         viewModel.onNewListConfirm()
         advanceUntilIdle()
 
-        assertEquals(CreateListCall("Garten", shared = false), listRepository.lastCreateCall)
+        assertEquals(
+            CreateListCall("Garten", shared = false, isTemplate = false),
+            listRepository.lastCreateCall
+        )
         assertNull(viewModel.uiState.value.newList)
     }
 
@@ -168,7 +171,10 @@ class TodoListViewModelTest {
         viewModel.onNewListConfirm()
         advanceUntilIdle()
 
-        assertEquals(CreateListCall("Garten", shared = true), listRepository.lastCreateCall)
+        assertEquals(
+            CreateListCall("Garten", shared = true, isTemplate = false),
+            listRepository.lastCreateCall
+        )
     }
 
     @Test
@@ -961,15 +967,222 @@ class TodoListViewModelTest {
         // Anders als LOAD_FAILED klebt er nicht: Die Liste ist danach wieder in Ordnung.
         assertNull(viewModel.uiState.value.error)
     }
+
+    // --- Vorlagen (ADR 0034) ---
+
+    @Test
+    fun `templates are kept apart from the working lists`() = runTest(testDispatcher) {
+        listRepository.emit(Result.success(listOf(TEMPLATE, LIST_A, LIST_B)))
+        advanceUntilIdle()
+
+        assertEquals(listOf(LIST_A, LIST_B), viewModel.uiState.value.lists)
+        assertEquals(listOf(TEMPLATE), viewModel.uiState.value.templates)
+    }
+
+    /** Wer eine Liste verloren hat, will weiterarbeiten — nicht in einer Vorlage landen. */
+    @Test
+    fun `the fallback prefers a working list over a template`() = runTest(testDispatcher) {
+        listRepository.emit(Result.success(listOf(TEMPLATE, LIST_A, LIST_B)))
+        advanceUntilIdle()
+
+        assertEquals(LIST_A, viewModel.uiState.value.selectedList)
+    }
+
+    /** Ein leerer Bildschirm neben einer vorhandenen Vorlage wäre die schlechtere Antwort. */
+    @Test
+    fun `a template is opened when there is no working list`() = runTest(testDispatcher) {
+        listRepository.emit(Result.success(listOf(TEMPLATE)))
+        advanceUntilIdle()
+
+        assertEquals(TEMPLATE, viewModel.uiState.value.selectedList)
+        assertTrue(viewModel.uiState.value.isTemplateOpen)
+    }
+
+    @Test
+    fun `a remembered template is opened`() = runTest(testDispatcher) {
+        selectedListRepository.setRemembered(TEMPLATE.id)
+        listRepository.emit(Result.success(listOf(TEMPLATE, LIST_A, LIST_B)))
+        createViewModel()
+        advanceUntilIdle()
+
+        assertEquals(TEMPLATE, viewModel.uiState.value.selectedList)
+    }
+
+    @Test
+    fun `a new template is created with the template flag`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+
+        viewModel.onNewTemplateClick()
+        viewModel.onNewListNameChange("  Urlaub packen  ")
+        viewModel.onNewListConfirm()
+        advanceUntilIdle()
+
+        assertEquals(
+            CreateListCall("Urlaub packen", shared = false, isTemplate = true),
+            listRepository.lastCreateCall
+        )
+        assertNull(viewModel.uiState.value.newList)
+    }
+
+    @Test
+    fun `the instantiation dialog is prefilled from the template`() = runTest(testDispatcher) {
+        openTemplate()
+
+        viewModel.onCreateListFromTemplateClick()
+
+        assertEquals(
+            NewList(name = TEMPLATE.name, shared = true, kind = NewListKind.FROM_TEMPLATE),
+            viewModel.uiState.value.newList
+        )
+    }
+
+    /** Ohne hinterlegten Partner bietet die Oberfläche „geteilt" nicht an — also darf es nicht vorbelegt sein. */
+    @Test
+    fun `instantiating a shared template stays private without a partner`() =
+        runTest(testDispatcher) {
+            partnerRepository.emit(null)
+            openTemplate()
+
+            viewModel.onCreateListFromTemplateClick()
+
+            assertFalse(viewModel.uiState.value.newList!!.shared)
+        }
+
+    @Test
+    fun `instantiating a template writes its entries into a new list`() = runTest(testDispatcher) {
+        openTemplate()
+
+        viewModel.onCreateListFromTemplateClick()
+        viewModel.onNewListNameChange("  Mallorca  ")
+        viewModel.onNewListConfirm()
+        advanceUntilIdle()
+
+        assertEquals(
+            CreateListFromTemplateCall("Mallorca", shared = true, todos = listOf(TODO_ENTRY)),
+            listRepository.lastCreateFromTemplateCall
+        )
+        // Die Vorlage selbst bleibt unangetastet — sie ist der Stempel, nicht der Abdruck.
+        assertNull(todoRepository.lastDeleteCall)
+        assertNull(viewModel.uiState.value.newList)
+    }
+
+    @Test
+    fun `an instantiated list starts with open entries`() = runTest(testDispatcher) {
+        openTemplate(entries = listOf(FINISHED_TODO_ENTRY))
+
+        viewModel.onCreateListFromTemplateClick()
+        viewModel.onNewListConfirm()
+        advanceUntilIdle()
+
+        val entry = listRepository.lastCreateFromTemplateCall?.todos?.single()
+        assertEquals(false, entry?.isDone)
+        assertNull(entry?.completedBy)
+        assertNull(entry?.completedAt)
+        // Was die Aufgabe beschreibt, kommt unverändert an.
+        assertEquals(FINISHED_TODO_ENTRY.createdAt, entry?.createdAt)
+        assertEquals(FINISHED_TODO_ENTRY.title, entry?.title)
+    }
+
+    /** Der einzige Anlegeweg, der die neue Liste auch öffnet. */
+    @Test
+    fun `instantiating a template opens the new list`() = runTest(testDispatcher) {
+        openTemplate()
+
+        viewModel.onCreateListFromTemplateClick()
+        viewModel.onNewListConfirm()
+        advanceUntilIdle()
+
+        assertEquals(LIST_FROM_TEMPLATE_ID, selectedListRepository.lastSelectedId)
+    }
+
+    @Test
+    fun `a failing instantiation keeps the dialog open and reports its own error`() =
+        runTest(testDispatcher) {
+            openTemplate()
+            listRepository.createFromTemplateResult =
+                Result.failure(IllegalStateException("no permission"))
+
+            viewModel.onCreateListFromTemplateClick()
+            viewModel.onNewListConfirm()
+            advanceUntilIdle()
+
+            assertEquals(TodoListError.LIST_ADD_FAILED, viewModel.uiState.value.error)
+            assertEquals(TEMPLATE.name, viewModel.uiState.value.newList?.name)
+        }
+
+    @Test
+    fun `an entry in a template can be moved to another template`() = runTest(testDispatcher) {
+        openTemplate()
+
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onEditedTargetListChange(SECOND_TEMPLATE)
+        viewModel.onEditConfirm()
+
+        assertEquals(
+            MoveTodoCall(TEMPLATE.id, SECOND_TEMPLATE.id, TODO_ENTRY),
+            todoRepository.lastMoveTodoCall
+        )
+    }
+
+    /**
+     * Die zweite Verteidigungslinie hinter dem Feld im Dialog: Eine Vorlage ist kein Ort, an dem eine
+     * Aufgabe abgelegt wird, und aus einer Vorlage heraus ist eine Arbeitsliste kein Ziel.
+     */
+    @Test
+    fun `an entry in a template is not moved into a working list`() = runTest(testDispatcher) {
+        openTemplate()
+
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onEditedTargetListChange(LIST_B)
+        viewModel.onEditConfirm()
+
+        assertNull(todoRepository.lastMoveTodoCall)
+        assertEquals(TodoListError.MOVE_FAILED, viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `an entry in a working list is not moved into a template`() = runTest(testDispatcher) {
+        listRepository.emit(Result.success(listOf(TEMPLATE, LIST_A, LIST_B)))
+        seedEntryInFirstList()
+
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onEditedTargetListChange(TEMPLATE)
+        viewModel.onEditConfirm()
+
+        assertNull(todoRepository.lastMoveTodoCall)
+        assertEquals(TodoListError.MOVE_FAILED, viewModel.uiState.value.error)
+    }
+
+    /** Öffnet die Vorlage mit ihren Einträgen — der Ausgangspunkt der Vorlagen-Tests. */
+    private fun TestScope.openTemplate(entries: List<Todo> = listOf(TODO_ENTRY)) {
+        listRepository.emit(Result.success(listOf(TEMPLATE, SECOND_TEMPLATE, LIST_A, LIST_B)))
+        advanceUntilIdle()
+        viewModel.onListSelected(TEMPLATE)
+        advanceUntilIdle()
+        todoRepository.emit(TEMPLATE.id, Result.success(entries))
+        advanceUntilIdle()
+    }
 }
 
 private val SIGNED_IN_USER = SignedInUser(uid = "uid-1", displayName = "Georg", email = null)
 
 private val PARTNER = Partner(uid = "uid-2", displayName = "Anna")
 
-private val LIST_A = TodoList(id = "list-a", name = "Einkauf", isShared = true)
+private val LIST_A = TodoList(id = "list-a", name = "Einkauf", isShared = true, isTemplate = false)
 
-private val LIST_B = TodoList(id = "list-b", name = "Zuhause", isShared = false)
+private val LIST_B = TodoList(id = "list-b", name = "Zuhause", isShared = false, isTemplate = false)
+
+/**
+ * Sortiert vor beide Arbeitslisten — nur so zeigt der Rückfall-Test wirklich etwas: Stünde die
+ * Vorlage hinten, wäre „die erste Arbeitsliste" auch ohne Regel die erste überhaupt.
+ */
+private val TEMPLATE =
+    TodoList(id = "template-a", name = "Ausrüstung", isShared = true, isTemplate = true)
+
+private val SECOND_TEMPLATE =
+    TodoList(id = "template-b", name = "Bergtour", isShared = false, isTemplate = true)
+
+private const val LIST_FROM_TEMPLATE_ID = "list-from-template"
 
 private val TODO_ENTRY = Todo(
     id = "todo-1",
@@ -1094,15 +1307,24 @@ private class FakeTodoRepository : TodoRepository {
     }
 }
 
-private data class CreateListCall(val name: String, val shared: Boolean)
+private data class CreateListCall(val name: String, val shared: Boolean, val isTemplate: Boolean)
+
+private data class CreateListFromTemplateCall(
+    val name: String,
+    val shared: Boolean,
+    val todos: List<Todo>
+)
 
 private data class RenameListCall(val listId: String, val name: String)
 
 private class FakeListRepository : ListRepository {
     var createResult: Result<Unit> = Result.success(Unit)
+    var createFromTemplateResult: Result<String> = Result.success(LIST_FROM_TEMPLATE_ID)
     var renameResult: Result<Unit> = Result.success(Unit)
     var deleteResult: Result<Unit> = Result.success(Unit)
     var lastCreateCall: CreateListCall? = null
+        private set
+    var lastCreateFromTemplateCall: CreateListFromTemplateCall? = null
         private set
     var lastRenameCall: RenameListCall? = null
         private set
@@ -1118,9 +1340,22 @@ private class FakeListRepository : ListRepository {
         emitted.value = result
     }
 
-    override suspend fun createList(name: String, shared: Boolean): Result<Unit> {
-        lastCreateCall = CreateListCall(name, shared)
+    override suspend fun createList(
+        name: String,
+        shared: Boolean,
+        isTemplate: Boolean
+    ): Result<Unit> {
+        lastCreateCall = CreateListCall(name, shared, isTemplate)
         return createResult
+    }
+
+    override suspend fun createListFromTemplate(
+        name: String,
+        shared: Boolean,
+        todos: List<Todo>
+    ): Result<String> {
+        lastCreateFromTemplateCall = CreateListFromTemplateCall(name, shared, todos)
+        return createFromTemplateResult
     }
 
     override fun renameList(listId: String, name: String): Result<Unit> {
@@ -1147,9 +1382,17 @@ private class FakePartnerRepository(partner: Partner? = PARTNER) : PartnerReposi
 private class FakeSelectedListRepository : SelectedListRepository {
     private val remembered = MutableStateFlow<String?>(null)
 
+    /**
+     * Was zuletzt gemerkt wurde. Die einzige Spur, über die sich prüfen lässt, dass eine aus einer
+     * Vorlage erzeugte Liste geöffnet wird — sie existiert im Attrappen-Bestand ja nicht.
+     */
+    var lastSelectedId: String? = null
+        private set
+
     override val selectedListId: Flow<String?> = remembered
 
     override suspend fun select(listId: String) {
+        lastSelectedId = listId
         remembered.value = listId
     }
 

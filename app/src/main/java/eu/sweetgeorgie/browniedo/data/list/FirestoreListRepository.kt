@@ -6,9 +6,11 @@ import eu.sweetgeorgie.browniedo.data.LISTS_COLLECTION
 import eu.sweetgeorgie.browniedo.data.TODOS_COLLECTION
 import eu.sweetgeorgie.browniedo.data.list.ListField.MEMBERS
 import eu.sweetgeorgie.browniedo.data.list.ListField.NAME
+import eu.sweetgeorgie.browniedo.data.todo.toDocument
 import eu.sweetgeorgie.browniedo.domain.auth.AuthRepository
 import eu.sweetgeorgie.browniedo.domain.list.ListRepository
 import eu.sweetgeorgie.browniedo.domain.list.TodoList
+import eu.sweetgeorgie.browniedo.domain.todo.Todo
 import eu.sweetgeorgie.browniedo.domain.user.PartnerRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.awaitClose
@@ -63,20 +65,64 @@ class FirestoreListRepository(
         awaitClose { registration.remove() }
     }
 
-    override suspend fun createList(name: String, shared: Boolean): Result<Unit> = runCatching {
-        val ownUid = authRepository.currentUser?.uid ?: error("Nobody is signed in.")
-        val members = if (shared) {
-            val partnerUid = partnerRepository.partner.first()?.uid
-                ?: error("No partner is on file, a shared list cannot be created.")
-            listOf(ownUid, partnerUid)
-        } else {
-            listOf(ownUid)
-        }
-
+    override suspend fun createList(
+        name: String,
+        shared: Boolean,
+        isTemplate: Boolean
+    ): Result<Unit> = runCatching {
         firestore.collection(LISTS_COLLECTION)
-            .add(ListDocument(name = name, members = members))
+            .add(
+                ListDocument(
+                    name = name,
+                    members = membersFor(shared),
+                    isTemplate = isTemplate
+                )
+            )
             .await()
     }.map { }
+
+    /**
+     * Ein einziger Batch für das Listen-Dokument und alle Aufgaben, Begründung in [ListRepository].
+     *
+     * Die id vergibt `document()` ohne Argument lokal — dieselbe Technik wie beim Verschieben einer
+     * Aufgabe. Nur deshalb kann diese Methode die id zurückgeben, ohne auf den Server zu warten, und
+     * nur deshalb funktioniert das Anlegen offline.
+     *
+     * **Keine Aufteilung in mehrere Batches**, anders als beim Löschen einer Liste: Ein Batch fasst
+     * 500 Operationen, und eine Vorlage mit 499 Einträgen gibt es nicht. Käme sie doch, lehnt
+     * Firestore den Commit ab und der Fehler kommt als `Result` heraus — das ist die ehrlichere
+     * Antwort als eine still gekürzte Liste.
+     */
+    override suspend fun createListFromTemplate(
+        name: String,
+        shared: Boolean,
+        todos: List<Todo>
+    ): Result<String> = runCatching {
+        val members = membersFor(shared)
+        val listDocument = firestore.collection(LISTS_COLLECTION).document()
+
+        val batch = firestore.batch()
+        batch.set(listDocument, ListDocument(name = name, members = members))
+        todos.forEach { todo ->
+            batch.set(listDocument.collection(TODOS_COLLECTION).document(), todo.toDocument())
+        }
+        batch.commit()
+
+        listDocument.id
+    }
+
+    /**
+     * Wer auf der neuen Liste steht. Der Partner wird nur für eine geteilte Liste nachgeschlagen —
+     * wer allein arbeitet, braucht die `users`-Collection nicht (ADR 0020).
+     */
+    private suspend fun membersFor(shared: Boolean): List<String> {
+        val ownUid = authRepository.currentUser?.uid ?: error("Nobody is signed in.")
+        if (!shared) return listOf(ownUid)
+
+        val partnerUid = partnerRepository.partner.first()?.uid
+            ?: error("No partner is on file, a shared list cannot be created.")
+        return listOf(ownUid, partnerUid)
+    }
 
     /**
      * Writes only the name. Sending the whole [ListDocument] would resubmit `members` and reset

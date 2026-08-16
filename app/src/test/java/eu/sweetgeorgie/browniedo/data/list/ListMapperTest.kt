@@ -20,7 +20,7 @@ class ListMapperTest {
         )
 
         assertEquals(
-            TodoList(id = DOCUMENT_ID, name = "Einkauf", isShared = true),
+            TodoList(id = DOCUMENT_ID, name = "Einkauf", isShared = true, isTemplate = false),
             document.toTodoList(DOCUMENT_ID)
         )
     }
@@ -48,9 +48,24 @@ class ListMapperTest {
     }
 
     @Test
+    fun `a document marked as a template maps to a template`() {
+        assertTrue(completeDocument().copy(isTemplate = true).toTodoList(DOCUMENT_ID)!!.isTemplate)
+    }
+
+    /**
+     * Der Migrationsfall: Listen von vor Phase 14 tragen das Feld nicht. Firestore lässt es dann auf
+     * dem Standardwert des Dokuments stehen — hier nachgestellt, indem der Standard nicht gesetzt
+     * wird. Kein Nachziehen in der Console nötig.
+     */
+    @Test
+    fun `a document without the template field is a plain list`() {
+        assertFalse(completeDocument().toTodoList(DOCUMENT_ID)!!.isTemplate)
+    }
+
+    @Test
     fun `maps without a creation timestamp — nothing reads it`() {
         assertEquals(
-            TodoList(id = DOCUMENT_ID, name = "Einkauf", isShared = true),
+            TodoList(id = DOCUMENT_ID, name = "Einkauf", isShared = true, isTemplate = false),
             completeDocument().copy(createdAt = null).toTodoList(DOCUMENT_ID)
         )
     }

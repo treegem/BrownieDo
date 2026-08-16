@@ -660,8 +660,9 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
 > Bedarf eine **konkrete Liste**, in der abgehakt wird — und beim nächsten Mal die nächste, aus
 > derselben Vorlage. Vorlagen und die daraus entstandenen Listen sind beide ganz normal bearbeitbar.
 >
-> **Vier Entscheidungen sind vorab getroffen** und tragen die ganze Phase; sie bekommen bei der
-> Umsetzung zwei ADRs (siehe unten), hier steht nur, was sie bedeuten:
+> **Vier Entscheidungen tragen die ganze Phase.** Die ersten beiden Punkte stehen begründet in
+> [ADR 0034](docs/decisions/0034-vorlagen-sind-listen-mit-einem-flag.md), die anderen beiden bekommen
+> ihren ADR mit 14b — hier steht nur, was sie bedeuten:
 > 1. **Eine Vorlage *ist* eine Liste** — dasselbe Dokument in `lists`, nur mit `isTemplate: true`.
 > 2. **Skaliert wird über ein Mengenfeld am Eintrag** — gesetzt heißt „skaliert", leer heißt „bleibt".
 > 3. **Gerechnet wird exakt**, Nachkommastellen erscheinen nur, wenn sie gebraucht werden.
@@ -674,56 +675,110 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
 > **Kein Schritt in der Firebase Console, kein Nachziehen bestehender Dokumente.**
 
 #### Phase 14a – Vorlagen anlegen, bearbeiten und instanziieren
-- [ ] `ListDocument` und `TodoList` um `isTemplate` erweitern, dazu `ListField` — nicht-nullable mit
-  Vorgabe `false`. Bestehende Listen tragen das Feld nicht und werden damit zu „keine Vorlage"
-  gelesen, genau wie in Phase 12 bei der Notiz. `createList` bekommt das Flag als dritten Parameter;
-  `LIST_ORDER` bleibt unangetastet und sortiert beide Arten mit demselben Vergleich nach Namen
-- [ ] **Vorlagen leben im Listen-Menü der TopAppBar, als zweiter Abschnitt unter einem Trenner** —
-  mit eigenem Symbol, `ListMenuItem` wird wiederverwendet. Daneben „Neue Vorlage" neben dem
-  vorhandenen „Neue Liste". Eine Vorlage zu öffnen führt in **denselben Bildschirm im
+- [x] `ListDocument` und `TodoList` um `isTemplate` erweitern — nicht-nullable mit Vorgabe `false`.
+  Bestehende Listen tragen das Feld nicht und werden damit zu „keine Vorlage" gelesen, genau wie in
+  Phase 12 bei der Notiz. `createList` bekommt das Flag als dritten Parameter; `LIST_ORDER` bleibt
+  unangetastet und sortiert beide Arten mit demselben Vergleich nach Namen.
+  **Kein Eintrag in `ListField`:** Der stünde nur für einen Feld-Update, und das Flag wird nie
+  einzeln geschrieben — `remove-unused-code` ist MUST FIX
+- [x] **Vorlagen leben im Listen-Menü der TopAppBar, als zweiter Abschnitt unter einem Trenner** —
+  `ListMenuItem` wird unverändert wiederverwendet, das Symbol bleibt geteilt/privat, den Unterschied
+  trägt die Abschnitts-Überschrift. Daneben „Neue Vorlage …" neben dem vorhandenen „Neue Liste …".
+  **Die Überschriften erscheinen erst, sobald es eine Vorlage gibt** — wer keine anlegt, sieht
+  dasselbe Menü wie vor Phase 14. Eine Vorlage zu öffnen führt in **denselben Bildschirm im
   Vorlagen-Modus**, nicht in einen zweiten Bildschirm: Ein eigener Vorlagen-Bildschirm wäre
   Navigation und damit **Auslöser 7 aus [ADR 0033](docs/decisions/0033-bearbeiten-bleibt-ein-dialog.md)**
   — er zöge den Bearbeiten-Bildschirm mit, den ADR 0033 gerade erst zurückgestellt hat. Der Modus
-  kostet dagegen ein Feld im UiState
-- [ ] Was der Vorlagen-Modus anders macht, und sonst nichts: **kein Abhaken** (die Checkbox
+  kostet dagegen ein abgeleitetes Feld im UiState
+- [x] Was der Vorlagen-Modus anders macht, und sonst nichts: **kein Abhaken** (die Checkbox
   entfällt — eine Vorlage hat keinen Erledigt-Zustand) · **damit auch kein Wischen**, weil
   [ADR 0016](docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md) nur erledigte Aufgaben
   wischen lässt und es hier keine gibt; gelöscht wird über den Bearbeiten-Dialog, den ADR 0016
   ohnehin als den mit TalkBack bedienbaren Weg verlangt · eigener Leerzustand-Text · der
   Listenname in der TopAppBar bekommt die Vorlagen-Markierung. `TODO_ORDER` bleibt unberührt:
-  ohne erledigte Einträge greift bereits heute Priorität, dann `createdAt`
-- [ ] **Verschieben trennt die beiden Welten** — das Zielliste-Feld im Bearbeiten-Dialog zeigt
+  ohne erledigte Einträge greift bereits heute Priorität, dann `createdAt`.
+  **Umbenennen und Löschen brauchten keine Zeile Logik** — nur die Beschriftungen wechseln, weil eine
+  Vorlage zwar eine Liste *ist*, aber niemand sie so nennt (`consistent-domain-terminology`)
+- [x] **Verschieben trennt die beiden Welten** — das Zielliste-Feld im Bearbeiten-Dialog zeigt
   Gleichartiges: in einer Liste nur Listen, in einer Vorlage nur Vorlagen. Eine Aufgabe in eine
   Vorlage zu schieben wäre kein Ablegen, sondern ein Verlust aus der Wochenliste. Der vorhandene
-  Ein-Element-Fall (Feld sichtbar, aber deaktiviert) greift damit auch für Vorlagen
-- [ ] **Der Bearbeiten-Dialog zeigt „Termin anlegen" im Vorlagen-Modus nicht** — ein Vorlagen-Eintrag
+  Ein-Element-Fall (Feld sichtbar, aber deaktiviert) greift damit auch für Vorlagen. Die Regel steht
+  als `targetLists` im UiState und wird in `onEditConfirm` ein **zweites** Mal geprüft — dieselbe
+  zweite Verteidigungslinie wie bei `isDone` und der Wischgeste, und ohne Gerät prüfbar
+- [x] **Der Bearbeiten-Dialog zeigt „Termin anlegen" im Vorlagen-Modus nicht** — ein Vorlagen-Eintrag
   hat keinen konkreten Tag, und [ADR 0027](docs/decisions/0027-termine-per-kalender-intent.md) hat
   ein geratenes Datum ausdrücklich verworfen. Das ist zugleich der Platz, den 14b für die Menge
-  braucht: So trägt **kein Modus mehr Eingaben als heute**, und Auslöser 1 aus ADR 0033 („ein
-  sechstes Eingabefeld") greift nicht. Beim Bauen nachzählen — daran hängt, ob die Phase im Dialog
-  bleiben darf
-- [ ] Liste aus einer Vorlage erzeugen — Dialog mit Name (vorbelegt aus dem Vorlagennamen),
+  braucht: So trägt **kein Modus mehr Eingaben als vor Phase 14**, und Auslöser 1 aus ADR 0033 („ein
+  sechstes Eingabefeld") greift nicht. Nachgezählt: Titel · Notiz · Priorität · Zielliste, dazu
+  Löschen und — außerhalb einer Vorlage — der Termin
+- [x] Liste aus einer Vorlage erzeugen — Dialog mit Name (vorbelegt aus dem Vorlagennamen),
   geteilt/privat wie beim normalen Anlegen, ausgelöst aus dem Überlauf-Menü, wenn eine Vorlage offen
   ist. Danach springt die App in die neue Liste. **Die Vorlage bleibt unverändert stehen** — sie ist
-  der Stempel, nicht der Abdruck
-- [ ] Als **ein `WriteBatch`**: Listen-Dokument und alle Aufgaben zusammen, mit lokal vergebener
+  der Stempel, nicht der Abdruck.
+  **Ein Dialog trägt jetzt alle drei Anlegewege**, weil alle drei dieselben zwei Eingaben haben; es
+  wechselt allein die Überschrift (`NewListKind`). Eine geteilte Vorlage ergibt eine geteilte Liste,
+  ohne hinterlegten Partner fällt das auf „nur für mich" zurück
+- [x] Als **ein `WriteBatch`**: Listen-Dokument und alle Aufgaben zusammen, mit lokal vergebener
   Listen-id (`document()`). Dasselbe Muster wie beim Verschieben und beim Löschen einer Liste
   ([ADR 0019](docs/decisions/0019-schreibrechte-auf-listen-dokumente.md)), und aus demselben Grund:
   Es soll keine halbe Liste geben. Nur der Partner-Nachschlag beim geteilten Fall bleibt `suspend`,
-  der Rest funktioniert offline
-- [ ] **`createdAt` wird aus der Vorlage übernommen, nicht neu vergeben** — sonst bekämen alle
+  der Rest funktioniert offline.
+  **Bewusst ohne Aufteilung in mehrere Batches**, anders als beim Löschen: Ein Batch fasst 500
+  Operationen, und eine Vorlage mit 499 Einträgen gibt es nicht. Käme sie doch, lehnt Firestore den
+  Commit ab und der Fehler kommt als `Result` heraus — ehrlicher als eine still gekürzte Liste
+- [x] **`createdAt` wird aus der Vorlage übernommen, nicht neu vergeben** — sonst bekämen alle
   Aufgaben eines Batches praktisch denselben Zeitpunkt und die Reihenfolge der Vorlage ginge
   verloren; `TODO_ORDER` sortiert offene Einträge gleicher Priorität danach. Die Ausnahme aus
   [ADR 0026](docs/decisions/0026-verschieben-schreibt-createdat-selbst.md) gilt damit auch hier.
   Erledigt-Zustand, `completedBy` und `completedAt` entstehen dagegen **nicht** mit: Eine frische
-  Liste ist offen
-- [ ] Der Rückfall auf „die erste Liste" (aus 8a) darf **nicht in einer Vorlage landen** — wird die
-  offene Liste gelöscht, fällt die App auf die erste echte Liste zurück. Eine Vorlage bleibt eine
-  bewusste Wahl. Im DataStore darf ihre id trotzdem stehen: Wer eine Vorlage offen hatte, findet sie
-  nach dem Neustart wieder ([ADR 0018](docs/decisions/0018-datastore-fuer-die-zuletzt-gewaehlte-liste.md))
-- [ ] ADR: **Vorlagen sind Listen mit einem Flag** — mit den verworfenen Alternativen (eigene
-  `templates`-Collection samt eigenen Rules und eigenem Bildschirm) und der Begründung für den Modus
-  statt eines zweiten Bildschirms
+  Liste ist offen. Das Zurücksetzen sitzt im ViewModel und nicht in der Datenschicht — es ist eine
+  Regel darüber, was eine Instanz erbt, und dort ohne Firestore prüfbar
+- [x] Der Rückfall auf „die erste Liste" (aus 8a) landet **nicht in einer Vorlage** — wird die offene
+  Liste gelöscht, fällt die App auf die erste Arbeitsliste zurück. Im DataStore darf eine Vorlagen-id
+  trotzdem stehen: Wer eine Vorlage offen hatte, findet sie nach dem Neustart wieder
+  ([ADR 0018](docs/decisions/0018-datastore-fuer-die-zuletzt-gewaehlte-liste.md)).
+  **Eine Verfeinerung gegenüber dem, was hier stand:** Gibt es *gar keine* Arbeitsliste, wird doch
+  die erste Vorlage geöffnet — ein leerer Bildschirm neben einer vorhandenen Vorlage wäre die
+  schlechtere Antwort. Die ursprüngliche Absicht („nicht versehentlich in einer Vorlage landen")
+  bleibt damit gewahrt
+- [x] ADR: **Vorlagen sind Listen mit einem Flag** —
+  [ADR 0034](docs/decisions/0034-vorlagen-sind-listen-mit-einem-flag.md), mit den verworfenen
+  Alternativen (eigene `templates`-Collection samt eigenen Rules und eigenem Bildschirm; Vorlagen
+  allein über eine Namenskonvention; Instanziieren über zwei Schreibvorgänge)
+- [x] **Security Rules gegengeprüft — keine Änderung nötig, kein Schritt in der Firebase Console.**
+  Das war der Prüfstein der ganzen Entscheidung und ist es wert, hier zu stehen: `create` auf `lists`
+  prüft `members` und `name`, aber **keine Feldmenge**; `update` erlaubt alles außer einer Änderung
+  an `members`; auf `todos` gilt `read, write` ohne Feldprüfung. Ein zusätzliches Feld und ein
+  weiteres Dokument in derselben Collection sind damit bereits erlaubt
+- [x] Unit-Tests — **133 grün** (vorher 117). Neu: Mapper mit gesetztem Flag und **ohne das Feld**
+  (der Migrationsfall) · die Trennung von Listen und Vorlagen im UiState · der Rückfall, der eine
+  Arbeitsliste vorzieht, und der, der doch eine Vorlage öffnet · die gemerkte Vorlage · das Anlegen
+  mit Flag · Vorbelegung des Instanziieren-Dialogs (auch ohne Partner) · das Instanziieren selbst,
+  inklusive „erbt `createdAt` und den Titel, aber nicht den Erledigt-Zustand" · das Öffnen der neuen
+  Liste · der Fehlschlag · und die drei Verschiebe-Fälle (Vorlage → Vorlage geht, Vorlage →
+  Arbeitsliste und Arbeitsliste → Vorlage nicht)
+- [x] Instrumentierte Tests **am 2026-08-16 auf einem SM-S928B gelaufen, alle 34 grün** (vorher 29).
+  Die fünf neuen stehen im `TodoListScreenTest`: Vorlagen-Markierung in der TopAppBar ·
+  Vorlagenzeile ohne Checkbox · die **Gegenprobe**, dass eine Listenzeile eine hat · Bearbeiten-Dialog
+  ohne Kalender-Aktion, aber mit Löschen · der Vorlagen-Abschnitt im Listen-Menü.
+  **Die Gegenprobe ist keine Zierde:** Ohne sie belegt das `assertDoesNotExist` der Vorlagenzeile nur,
+  dass `isToggleable()` nichts findet — nicht, dass es überhaupt etwas finden *könnte*.
+  Canary-Gegenprobe mitgemacht: `theListMenuShowsTemplatesInTheirOwnSection` auf einen erfundenen Text
+  gedreht scheitert mit „Assert failed: The component with Text + InputText + EditableText contains
+  'CANARY Vorlagen' … is not displayed!" — ein aufgelöster Matcher gegen einen echten Baum, nicht
+  „No compose hierarchies found". Danach zurückgedreht und erneut 34 grün.
+  **Nebenbei gelernt:** Ein zweiter, `offline` gemeldeter Emulator stört nicht, Gradle überspringt ihn
+  von allein („Skipping device … Device is OFFLINE") — und die Zeile „Shell command failed (255):
+  appops set androidx.test.services MANAGE_EXTERNAL_STORAGE allow / Error: No UID" ist folgenlos, der
+  Lauf geht danach normal weiter
+- [ ] Auf dem Gerät prüfen — Vorlage anlegen, füllen und daraus eine Liste erzeugen · dieselbe
+  Vorlage ein zweites Mal instanziieren, beide Listen stehen nebeneinander · Reihenfolge der Einträge
+  stimmt mit der Vorlage überein und die neue Liste ist offen (nichts abgehakt) · geteilte Vorlage
+  instanziieren und beim Partner nachsehen · privat instanziieren · offline instanziieren und wieder
+  verbinden · Vorlage löschen, während eine daraus erzeugte Liste offen ist (die Liste muss bleiben)
+  · die letzte Arbeitsliste löschen, während nur noch eine Vorlage übrig ist · das Listen-Menü mit
+  und ohne Vorlagen (die Überschriften dürfen ohne Vorlage nicht auftauchen) · Bearbeiten-Dialog in
+  einer Vorlage: kein Kalender-Knopf, Zielliste zeigt nur Vorlagen · hell und dunkel
 
 #### Phase 14b – Menge und Faktor
 > Der Sinn der Vorlage für eine Reise: Man schreibt sie für **einen Tag** (Faktor 1) und
@@ -766,23 +821,17 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   verworfenen Alternativen (führende Zahl parsen samt Schalter; Menge als dauerhaftes Feld auch in
   der erzeugten Liste)
 
-#### Tests und Geräteblick für beide Teile
-- [ ] Unit-Tests — Mapper mit und ohne die neuen Felder plus Hin-und-zurück fürs Verschieben ·
-  die Skalierung für sich (ganze Zahl · Kommazahl · Faktor 1 · Eintrag ohne Menge bleibt unberührt ·
-  der Fließkomma-Fall oben · Komma- und Punkt-Eingabe) · `LIST_ORDER` mit gemischten Arten · im
-  ViewModel die Aufteilung des Menüs, der Rückfall, der nicht in einer Vorlage landen darf, und das
-  Instanziieren
-- [ ] Instrumentierte Tests — Vorlagen-Abschnitt im Listen-Menü · Vorlagen-Modus zeigt keine
-  Checkbox · Mengenfeld nur dort und meldet seine Eingabe · das Zielliste-Feld zeigt Gleichartiges ·
-  der Instanziieren-Dialog. **Die Canary-Gegenprobe gehört dazu** (siehe „Querlaufend"), und
-  Listennamen werden auf den Dialog eingegrenzt, weil derselbe Name in der TopAppBar steht
-- [ ] Auf dem Gerät prüfen — Vorlage anlegen, füllen und daraus eine Liste erzeugen · dieselbe
-  Vorlage ein zweites Mal instanziieren, beide Listen stehen nebeneinander · Reihenfolge der
-  Einträge stimmt mit der Vorlage überein · Faktor 3 und Faktor 2,5 · ein Eintrag ohne Menge bleibt
-  unverändert · geteilt erzeugen und beim Partner nachsehen · offline instanziieren und wieder
-  verbinden · Vorlage löschen, während eine daraus erzeugte Liste offen ist (die Liste muss bleiben)
-  · hell und dunkel · und der Blick auf den Bearbeiten-Dialog bei Schriftskalierung ≥ 1,3 mit
-  offener Tastatur, der zugleich **Auslöser 4 aus ADR 0033** beantwortet
+#### Tests und Geräteblick für 14b
+- [ ] Unit-Tests — Mapper mit und ohne das Mengenfeld plus Hin-und-zurück fürs Verschieben · die
+  Skalierung für sich (ganze Zahl · Kommazahl · Faktor 1 · Eintrag ohne Menge bleibt unberührt · der
+  Fließkomma-Fall oben · Komma- und Punkt-Eingabe) · im ViewModel die Menge im Bearbeiten-Dialog und
+  ihr Mitwandern beim Verschieben
+- [ ] Instrumentierte Tests — Mengenfeld nur im Vorlagen-Modus und meldet seine Eingabe · das
+  Faktor-Feld im Instanziieren-Dialog. **Die Canary-Gegenprobe gehört dazu**, und Listennamen werden
+  auf den Dialog eingegrenzt, weil derselbe Name in der TopAppBar steht
+- [ ] Auf dem Gerät prüfen — Faktor 3 und Faktor 2,5 · ein Eintrag ohne Menge bleibt unverändert ·
+  eine Menge mit Komma eingeben · und der Blick auf den Bearbeiten-Dialog bei Schriftskalierung ≥ 1,3
+  mit offener Tastatur, der zugleich **Auslöser 4 aus ADR 0033** beantwortet
 
 ### Querlaufend – Werkzeuge & Doku
 > Läuft neben den Phasen und gehört zu keiner.

@@ -51,6 +51,7 @@ private const val DELETE_SWIPE_FRACTION = 0.85f
 internal fun SwipeableTodoRow(
     todo: Todo,
     deleteFailed: Boolean,
+    isTemplateEntry: Boolean,
     onDoneChange: (Boolean) -> Unit,
     onClick: () -> Unit,
     onSwipedAway: () -> Unit,
@@ -93,7 +94,12 @@ internal fun SwipeableTodoRow(
             if (direction == SwipeToDismissBoxValue.StartToEnd) onSwipedAway()
         }
     ) {
-        TodoRow(todo = todo, onDoneChange = onDoneChange, onClick = onClick)
+        TodoRow(
+            todo = todo,
+            isTemplateEntry = isTemplateEntry,
+            onDoneChange = onDoneChange,
+            onClick = onClick
+        )
     }
 }
 
@@ -121,6 +127,7 @@ private fun DeleteBackground() {
 @Composable
 private fun TodoRow(
     todo: Todo,
+    isTemplateEntry: Boolean,
     onDoneChange: (Boolean) -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -143,7 +150,14 @@ private fun TodoRow(
                 Text(text = notes, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         },
-        leadingContent = { Checkbox(checked = todo.isDone, onCheckedChange = onDoneChange) },
+        // In einer Vorlage gibt es nichts abzuhaken: Sie beschreibt, was jedes Mal dazugehört, und
+        // erledigt wird erst in der Liste, die aus ihr entsteht (ADR 0034). Ohne Checkbox rückt die
+        // Zeile nach links — das ist der sichtbare Unterschied zwischen den beiden Arten.
+        leadingContent = if (isTemplateEntry) {
+            null
+        } else {
+            { Checkbox(checked = todo.isDone, onCheckedChange = onDoneChange) }
+        },
         trailingContent = if (markerIconResId == null) {
             null
         } else {

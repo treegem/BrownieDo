@@ -26,5 +26,6 @@ class ListOrderTest {
         )
     }
 
-    private fun list(name: String) = TodoList(id = name.lowercase(), name = name, isShared = false)
+    private fun list(name: String) =
+        TodoList(id = name.lowercase(), name = name, isShared = false, isTemplate = false)
 }

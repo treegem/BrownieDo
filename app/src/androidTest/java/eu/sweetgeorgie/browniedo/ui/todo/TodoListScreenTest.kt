@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -454,6 +455,97 @@ class TodoListScreenTest {
         assertEquals("Die haltbare", typed)
     }
 
+    // --- Vorlagen (ADR 0034) ---
+
+    @Test
+    fun anOpenTemplateIsMarkedInTheTopBar() {
+        setScreenContent(uiState = openTemplate())
+
+        val label = composeTestRule.activity.getString(R.string.todo_list_template)
+        composeTestRule.onNodeWithContentDescription(label).assertIsDisplayed()
+    }
+
+    /**
+     * Der sichtbare Unterschied zwischen einer Vorlage und einer Liste: In einer Vorlage gibt es
+     * nichts abzuhaken. Gesucht wird über [isToggleable], nicht über einen Text — die Checkbox trägt
+     * keinen.
+     */
+    @Test
+    fun aTemplateRowHasNoCheckbox() {
+        setScreenContent(uiState = openTemplate())
+
+        composeTestRule.onNodeWithText(OPEN_TODO.title).assertIsDisplayed()
+        composeTestRule.onNode(isToggleable()).assertDoesNotExist()
+    }
+
+    /**
+     * Die Gegenprobe zum Test darüber, und sie ist keine Zierde: Ohne sie beweist ein
+     * `assertDoesNotExist` nur, dass der Matcher nichts findet — nicht, dass er überhaupt etwas
+     * finden *könnte*.
+     */
+    @Test
+    fun aListRowHasACheckbox() {
+        setScreenContent(
+            uiState = TodoListUiState(
+                lists = listOf(LIST),
+                selectedList = LIST,
+                isLoading = false,
+                todos = listOf(OPEN_TODO)
+            )
+        )
+
+        composeTestRule.onNode(isToggleable()).assertIsDisplayed()
+    }
+
+    @Test
+    fun theEditDialogInATemplateOffersNoCalendarAction() {
+        setScreenContent(uiState = editingInTemplate())
+
+        // Ein Vorlagen-Eintrag hat keinen Tag, an dem er stattfindet (ADR 0027 und ADR 0034).
+        val label = composeTestRule.activity.getString(R.string.todo_list_create_calendar_event)
+        composeTestRule.onNodeWithText(label).assertDoesNotExist()
+        // Aber gelöscht wird auch hier über den Dialog, das ist der TalkBack-Weg (ADR 0016).
+        val deleteLabel = composeTestRule.activity.getString(R.string.todo_list_delete)
+        composeTestRule.onNode(hasAnyAncestor(isDialog()) and hasText(deleteLabel))
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun theListMenuShowsTemplatesInTheirOwnSection() {
+        setScreenContent(uiState = openTemplate())
+
+        // Der Titel ist die Auswahl (ADR 0013). Vor dem Tipp steht der Name nur dort.
+        composeTestRule.onNodeWithText(TEMPLATE.name).performClick()
+
+        val section = composeTestRule.activity.getString(R.string.todo_list_templates_section)
+        composeTestRule.onNodeWithText(section).assertIsDisplayed()
+        composeTestRule
+            .onNodeWithText(composeTestRule.activity.getString(R.string.todo_list_new_template))
+            .assertIsDisplayed()
+    }
+
+    /** Eine offene Vorlage mit einem Eintrag — der Ausgangspunkt der Vorlagen-Tests. */
+    private fun openTemplate() = TodoListUiState(
+        lists = listOf(LIST),
+        templates = listOf(TEMPLATE),
+        selectedList = TEMPLATE,
+        isLoading = false,
+        todos = listOf(OPEN_TODO)
+    )
+
+    private fun editingInTemplate(): TodoListUiState {
+        val state = openTemplate()
+        return state.copy(
+            editedTodo = TodoEdit(
+                todoId = OPEN_TODO.id,
+                title = OPEN_TODO.title,
+                priority = TodoPriority.MEDIUM,
+                targetListId = TEMPLATE.id,
+                notes = ""
+            )
+        )
+    }
+
     private fun editingIn(list: TodoList, lists: List<TodoList>) = TodoListUiState(
         lists = lists,
         selectedList = list,
@@ -528,6 +620,8 @@ class TodoListScreenTest {
         val NO_TOP_BAR_ACTIONS = TodoListTopBarActions(
             onListSelected = {},
             onNewListClick = {},
+            onNewTemplateClick = {},
+            onCreateListFromTemplateClick = {},
             onRenameListClick = {},
             onDeleteListClick = {},
             onSignOutClick = {}
@@ -564,9 +658,13 @@ class TodoListScreenTest {
             onDismiss = {}
         )
 
-        val LIST = TodoList(id = "list-1", name = "Einkauf", isShared = true)
+        val LIST = TodoList(id = "list-1", name = "Einkauf", isShared = true, isTemplate = false)
 
-        val OTHER_LIST = TodoList(id = "list-2", name = "Zuhause", isShared = false)
+        val OTHER_LIST =
+            TodoList(id = "list-2", name = "Zuhause", isShared = false, isTemplate = false)
+
+        val TEMPLATE =
+            TodoList(id = "template-1", name = "Urlaub packen", isShared = true, isTemplate = true)
 
         val TIMESTAMP: Instant = Instant.parse("2026-08-07T20:00:00Z")
 

@@ -19,6 +19,7 @@ fun ListDocument.toTodoList(id: String): TodoList? {
     return TodoList(
         id = id,
         name = name,
-        isShared = members.size > 1
+        isShared = members.size > 1,
+        isTemplate = isTemplate
     )
 }
