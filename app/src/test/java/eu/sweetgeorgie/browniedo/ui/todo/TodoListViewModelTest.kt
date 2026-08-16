@@ -177,6 +177,44 @@ class TodoListViewModelTest {
         )
     }
 
+    /** Wer eine Liste anlegt, will sie füllen — und landet deshalb direkt darin (ADR 0036). */
+    @Test
+    fun `a new list is opened right away`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+
+        viewModel.onNewListClick()
+        viewModel.onNewListNameChange("Garten")
+        viewModel.onNewListConfirm()
+        advanceUntilIdle()
+
+        assertEquals(CREATED_LIST_ID, selectedListRepository.lastSelectedId)
+    }
+
+    @Test
+    fun `a new template is opened right away`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+
+        viewModel.onNewTemplateClick()
+        viewModel.onNewListNameChange("Urlaub packen")
+        viewModel.onNewListConfirm()
+        advanceUntilIdle()
+
+        assertEquals(CREATED_LIST_ID, selectedListRepository.lastSelectedId)
+    }
+
+    @Test
+    fun `a failing create opens nothing`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+        listRepository.createResult = Result.failure(IllegalStateException("no permission"))
+
+        viewModel.onNewListClick()
+        viewModel.onNewListNameChange("Garten")
+        viewModel.onNewListConfirm()
+        advanceUntilIdle()
+
+        assertNull(selectedListRepository.lastSelectedId)
+    }
+
     @Test
     fun `sharing stays off while no partner is on file`() = runTest(testDispatcher) {
         partnerRepository.emit(null)
@@ -1182,6 +1220,8 @@ private val TEMPLATE =
 private val SECOND_TEMPLATE =
     TodoList(id = "template-b", name = "Bergtour", isShared = false, isTemplate = true)
 
+private const val CREATED_LIST_ID = "list-created"
+
 private const val LIST_FROM_TEMPLATE_ID = "list-from-template"
 
 private val TODO_ENTRY = Todo(
@@ -1318,7 +1358,7 @@ private data class CreateListFromTemplateCall(
 private data class RenameListCall(val listId: String, val name: String)
 
 private class FakeListRepository : ListRepository {
-    var createResult: Result<Unit> = Result.success(Unit)
+    var createResult: Result<String> = Result.success(CREATED_LIST_ID)
     var createFromTemplateResult: Result<String> = Result.success(LIST_FROM_TEMPLATE_ID)
     var renameResult: Result<Unit> = Result.success(Unit)
     var deleteResult: Result<Unit> = Result.success(Unit)
@@ -1344,7 +1384,7 @@ private class FakeListRepository : ListRepository {
         name: String,
         shared: Boolean,
         isTemplate: Boolean
-    ): Result<Unit> {
+    ): Result<String> {
         lastCreateCall = CreateListCall(name, shared, isTemplate)
         return createResult
     }

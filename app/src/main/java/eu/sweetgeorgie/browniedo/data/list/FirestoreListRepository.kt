@@ -65,21 +65,22 @@ class FirestoreListRepository(
         awaitClose { registration.remove() }
     }
 
+    /**
+     * Die id vergibt `document()` lokal, statt sie von `add()` samt Server-Bestätigung zu holen.
+     * Damit gibt die Methode sie sofort zurück — der Aufrufer kann die neue Liste öffnen — und der
+     * Vorgang funktioniert offline, wie es
+     * docs/decisions/0011-schreibvorgaenge-nicht-abwarten.md ohnehin verlangt.
+     */
     override suspend fun createList(
         name: String,
         shared: Boolean,
         isTemplate: Boolean
-    ): Result<Unit> = runCatching {
-        firestore.collection(LISTS_COLLECTION)
-            .add(
-                ListDocument(
-                    name = name,
-                    members = membersFor(shared),
-                    isTemplate = isTemplate
-                )
-            )
-            .await()
-    }.map { }
+    ): Result<String> = runCatching {
+        val members = membersFor(shared)
+        val listDocument = firestore.collection(LISTS_COLLECTION).document()
+        listDocument.set(ListDocument(name = name, members = members, isTemplate = isTemplate))
+        listDocument.id
+    }
 
     /**
      * **Erst die Liste, dann ihre Aufgaben — und ausdrücklich nicht beides in einem Batch**, siehe

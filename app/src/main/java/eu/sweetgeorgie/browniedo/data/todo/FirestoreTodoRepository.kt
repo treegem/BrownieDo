@@ -18,8 +18,12 @@ import eu.sweetgeorgie.browniedo.domain.todo.Todo
 import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
 import eu.sweetgeorgie.browniedo.domain.todo.TodoRepository
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.retryWhen
 import java.time.Instant
 
 /**
@@ -35,11 +39,41 @@ class FirestoreTodoRepository(private val firestore: FirebaseFirestore) : TodoRe
         .document(listId)
         .collection(TODOS_COLLECTION)
 
-    override fun todos(listId: String): Flow<Result<List<Todo>>> = callbackFlow {
+    /**
+     * **Ein abgewiesener Listener wird ein paar Mal neu aufgebaut, bevor der Fehler herauskommt**,
+     * siehe docs/decisions/0036-neue-liste-wird-geoeffnet-und-listener-wiederholt.md.
+     *
+     * Der Grund ist ein Wettlauf beim Anlegen: Die Leseregel auf `todos` schlägt die Mitglieder des
+     * Listen-Dokuments nach, und direkt nach dem Anlegen kennt der Server dieses Dokument
+     * womöglich noch nicht — der Listener wird dann mit `PERMISSION_DENIED` abgewiesen, obwohl
+     * gleich alles in Ordnung ist. Ein Versuch später ist es das auch.
+     *
+     * Betrifft nur den Online-Fall: Ohne Verbindung beantwortet Firestore den Listener aus dem
+     * lokalen Cache und fragt gar nicht erst.
+     */
+    override fun todos(listId: String): Flow<Result<List<Todo>>> = todoSnapshots(listId)
+        .map { Result.success(it) }
+        .retryWhen { _, attempt ->
+            if (attempt >= LISTEN_RETRIES) return@retryWhen false
+            // Steigend, damit der zweite Versuch nicht in dieselbe Lücke fällt wie der erste.
+            delay(LISTEN_RETRY_DELAY_MILLIS * (attempt + 1))
+            true
+        }
+        // Erst wenn die Versuche aufgebraucht sind, ist es wirklich ein Fehler. Ab hier gilt
+        // unverändert, was `TodoListViewModel.onErrorShown` festhält: Der Listener ist endgültig ab,
+        // die Liste aktualisiert sich nicht mehr, und die Meldung bleibt deshalb stehen.
+        .catch { emit(Result.failure(it)) }
+
+    /**
+     * Der nackte Listener. Meldet einen Fehler als Abbruch des Flows statt als Wert, damit [todos]
+     * ihn mit `retryWhen` wiederholen kann — ein `Result.failure` als Emission wäre für den Operator
+     * ein ganz normaler Wert.
+     */
+    private fun todoSnapshots(listId: String): Flow<List<Todo>> = callbackFlow {
         val registration = todoCollection(listId).addSnapshotListener { snapshot, error ->
             when {
-                error != null -> trySend(Result.failure(error))
-                snapshot != null -> trySend(Result.success(snapshot.toTodos()))
+                error != null -> close(error)
+                snapshot != null -> trySend(snapshot.toTodos())
             }
         }
         awaitClose { registration.remove() }
@@ -153,6 +187,18 @@ class FirestoreTodoRepository(private val firestore: FirebaseFirestore) : TodoRe
      */
     override fun restoreTodo(listId: String, todo: Todo): Result<Unit> =
         runCatching { todoCollection(listId).document(todo.id).set(todo.toDocument()) }.map { }
+
+    private companion object {
+        /**
+         * Wie oft ein abgewiesener Listener neu aufgebaut wird. Zwei reichen: Es geht um das Fenster
+         * zwischen dem lokalen Anlegen einer Liste und ihrer Bestätigung durch den Server, nicht um
+         * eine kaputte Verbindung — die bedient Firestore selbst aus dem Cache.
+         */
+        const val LISTEN_RETRIES = 2
+
+        /** Grundabstand zwischen zwei Versuchen; der zweite wartet doppelt so lang. */
+        const val LISTEN_RETRY_DELAY_MILLIS = 700L
+    }
 }
 
 /**

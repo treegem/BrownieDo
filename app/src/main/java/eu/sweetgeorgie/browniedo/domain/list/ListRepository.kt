@@ -18,8 +18,12 @@ interface ListRepository {
     val lists: Flow<Result<List<TodoList>>>
 
     /**
-     * Creates a list. [shared] decides whether the partner is put on it as well; who that is stays
-     * inside the data layer, see docs/decisions/0020-partner-aus-users-collection.md.
+     * Creates a list and returns its id, damit der Aufrufer sie öffnen kann — jeder Anlegeweg landet
+     * in dem, was er angelegt hat, siehe
+     * docs/decisions/0036-neue-liste-wird-geoeffnet-und-listener-wiederholt.md.
+     *
+     * [shared] decides whether the partner is put on it as well; who that is stays inside the data
+     * layer, see docs/decisions/0020-partner-aus-users-collection.md.
      *
      * [isTemplate] entscheidet nur, in welchem Abschnitt der Auswahl die Liste erscheint und was man
      * mit ihr anfangen kann — geschrieben wird in beiden Fällen dasselbe Dokument.
@@ -27,10 +31,10 @@ interface ListRepository {
      * Fails when [shared] is true and no partner is known — the caller is expected to not offer the
      * option in that case, this is the second line of defence.
      *
-     * Unlike the todo writes this suspends: the partner has to be looked up first, see
-     * docs/decisions/0019-schreibrechte-auf-listen-dokumente.md.
+     * Suspendiert allein wegen des Partner-Nachschlags, nicht wegen des Schreibvorgangs — auf den
+     * Server wartet er nicht (docs/decisions/0011-schreibvorgaenge-nicht-abwarten.md).
      */
-    suspend fun createList(name: String, shared: Boolean, isTemplate: Boolean): Result<Unit>
+    suspend fun createList(name: String, shared: Boolean, isTemplate: Boolean): Result<String>
 
     /**
      * Legt eine **Arbeitsliste** mit [todos] als Inhalt an und gibt deren id zurück, damit der

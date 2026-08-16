@@ -218,56 +218,51 @@ class TodoListViewModel(
 
     fun onNewListDismiss() = mutableUiState.update { it.copy(newList = null) }
 
+    /**
+     * Alle drei Anlegewege enden gleich: Was angelegt wurde, wird auch geöffnet, siehe
+     * docs/decisions/0036-neue-liste-wird-geoeffnet-und-listener-wiederholt.md. Geöffnet wird über
+     * den gemerkten Stand, damit Auswahl und Rückfall denselben Weg nehmen wie sonst.
+     */
     fun onNewListConfirm() {
         val newList = mutableUiState.value.newList ?: return
         val name = newList.name.trim()
         if (name.isEmpty()) return
-        if (newList.kind == NewListKind.FROM_TEMPLATE) {
-            confirmListFromTemplate(name = name, shared = newList.shared)
-            return
+        // Beim Instanziieren kommen die Einträge aus dem angezeigten Stand der Vorlage, nicht aus
+        // einer eigenen Abfrage — dieselbe Quelle wie beim Verschieben, und die einzige, die auch
+        // offline etwas liefert. Gelesen wird vor dem Start der Coroutine, damit der Stand der ist,
+        // den der Nutzer beim Bestätigen vor sich hatte.
+        val templateEntries = if (newList.kind == NewListKind.FROM_TEMPLATE) {
+            mutableUiState.value.todos
+        } else {
+            emptyList()
         }
-        viewModelScope.launch {
-            listRepository.createList(
-                name = name,
-                shared = newList.shared,
-                isTemplate = newList.kind == NewListKind.TEMPLATE
-            ).fold(
-                // Die neue Liste wird nicht selbst ausgewählt: Sie taucht über den Listen-Snapshot
-                // auf, und wer sie sofort öffnen will, tippt sie im Menü an.
-                onSuccess = { mutableUiState.update { it.copy(newList = null, error = null) } },
-                // Der Dialog bleibt offen, damit der eingetippte Name nicht verloren geht.
-                onFailure = {
-                    mutableUiState.update { it.copy(error = TodoListError.LIST_ADD_FAILED) }
-                }
-            )
-        }
-    }
 
-    /**
-     * Der einzige Anlegeweg, der die neue Liste auch öffnet — anders als beim Anlegen einer leeren:
-     * Wer eine Vorlage instanziiert, will genau dort weiterarbeiten. Ausgewählt wird über den
-     * gemerkten Stand, damit Auswahl und Rückfall denselben Weg nehmen wie sonst.
-     *
-     * Die Einträge kommen aus dem angezeigten Stand der Vorlage, nicht aus einer eigenen Abfrage —
-     * dieselbe Quelle wie beim Verschieben, und die einzige, die auch offline etwas liefert.
-     */
-    private fun confirmListFromTemplate(name: String, shared: Boolean) {
-        // Eine frische Liste ist offen. Vorlagen kennen kein Abhaken, das ist also Vorsorge für
-        // einen Bestand, der von Hand entstanden sein kann — und es sagt, was eine Instanz erbt und
-        // was nicht.
-        val entries = mutableUiState.value.todos.map {
-            it.copy(isDone = false, completedBy = null, completedAt = null)
-        }
         viewModelScope.launch {
-            listRepository.createListFromTemplate(
-                name = name,
-                shared = shared,
-                todos = entries
-            ).fold(
+            val created = when (newList.kind) {
+                NewListKind.FROM_TEMPLATE -> listRepository.createListFromTemplate(
+                    name = name,
+                    shared = newList.shared,
+                    // Eine frische Liste ist offen. Vorlagen kennen kein Abhaken, das ist also
+                    // Vorsorge für einen Bestand, der von Hand entstanden sein kann — und es sagt,
+                    // was eine Instanz erbt und was nicht.
+                    todos = templateEntries.map {
+                        it.copy(isDone = false, completedBy = null, completedAt = null)
+                    }
+                )
+
+                NewListKind.LIST, NewListKind.TEMPLATE -> listRepository.createList(
+                    name = name,
+                    shared = newList.shared,
+                    isTemplate = newList.kind == NewListKind.TEMPLATE
+                )
+            }
+
+            created.fold(
                 onSuccess = { listId ->
                     mutableUiState.update { it.copy(newList = null, error = null) }
                     selectedListRepository.select(listId)
                 },
+                // Der Dialog bleibt offen, damit der eingetippte Name nicht verloren geht.
                 onFailure = {
                     mutableUiState.update { it.copy(error = TodoListError.LIST_ADD_FAILED) }
                 }

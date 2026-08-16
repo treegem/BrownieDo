@@ -75,6 +75,10 @@ möglich unverändert lassen:**
   Erledigt-Zustand kommt dagegen **nicht** mit: Eine frische Liste ist offen.
 - **Die neue Liste wird geöffnet** — als einziger Anlegeweg. Wer eine Vorlage instanziiert, will
   genau dort weiterarbeiten; wer eine leere Liste anlegt, oft noch nicht.
+  > **„Als einziger Anlegeweg" ist überholt**, siehe
+  > [ADR 0036](0036-neue-liste-wird-geoeffnet-und-listener-wiederholt.md): Im Alltag will man auch in
+  > die Liste und die Vorlage, die man gerade angelegt hat. Jetzt öffnen alle drei Wege, was sie
+  > angelegt haben. Dass die neue Liste geöffnet wird, gilt also weiterhin — nur nicht mehr exklusiv.
 
 ## Konsequenzen
 

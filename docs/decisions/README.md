@@ -61,3 +61,4 @@ der den alten als „abgelöst" markiert.
 | [0033](0033-bearbeiten-bleibt-ein-dialog.md) | Bearbeiten bleibt ein Dialog, bis ein Auslöser greift | akzeptiert |
 | [0034](0034-vorlagen-sind-listen-mit-einem-flag.md) | Vorlagen sind Listen mit einem Flag | akzeptiert (ein Punkt durch 0035 abgelöst) |
 | [0035](0035-instanziieren-schreibt-die-liste-vor-ihren-aufgaben.md) | Instanziieren schreibt die Liste vor ihren Aufgaben | akzeptiert |
+| [0036](0036-neue-liste-wird-geoeffnet-und-listener-wiederholt.md) | Jeder Anlegeweg öffnet, was er angelegt hat | akzeptiert |

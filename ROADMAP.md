@@ -649,11 +649,13 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   vorhandenen Fehlerkanal läuft. Der Preis ist die Schnittstelle — das Ergebnis passt dann nicht mehr
   allein in ein `Result`, das Repository braucht einen zweiten Kanal. Das ist der eigentliche Umfang
   dieses Punktes und der Grund, warum er nicht nebenbei erledigt wurde
-- [ ] **`createList` hängt offline** — `add(...).await()` schließt erst nach Server-Bestätigung ab.
-  Im Flugmodus wartet die Coroutine also für immer, der Dialog bleibt ohne Rückmeldung offen. Fällt
-  jetzt auf, weil `createListFromTemplate` daneben steht und **nicht** wartet (ADR 0035);
-  `deleteList` hat dieselbe Falle. Kein dringender Fehler — beides sind seltene Vorgänge, und offline
-  angelegt wird selten —, aber ein Widerspruch zu ADR 0011 an genau zwei Stellen
+- [ ] **`deleteList` hängt offline** — `commit().await()` schließt erst nach Server-Bestätigung ab.
+  Im Flugmodus wartet die Coroutine also für immer, der Dialog bleibt ohne Rückmeldung offen. Ein
+  Widerspruch zu [ADR 0011](docs/decisions/0011-schreibvorgaenge-nicht-abwarten.md), aber kein
+  dringender: Offline gelöscht wird selten. **`createList` hatte dieselbe Falle und ist raus** — es
+  vergibt die id jetzt lokal und wartet nicht mehr, siehe
+  [ADR 0036](docs/decisions/0036-neue-liste-wird-geoeffnet-und-listener-wiederholt.md). Beim Löschen
+  geht das nicht so einfach: Dort *muss* zuerst gelesen werden, welche Aufgaben es zu löschen gibt
 - [ ] **`TodoListViewModel` ist bei 471 Zeilen und trägt drei Themen** (Listenwahl: ~211 Zeilen,
   Aufgaben-CRUD: ~56, Dialogzustände: ~133). Der Bildschirm wurde in Phase 11 entzerrt, das ViewModel
   nicht. Kein Fehler, aber der nächste Ort, an dem Wachstum wehtut.
@@ -730,7 +732,8 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
 - [x] Liste aus einer Vorlage erzeugen — Dialog mit Name (vorbelegt aus dem Vorlagennamen),
   geteilt/privat wie beim normalen Anlegen, ausgelöst aus dem Überlauf-Menü, wenn eine Vorlage offen
   ist. Danach springt die App in die neue Liste. **Die Vorlage bleibt unverändert stehen** — sie ist
-  der Stempel, nicht der Abdruck.
+  der Stempel, nicht der Abdruck. (Hier stand „als einziger Anlegeweg, der öffnet" — inzwischen
+  öffnen alle drei, siehe den Punkt weiter unten.)
   **Ein Dialog trägt jetzt alle drei Anlegewege**, weil alle drei dieselben zwei Eingaben haben; es
   wechselt allein die Überschrift (`NewListKind`). Eine geteilte Vorlage ergibt eine geteilte Liste,
   ohne hinterlegten Partner fällt das auf „nur für mich" zurück
@@ -777,13 +780,29 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   prüft `members` und `name`, aber **keine Feldmenge**; `update` erlaubt alles außer einer Änderung
   an `members`; auf `todos` gilt `read, write` ohne Feldprüfung. Ein zusätzliches Feld und ein
   weiteres Dokument in derselben Collection sind damit bereits erlaubt
-- [x] Unit-Tests — **133 grün** (vorher 117). Neu: Mapper mit gesetztem Flag und **ohne das Feld**
+- [x] **Nach dem Anlegen landet man in dem, was man angelegt hat** — für alle drei Wege gleich, siehe
+  [ADR 0036](docs/decisions/0036-neue-liste-wird-geoeffnet-und-listener-wiederholt.md). Aufgefallen
+  war es bei den Vorlagen: Man legt eine an, um sie zu füllen, und musste sie danach im Menü
+  heraussuchen. `createList` gibt dafür die id zurück und vergibt sie lokal — womit es nebenbei
+  aufhört, offline zu hängen. Die drei Anlegewege sind im ViewModel zu einem Pfad zusammengelaufen
+- [x] **Der Fehlalarm „Die Liste konnte nicht geladen werden." nach dem Anlegen ist weg** — und er
+  hing an derselben Regel wie der Batch-Fehler oben. Die App springt sofort in die neue Liste und
+  hängt einen Listener an ihre `todos`; dessen **Leseregel** schlägt wieder das Listen-Dokument nach,
+  das der Server womöglich noch nicht hat. Der Listener wurde dann abgewiesen, während die Einträge
+  aus dem lokalen Cache trotzdem dastanden — daher das verwirrende Bild „Fehler und Liste
+  gleichzeitig", und daher „manchmal".
+  **Nicht bloß kosmetisch:** Firestore baut einen abgewiesenen Listener ab, die Liste aktualisierte
+  sich bis zum nächsten Listenwechsel nicht mehr. `todos` wiederholt den Listener jetzt zweimal mit
+  steigendem Abstand, bevor daraus ein Fehler wird (ADR 0036). Ohne diesen Punkt hätte das Öffnen
+  oben den Fehlalarm auf *alle* Anlegewege ausgedehnt
+- [x] Unit-Tests — **136 grün** (vorher 117). Neu: Mapper mit gesetztem Flag und **ohne das Feld**
   (der Migrationsfall) · die Trennung von Listen und Vorlagen im UiState · der Rückfall, der eine
   Arbeitsliste vorzieht, und der, der doch eine Vorlage öffnet · die gemerkte Vorlage · das Anlegen
   mit Flag · Vorbelegung des Instanziieren-Dialogs (auch ohne Partner) · das Instanziieren selbst,
   inklusive „erbt `createdAt` und den Titel, aber nicht den Erledigt-Zustand" · das Öffnen der neuen
   Liste · der Fehlschlag · und die drei Verschiebe-Fälle (Vorlage → Vorlage geht, Vorlage →
-  Arbeitsliste und Arbeitsliste → Vorlage nicht)
+  Arbeitsliste und Arbeitsliste → Vorlage nicht) · dazu, dass jeder Anlegeweg die neue Liste öffnet
+  und ein Fehlschlag eben nicht (ADR 0036)
 - [x] Instrumentierte Tests **am 2026-08-16 auf einem SM-S928B gelaufen, alle 34 grün** (vorher 29).
   Die fünf neuen stehen im `TodoListScreenTest`: Vorlagen-Markierung in der TopAppBar ·
   Vorlagenzeile ohne Checkbox · die **Gegenprobe**, dass eine Listenzeile eine hat · Bearbeiten-Dialog
@@ -798,15 +817,19 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   von allein („Skipping device … Device is OFFLINE") — und die Zeile „Shell command failed (255):
   appops set androidx.test.services MANAGE_EXTERNAL_STORAGE allow / Error: No UID" ist folgenlos, der
   Lauf geht danach normal weiter.
-  **Nach dem Fix aus [ADR 0035](docs/decisions/0035-instanziieren-schreibt-die-liste-vor-ihren-aufgaben.md)
-  erneut gelaufen, wieder alle 34 grün** — erwartungsgemäß, der Fix fasst nur die Datenschicht an
+  **Nach den Korrekturen aus [ADR 0035](docs/decisions/0035-instanziieren-schreibt-die-liste-vor-ihren-aufgaben.md)
+  und [ADR 0036](docs/decisions/0036-neue-liste-wird-geoeffnet-und-listener-wiederholt.md) je erneut
+  gelaufen, beide Male alle 34 grün** — erwartungsgemäß, beide fassen nur Datenschicht und ViewModel
+  an, nicht den Bildschirm
 - [ ] Auf dem Gerät prüfen. **Das ist hier kein Feinschliff, sondern der einzige Test des
   Batch-Fehlers oben:** Kein Unit-Test kennt die Security Rules, alle 133 blieben grün, während der
   Weg auf dem Gerät nicht funktionierte (ADR 0035). Zu prüfen: **Vorlage mit mehreren Einträgen
   instanziieren — die Liste erscheint unter „Listen" und trägt alle Einträge** · dieselbe Vorlage ein
   zweites Mal instanziieren, beide Listen stehen nebeneinander · Reihenfolge der Einträge stimmt mit
-  der Vorlage überein und die neue Liste ist offen (nichts abgehakt) · **leere** Vorlage
-  instanziieren · geteilte Vorlage instanziieren und beim Partner nachsehen · privat instanziieren ·
+  der Vorlage überein und die neue Liste ist offen (nichts abgehakt) · **mehrmals hintereinander
+  instanziieren** — der Fehlalarm aus ADR 0036 trat nur „manchmal" auf, ein einzelner Durchlauf
+  beweist also wenig · **eine Liste und eine Vorlage anlegen und prüfen, dass man direkt darin
+  landet** · **leere** Vorlage instanziieren · geteilte Vorlage instanziieren und beim Partner nachsehen · privat instanziieren ·
   **offline instanziieren und wieder verbinden** — der Punkt, an dem die Reihenfolge-Annahme des Fixes
   wirklich geprüft wird · Vorlage löschen, während eine daraus erzeugte Liste offen ist (die Liste
   muss bleiben) · die letzte Arbeitsliste löschen, während nur noch eine Vorlage übrig ist · das
