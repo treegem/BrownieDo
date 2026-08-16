@@ -864,6 +864,64 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   „Querlaufend" greift dabei aber schärfer: Ohne Kabel hilft „Aktiv lassen" nicht, es hängt allein an
   `screen_off_timeout` (hier 10 Minuten, also reichlich). Vorher prüfen lohnt
 
+### Phase 15 – Manuelles Sortieren innerhalb der Prioritätsstufe
+> Drei Regeln stehen fest, in dieser Reihenfolge — keine davon zur Debatte, sie sind die Vorgabe für
+> die ganze Phase:
+> 1. **Erledigt ist immer am Ende.** Das ist bereits die äußere Fallunterscheidung in `TODO_ORDER`
+>    ([FirestoreTodoRepository.kt](app/src/main/java/eu/sweetgeorgie/browniedo/data/todo/FirestoreTodoRepository.kt))
+>    und bleibt unverändert.
+> 2. **Priorität steht immer über der manuellen Sortierung.** Wer eine Aufgabe von Hand einordnet,
+>    verschiebt sie **innerhalb** ihrer Stufe (niedrig/mittel/hoch) — nie über eine Stufengrenze
+>    hinweg. Die Stufe wechselt weiterhin nur über den Bearbeiten-Dialog.
+> 3. **Innerhalb einer Stufe ist die Reihenfolge manuell bestimmbar.** Das ist neu und der eigentliche
+>    Inhalt der Phase.
+>
+> Gilt für Listen **und** Vorlagen gleichermaßen — eine Vorlage hat dieselbe Prioritäts- und jetzt
+> auch Sortier-Ebene wie eine Arbeitsliste.
+- [ ] `Todo` und `TodoDocument` um `sortOrder: Double?` erweitern, dazu `TodoField`. **Nullable, und
+  „noch nie manuell einsortiert" ist der Normalfall für Bestandsaufgaben** — dieselbe Antwort wie bei
+  Notiz und Menge, kein Rückfallwert und kein Nachziehen in der Console
+  ([ADR 0023](docs/decisions/0023-prioritaet-migration-und-sortierung.md) zum Gegenbeispiel, wo ein
+  Rückfallwert nötig war, weil `TodoPriority` nicht nullable ist)
+- [ ] `TODO_ORDER` erweitern: `OPEN_ORDER` vergleicht weiterhin zuerst nach `priority`
+  (`compareByDescending`, unangetastet — das ist Regel 2), danach nach `sortOrder` aufsteigend
+  (`nullsLast`), erst danach wie bisher nach `createdAt` absteigend als letzter Tie-Breaker.
+  `FINISHED_ORDER` bleibt **unangetastet** — erledigte Aufgaben sind ein Protokoll nach
+  Erledigungszeitpunkt, keine Werkliste, die man umordnen wollte, und Regel 1 verlangt ohnehin keine
+  Sortierbarkeit dort
+- [ ] Beim Anlegen (`addTodo`) sofort einen `sortOrder` vergeben, der die Aufgabe an die Spitze ihrer
+  Prioritätsgruppe setzt — das heutige Verhalten (neueste zuerst) bleibt damit die Vorgabe, bis jemand
+  von Hand einordnet. Ohne diesen Schritt bräuchte jede frisch angelegte Aufgabe eine Sonderbehandlung
+  im Comparator
+- [ ] Verschieben zwischen Listen und Instanziieren aus einer Vorlage nehmen `sortOrder` unverändert
+  mit — wie `priority`, `notes` und `quantity` schon
+  ([ADR 0024](docs/decisions/0024-verschieben-behaelt-zustand.md),
+  [ADR 0026](docs/decisions/0026-verschieben-schreibt-createdat-selbst.md)). Ohne das fiele eine
+  verschobene Aufgabe in der Zielliste an eine zufällige Position gegenüber einer dort bereits von
+  Hand sortierten Nachbarschaft
+- [ ] Bedienung: Aufgabe per Ziehen (Long-Press-Drag) innerhalb ihrer Prioritätsgruppe neu einordnen.
+  Ein Ziehen über eine Gruppengrenze hinweg ändert nichts an der Priorität — es sortiert nur innerhalb
+  der eigenen Gruppe, oder ist über die Grenze hinweg gar nicht erst möglich (Regel 2)
+- [ ] Beim Ablegen wird **nur die gezogene Aufgabe neu geschrieben** — ein `sortOrder`, der zwischen
+  die neuen Nachbarn fällt (gebrochene Rangzahl statt Neunummerierung; am Gruppenanfang/-ende ein
+  fester Abstand zum einzigen Nachbarn). Kein Batch, keine Neuvergabe an unberührte Nachbarn — analog
+  zum sparsamen Schreiben beim Verschieben
+  ([ADR 0011](docs/decisions/0011-schreibvorgaenge-nicht-abwarten.md))
+- [ ] Bestandsaufgaben ohne `sortOrder` fallen ans Ende ihrer Prioritätsgruppe, untereinander
+  weiterhin nach `createdAt` geordnet — genau die heutige Reihenfolge, bis eine von ihnen selbst
+  gezogen wird
+- [ ] Security Rules gegenprüfen — vermutlich keine Änderung nötig, `todos` kennt bislang keine
+  Feldprüfung (wie bei Priorität, Notiz und Menge), aber ausdrücklich nachsehen und hier vermerken
+- [ ] ADR: **Manuelle Sortierung über eine gebrochene Rangzahl (`sortOrder`)** statt Neuschreiben
+  ganzer Gruppen bei jedem Zug — mit den Alternativen (ganzzahlige Positionen bei jedem Zug komplett
+  neu durchnummerieren; feste Reihenfolge über ein Firestore-Array statt eines Felds je Dokument; ein
+  fertiges Drag-and-Drop-Bibliothekspaket statt einer eigenen Geste)
+- [ ] Unit-Tests: `TODO_ORDER` mit gemischten `sortOrder`-Werten, mit und ohne das Feld, innerhalb
+  aller drei Prioritätsstufen · die Vergabe eines Werts beim Anlegen · das Mitführen beim Verschieben
+  und beim Instanziieren aus einer Vorlage
+- [ ] Instrumentierte Tests: Ziehen innerhalb einer Gruppe meldet die neue Reihenfolge; ein Ziehen über
+  eine Gruppengrenze hinweg ändert nichts (oder ist gar nicht erst auslösbar)
+
 ### Handprüfungen auf dem Gerät
 > Alles, was **nur von Hand** geht, aus allen Phasen hier zusammengezogen: echte Firestore-Daten,
 > echtes Aussehen, echte Tastatur. Kein instrumentierter Test ersetzt das, und keine dieser Zeilen
@@ -977,6 +1035,12 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   mit offener Tastatur — das ist **Auslöser 4 aus
   [ADR 0033](docs/decisions/0033-bearbeiten-bleibt-ein-dialog.md)**, und hier fällt das Urteil, ob
   Bearbeiten ein Dialog bleiben darf
+- [ ] **(Phase 15)** Manuelles Sortieren — Ziehen innerhalb einer Prioritätsgruppe fühlt sich flüssig
+  an, kein sichtbares Ruckeln beim Ablegen · ein Ziehversuch über eine Gruppengrenze hinweg ändert
+  nichts an der Priorität · in einer Vorlage genauso ausprobieren wie in einer Arbeitsliste · eine
+  alte Aufgabe ohne `sortOrder` erscheint weiterhin am Ende ihrer Gruppe, bis sie selbst gezogen wird
+  · offline sortieren und wieder verbinden · App-Neustart behält die gezogene Reihenfolge · hell und
+  dunkel
 
 #### Mit zwei Handys
 - [x] **(Phase 0)** Beide Galaxy-Phones als Testgeräte einrichten (Entwickleroptionen +
@@ -998,6 +1062,8 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   wieder auftaucht — **nicht oben**. Das ist der eigentliche Beleg dafür, dass das Rückgängig auf
   dieselbe Dokument-id schreibt und `createdAt` behält (ADR 0031)
 - [ ] **(Phase 14a)** Geteilte Vorlage instanziieren und beim Partner nachsehen
+- [ ] **(Phase 15)** Auf einem Gerät ziehen, auf dem anderen nachsehen, dass die neue Reihenfolge
+  ankommt — und nicht durch den Realtime-Listener des zweiten Geräts wieder verworfen wird
 
 ### Querlaufend – Werkzeuge & Doku
 > Läuft neben den Phasen und gehört zu keiner.
@@ -1096,6 +1162,18 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   (WorkManager) und führen damit geradewegs zu dem Benachrichtigungsweg, den ADR 0027 vermeidet
 - [ ] Play-Store-Veröffentlichung (Developer-Account, Store-Eintrag, Datenschutzerklärung)
 - [ ] iOS-Version via Kotlin Multiplatform (Logik-Schicht wiederverwenden)
+- [ ] Browser-Oberfläche für den PC, ähnlich der App — dieselbe Logik-Schicht wie bei der geplanten
+  iOS-Version käme über Kotlin Multiplatform wieder, hier vermutlich als Compose for Web oder Kotlin/JS
+  gegen das Firestore-Web-SDK. Offene Frage vor dem Start: Firestores Offline-Persistenz im Browser ist
+  an den Tab gebunden und nicht so robust wie auf Android — ob der nicht verhandelbare Kern der App
+  (Abschnitt 1) dort in gleicher Verlässlichkeit gilt, ist ungeklärt und müsste zuerst geklärt werden
+- [ ] Listen aus anderen Diensten übernehmen (z. B. Google Tasks, Trello) — vermutlich als **Vorlage**
+  statt als Arbeitsliste, weil eine importierte Checkliste genau das ist: eine wiederverwendbare
+  Struktur, keine Aufgabe für diese Woche. Google Tasks läge nahe, weil die App bereits über Google
+  anmeldet (Phase 2) und nur einen zusätzlichen OAuth-Scope bräuchte; Trello verlangt einen eigenen
+  API-Schlüssel. Als **einmaliger Import**, keine laufende Synchronisation — sonst entstünde ein
+  zweites System mit eigenen Konfliktregeln neben Firestore, und das widerspräche der Einfachheit vor
+  Vollständigkeit aus Abschnitt 1
 
 ---
 
