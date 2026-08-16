@@ -638,6 +638,22 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   überschreibt der zweite den ersten, bevor die Snackbar ihn gezeigt hat. Bei zwei Nutzern selten,
   aber echt — eine Warteschlange wäre die saubere Antwort, ein bewusstes „reicht uns" der billigere
   Weg. Dann aber als Kommentar am Feld, nicht als Zufall
+- [ ] **Ein serverseitig abgelehnter Schreibvorgang verschwindet spurlos.**
+  [ADR 0011](docs/decisions/0011-schreibvorgaenge-nicht-abwarten.md) wartet bewusst nicht auf den
+  Server — das `Result` sagt also nur, ob Firestore die Schreibung *lokal* angenommen hat. Lehnen die
+  Security Rules sie danach ab, rollt Firestore die lokale Änderung still zurück und **niemand
+  erfährt davon**. Genau so ist der Batch-Fehler aus Phase 14a durchgekommen
+  ([ADR 0035](docs/decisions/0035-instanziieren-schreibt-die-liste-vor-ihren-aufgaben.md)), und es
+  betrifft Verschieben, Löschen und Wiederherstellen genauso.
+  **Ohne das Warten aufzugeben lösbar:** ein `addOnFailureListener` am Schreibvorgang, der in den
+  vorhandenen Fehlerkanal läuft. Der Preis ist die Schnittstelle — das Ergebnis passt dann nicht mehr
+  allein in ein `Result`, das Repository braucht einen zweiten Kanal. Das ist der eigentliche Umfang
+  dieses Punktes und der Grund, warum er nicht nebenbei erledigt wurde
+- [ ] **`createList` hängt offline** — `add(...).await()` schließt erst nach Server-Bestätigung ab.
+  Im Flugmodus wartet die Coroutine also für immer, der Dialog bleibt ohne Rückmeldung offen. Fällt
+  jetzt auf, weil `createListFromTemplate` daneben steht und **nicht** wartet (ADR 0035);
+  `deleteList` hat dieselbe Falle. Kein dringender Fehler — beides sind seltene Vorgänge, und offline
+  angelegt wird selten —, aber ein Widerspruch zu ADR 0011 an genau zwei Stellen
 - [ ] **`TodoListViewModel` ist bei 471 Zeilen und trägt drei Themen** (Listenwahl: ~211 Zeilen,
   Aufgaben-CRUD: ~56, Dialogzustände: ~133). Der Bildschirm wurde in Phase 11 entzerrt, das ViewModel
   nicht. Kein Fehler, aber der nächste Ort, an dem Wachstum wehtut.
@@ -718,14 +734,25 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   **Ein Dialog trägt jetzt alle drei Anlegewege**, weil alle drei dieselben zwei Eingaben haben; es
   wechselt allein die Überschrift (`NewListKind`). Eine geteilte Vorlage ergibt eine geteilte Liste,
   ohne hinterlegten Partner fällt das auf „nur für mich" zurück
-- [x] Als **ein `WriteBatch`**: Listen-Dokument und alle Aufgaben zusammen, mit lokal vergebener
-  Listen-id (`document()`). Dasselbe Muster wie beim Verschieben und beim Löschen einer Liste
-  ([ADR 0019](docs/decisions/0019-schreibrechte-auf-listen-dokumente.md)), und aus demselben Grund:
-  Es soll keine halbe Liste geben. Nur der Partner-Nachschlag beim geteilten Fall bleibt `suspend`,
-  der Rest funktioniert offline.
-  **Bewusst ohne Aufteilung in mehrere Batches**, anders als beim Löschen: Ein Batch fasst 500
+- [x] **Erst das Listen-Dokument, dann seine Aufgaben** — zwei Schreibvorgänge in fester Reihenfolge,
+  keiner abgewartet, mit lokal vergebener Listen-id (`document()`). Nur der Partner-Nachschlag beim
+  geteilten Fall bleibt `suspend`, der Rest funktioniert offline.
+  **Hier stand „als ein `WriteBatch`", und das war falsch — es hat auf dem Gerät gar keine Liste
+  angelegt.** Die Regel auf `todos` schlägt über `isListMember` die Mitglieder der Liste nach, und
+  ein `get()` in den Security Rules liest den Stand **vor** dem Commit: Im gemeinsamen Batch
+  existierte die Liste dort noch nicht, die Regel scheiterte, und weil ein Batch atomar ist, fiel das
+  Listen-Dokument mit. Gesehen hat man davon nichts — Firestore wendet den Batch erst lokal an und
+  rollt ihn nach der Ablehnung still zurück. Die ganze Begründung steht in
+  [ADR 0035](docs/decisions/0035-instanziieren-schreibt-die-liste-vor-ihren-aufgaben.md), samt der
+  aufgegebenen Atomarität.
+  **Der Fallstrick, den es sich zu merken lohnt:** Beim **Löschen** einer Liste ist derselbe
+  Vor-Commit-Stand der Grund, warum ein gemeinsamer Batch *funktioniert*
+  ([ADR 0019](docs/decisions/0019-schreibrechte-auf-listen-dokumente.md)) — beim **Anlegen** ist er
+  der Grund, warum es scheitert. Das Muster wurde gespiegelt, die Begründung mitgenommen, und sie hat
+  die Spiegelung nicht überlebt.
+  Die Aufgaben bleiben unter sich in einem Batch, **ohne Aufteilung in mehrere**: Ein Batch fasst 500
   Operationen, und eine Vorlage mit 499 Einträgen gibt es nicht. Käme sie doch, lehnt Firestore den
-  Commit ab und der Fehler kommt als `Result` heraus — ehrlicher als eine still gekürzte Liste
+  Commit ab — ehrlicher als eine still gekürzte Liste
 - [x] **`createdAt` wird aus der Vorlage übernommen, nicht neu vergeben** — sonst bekämen alle
   Aufgaben eines Batches praktisch denselben Zeitpunkt und die Reihenfolge der Vorlage ginge
   verloren; `TODO_ORDER` sortiert offene Einträge gleicher Priorität danach. Die Ausnahme aus
@@ -770,15 +797,28 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   **Nebenbei gelernt:** Ein zweiter, `offline` gemeldeter Emulator stört nicht, Gradle überspringt ihn
   von allein („Skipping device … Device is OFFLINE") — und die Zeile „Shell command failed (255):
   appops set androidx.test.services MANAGE_EXTERNAL_STORAGE allow / Error: No UID" ist folgenlos, der
-  Lauf geht danach normal weiter
-- [ ] Auf dem Gerät prüfen — Vorlage anlegen, füllen und daraus eine Liste erzeugen · dieselbe
-  Vorlage ein zweites Mal instanziieren, beide Listen stehen nebeneinander · Reihenfolge der Einträge
-  stimmt mit der Vorlage überein und die neue Liste ist offen (nichts abgehakt) · geteilte Vorlage
-  instanziieren und beim Partner nachsehen · privat instanziieren · offline instanziieren und wieder
-  verbinden · Vorlage löschen, während eine daraus erzeugte Liste offen ist (die Liste muss bleiben)
-  · die letzte Arbeitsliste löschen, während nur noch eine Vorlage übrig ist · das Listen-Menü mit
-  und ohne Vorlagen (die Überschriften dürfen ohne Vorlage nicht auftauchen) · Bearbeiten-Dialog in
-  einer Vorlage: kein Kalender-Knopf, Zielliste zeigt nur Vorlagen · hell und dunkel
+  Lauf geht danach normal weiter.
+  **Nach dem Fix aus [ADR 0035](docs/decisions/0035-instanziieren-schreibt-die-liste-vor-ihren-aufgaben.md)
+  erneut gelaufen, wieder alle 34 grün** — erwartungsgemäß, der Fix fasst nur die Datenschicht an
+- [ ] Auf dem Gerät prüfen. **Das ist hier kein Feinschliff, sondern der einzige Test des
+  Batch-Fehlers oben:** Kein Unit-Test kennt die Security Rules, alle 133 blieben grün, während der
+  Weg auf dem Gerät nicht funktionierte (ADR 0035). Zu prüfen: **Vorlage mit mehreren Einträgen
+  instanziieren — die Liste erscheint unter „Listen" und trägt alle Einträge** · dieselbe Vorlage ein
+  zweites Mal instanziieren, beide Listen stehen nebeneinander · Reihenfolge der Einträge stimmt mit
+  der Vorlage überein und die neue Liste ist offen (nichts abgehakt) · **leere** Vorlage
+  instanziieren · geteilte Vorlage instanziieren und beim Partner nachsehen · privat instanziieren ·
+  **offline instanziieren und wieder verbinden** — der Punkt, an dem die Reihenfolge-Annahme des Fixes
+  wirklich geprüft wird · Vorlage löschen, während eine daraus erzeugte Liste offen ist (die Liste
+  muss bleiben) · die letzte Arbeitsliste löschen, während nur noch eine Vorlage übrig ist · das
+  Listen-Menü mit und ohne Vorlagen (die Überschriften dürfen ohne Vorlage nicht auftauchen) ·
+  Bearbeiten-Dialog in einer Vorlage: kein Kalender-Knopf, Zielliste zeigt nur Vorlagen · hell und
+  dunkel.
+  Dabei einmal in die Firebase Console sehen: `lists/{neueId}` mit `members` und darunter die
+  `todos` — **und wie das Vorlagen-Feld dort tatsächlich heißt.** Kotlin macht aus `var isTemplate`
+  den Getter `isTemplate()`, und Firebase leitet daraus vermutlich `template` ab. Funktional harmlos,
+  weil Lesen und Schreiben symmetrisch sind; stimmt es aber nicht, weichen KDoc und ADR vom Bestand
+  ab, und ein `@PropertyName` ist jetzt noch billig — mit mehr angelegten Vorlagen wird es eine
+  Migration
 
 #### Phase 14b – Menge und Faktor
 > Der Sinn der Vorlage für eine Reise: Man schreibt sie für **einen Tag** (Faktor 1) und
@@ -850,6 +890,12 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   **Achtung für den nächsten Lauf:** Sperrt der Bildschirm während des Laufs, brechen die Tests mit
   demselben „No compose hierarchies"-Fehler ab und Wireless Debugging verliert die Verbindung —
   per Kabel testen oder in den Entwickleroptionen „Aktiv lassen" einschalten.
+  **„Aktiv lassen" allein genügt nicht**, wie sich am 2026-08-16 zeigte: Es hält den Bildschirm nur
+  *bei angestecktem Kabel* wach. Wird das Kabel zwischendurch gezogen, schläft das Gerät ein und
+  sperrt — und beim nächsten Lauf scheitern schlagartig **alle** Compose-Tests, während die
+  Nicht-Compose-Tests durchlaufen. Genau dieses Muster (hier 28 von 34) ist die Signatur des
+  gesperrten Bildschirms und **kein** Hinweis auf einen Fehler im Code. Vor dem Lauf prüfen:
+  `adb shell dumpsys window | grep isKeyguardShowing` muss `false` liefern.
 - [x] **Zweiter Lauf am 2026-08-12, alle 16 grün** (SM-S928B per Kabel, `stay_on_while_plugged_in`
   war gesetzt) — dazu 97 Unit-Tests. Einer der acht neuen Tests aus Phase 9 und 10 fiel dabei durch,
   und zwar zu Recht: `theEditDialogShowsTheListTheEntryIsIn` prüfte mit `onNodeWithText(LIST.name)`,

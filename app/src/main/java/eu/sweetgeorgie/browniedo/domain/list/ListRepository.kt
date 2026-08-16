@@ -40,11 +40,12 @@ interface ListRepository {
      * Die Aufgaben werden übernommen, wie sie hereinkommen — welche Felder eine Instanz von ihrer
      * Vorlage erbt, entscheidet der Aufrufer und nicht die Datenschicht.
      *
-     * Listen-Dokument und Aufgaben gehen in **einem** `WriteBatch` raus: Eine halb angelegte Liste
-     * wäre schlimmer als gar keine. Dass das Listen-Dokument im selben Batch entsteht, in dem seine
-     * Aufgaben geschrieben werden, ist erlaubt — die Regeln werten jede Schreibung gegen den Stand
-     * *vor* dem Commit aus, und das Anlegen prüft `members` aus den eingehenden Daten
-     * (docs/decisions/0019-schreibrechte-auf-listen-dokumente.md).
+     * **Das Listen-Dokument entsteht vor seinen Aufgaben, in einem eigenen Schreibvorgang.** Beides
+     * zusammen in einem `WriteBatch` wäre atomar, scheitert aber an den Security Rules: Die Regel
+     * auf `todos` schlägt die Mitglieder der Liste nach, und ein `get()` in den Rules sieht den
+     * Stand *vor* dem Commit — die Liste existierte dort noch nicht. Ausführlich in
+     * docs/decisions/0035-instanziieren-schreibt-die-liste-vor-ihren-aufgaben.md, samt der Frage,
+     * was ein Fehlschlag zwischen beiden Schreibvorgängen hinterlässt.
      *
      * Suspendiert allein wegen des Partner-Nachschlags wie [createList]; auf den Server wartet der
      * Vorgang nicht, das Anlegen funktioniert also offline

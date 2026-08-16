@@ -37,7 +37,7 @@ android {
         targetSdk = 37
         // Steigt bei jeder mittleren oder größeren Änderung, nicht erst beim Verteilen — die Regel
         // samt Abgrenzung steht in AGENTS.md unter „Erwartungen an eine Änderung".
-        versionCode = 8
+        versionCode = 9
         versionName = "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

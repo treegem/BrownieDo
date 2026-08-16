@@ -63,6 +63,11 @@ möglich unverändert lassen:**
   ([ADR 0024](0024-verschieben-behaelt-zustand.md)) und aus demselben Grund: Eine halb angelegte
   Liste wäre schlimmer als gar keine. Auf den Server wird nicht gewartet
   ([ADR 0011](0011-schreibvorgaenge-nicht-abwarten.md)), das Instanziieren funktioniert also offline.
+  > **Dieser eine Punkt ist überholt und war schlicht falsch**, siehe
+  > [ADR 0035](0035-instanziieren-schreibt-die-liste-vor-ihren-aufgaben.md): Ein gemeinsamer Batch
+  > wird von den Security Rules abgelehnt, weil deren `get()` das Listen-Dokument noch nicht sieht,
+  > das derselbe Batch erst anlegt. Geschrieben wird jetzt erst die Liste, dann ihre Aufgaben. Alles
+  > Übrige an diesem ADR bleibt gültig.
 - **`createdAt` wird aus der Vorlage übernommen.** Sonst bekämen alle Aufgaben eines Batches
   praktisch denselben Zeitpunkt und die Reihenfolge der Vorlage ginge verloren — `TODO_ORDER`
   sortiert offene Einträge gleicher Priorität danach. Die Ausnahme aus

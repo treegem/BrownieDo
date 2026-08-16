@@ -82,15 +82,28 @@ class FirestoreListRepository(
     }.map { }
 
     /**
-     * Ein einziger Batch für das Listen-Dokument und alle Aufgaben, Begründung in [ListRepository].
+     * **Erst die Liste, dann ihre Aufgaben — und ausdrücklich nicht beides in einem Batch**, siehe
+     * docs/decisions/0035-instanziieren-schreibt-die-liste-vor-ihren-aufgaben.md.
      *
-     * Die id vergibt `document()` ohne Argument lokal — dieselbe Technik wie beim Verschieben einer
-     * Aufgabe. Nur deshalb kann diese Methode die id zurückgeben, ohne auf den Server zu warten, und
-     * nur deshalb funktioniert das Anlegen offline.
+     * Der Grund ist die Regel auf `todos`: Sie schlägt über `isListMember` die Mitglieder des
+     * Listen-Dokuments nach, und ein `get()` in den Security Rules liest den Stand **vor** dem
+     * Commit. Läge das Anlegen der Liste im selben Batch, existierte sie zum Prüfzeitpunkt noch
+     * nicht — die Regel scheiterte, und weil ein Batch atomar ist, fiele das Listen-Dokument mit.
+     * Genau umgekehrt zu [deleteList], wo derselbe Vor-Commit-Stand der Grund ist, warum es klappt.
      *
-     * **Keine Aufteilung in mehrere Batches**, anders als beim Löschen einer Liste: Ein Batch fasst
-     * 500 Operationen, und eine Vorlage mit 499 Einträgen gibt es nicht. Käme sie doch, lehnt
-     * Firestore den Commit ab und der Fehler kommt als `Result` heraus — das ist die ehrlichere
+     * Zwei Schreibvorgänge, keiner abgewartet
+     * (docs/decisions/0011-schreibvorgaenge-nicht-abwarten.md): Firestores Mutations-Warteschlange
+     * ist FIFO und der Write-Stream ordnungserhaltend, die Liste ist also da, wenn die Aufgaben
+     * geprüft werden — auch dann, wenn beide erst beim Wiederverbinden rausgehen.
+     *
+     * Die id vergibt `document()` ohne Argument lokal, dieselbe Technik wie beim Verschieben einer
+     * Aufgabe. Nur deshalb kann diese Methode die id sofort zurückgeben, und nur deshalb
+     * funktioniert das Anlegen offline.
+     *
+     * Die Aufgaben bleiben unter sich in **einem** Batch: Sie hängen an keiner Regel, die etwas
+     * nachschlägt, was derselbe Batch erst anlegt. **Ohne Aufteilung in mehrere Batches**, anders
+     * als beim Löschen einer Liste — ein Batch fasst 500 Operationen, und eine Vorlage mit 499
+     * Einträgen gibt es nicht. Käme sie doch, lehnt Firestore den Commit ab; das ist die ehrlichere
      * Antwort als eine still gekürzte Liste.
      */
     override suspend fun createListFromTemplate(
@@ -100,13 +113,16 @@ class FirestoreListRepository(
     ): Result<String> = runCatching {
         val members = membersFor(shared)
         val listDocument = firestore.collection(LISTS_COLLECTION).document()
+        listDocument.set(ListDocument(name = name, members = members))
 
-        val batch = firestore.batch()
-        batch.set(listDocument, ListDocument(name = name, members = members))
-        todos.forEach { todo ->
-            batch.set(listDocument.collection(TODOS_COLLECTION).document(), todo.toDocument())
+        // Der Wächter ist keine Kosmetik: Ein leerer Batch wäre ein Commit ohne Operation.
+        if (todos.isNotEmpty()) {
+            val batch = firestore.batch()
+            todos.forEach { todo ->
+                batch.set(listDocument.collection(TODOS_COLLECTION).document(), todo.toDocument())
+            }
+            batch.commit()
         }
-        batch.commit()
 
         listDocument.id
     }
