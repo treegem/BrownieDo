@@ -137,23 +137,6 @@ internal fun TodoListTopBar(
                 // es nichts zu tun. Beide gelten für Vorlagen genauso, nur heißen sie dort anders:
                 // Eine Vorlage ist eine Liste, aber niemand nennt sie so (ADR 0034).
                 if (selectedList != null) {
-                    // Der Zweck einer Vorlage steht als erstes im Menü.
-                    if (isTemplateOpen) {
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    text = stringResource(
-                                        R.string.todo_list_create_list_from_template
-                                    )
-                                )
-                            },
-                            onClick = {
-                                menuExpanded = false
-                                actions.onCreateListFromTemplateClick()
-                            }
-                        )
-                        HorizontalDivider()
-                    }
                     DropdownMenuItem(
                         text = {
                             Text(

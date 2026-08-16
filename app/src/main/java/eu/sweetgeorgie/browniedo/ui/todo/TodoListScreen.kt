@@ -7,10 +7,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -20,6 +22,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -59,6 +62,11 @@ import java.time.Instant
  *
  * Die Rückrufe des [SnackbarHostState] stehen in einem eigenen Halter [SnackbarActions] — sie
  * gehören diesem Scaffold und keinem der vier sichtbaren Bereiche.
+ *
+ * [onCreateListFromTemplateClick] steht dagegen einzeln, denn der schwebende Knopf gehört wie der
+ * `SnackbarHost` dem Scaffold selbst und ist genau ein Rückruf. Das ist derselbe Weg, den
+ * `onErrorShown` und `onMovedMessageShown` genommen haben: einzeln, solange es wenige sind, und in
+ * einen Halter, sobald es vier werden (ADR 0028).
  */
 @Composable
 fun TodoListScreen(
@@ -68,6 +76,7 @@ fun TodoListScreen(
     todoActions: TodoActions,
     editActions: TodoEditActions,
     snackbarActions: SnackbarActions,
+    onCreateListFromTemplateClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -148,7 +157,40 @@ fun TodoListScreen(
                 onAddClick = todoActions.onAddTodoClick
             )
         },
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        floatingActionButton = {
+            // Eine Liste aus der Vorlage zu erzeugen ist der Zweck einer Vorlage — der Knopf steht
+            // deshalb im Bildschirm statt im Überlauf-Menü, siehe ADR 0038. In einer Arbeitsliste
+            // gibt es nichts zu instanziieren, dann bleibt der Slot leer.
+            if (uiState.isTemplateOpen) {
+                val label = stringResource(R.string.todo_list_create_list_from_template)
+
+                ExtendedFloatingActionButton(
+                    onClick = onCreateListFromTemplateClick,
+                    // Die Beschriftung steht sichtbar daneben, landet aber **nicht** im
+                    // Semantik-Knoten: Der Extended FAB faltet seinen Text-Slot nicht in den
+                    // zusammengefassten Knoten (nachgesehen im Semantik-Baum auf dem Gerät — dort
+                    // trägt er nur `Role = Button`). Ohne diese Zeile wäre er für TalkBack ein
+                    // Knopf ohne Namen.
+                    modifier = Modifier.semantics { contentDescription = label },
+                    // Dieselben Farben wie der Hinzufügen-Knopf der Eingabeleiste
+                    // (primary/onPrimary) statt der FAB-Vorgabe primaryContainer/onPrimaryContainer:
+                    // Der Knopf soll wie der eine andere gefüllte Knopf des Bildschirms aussehen,
+                    // und dieses Paar sichert ColorSchemeContrastTest bereits ab.
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    icon = {
+                        // Ohne contentDescription: die Beschriftung daneben sagt dasselbe, und
+                        // TalkBack läse sie sonst zweimal vor.
+                        Icon(
+                            painter = painterResource(R.drawable.ic_add),
+                            contentDescription = null
+                        )
+                    },
+                    text = { Text(text = label) }
+                )
+            }
+        }
     ) { innerPadding ->
         val hasLoadError = uiState.error == TodoListError.LOAD_FAILED
         when {
@@ -202,6 +244,15 @@ fun TodoListScreen(
                         )
                     )
                 }
+                // Der schwebende Knopf liegt über der Liste und wüsste sonst niemand etwas davon:
+                // Ohne diesen Platz am Ende läge die letzte Zeile darunter und wäre nicht
+                // antippbar. Ein Element statt eines aufgeschlagenen contentPadding, damit die
+                // seitlichen Insets aus innerPadding unangetastet bleiben.
+                if (uiState.isTemplateOpen) {
+                    item(key = FAB_SPACE_KEY) {
+                        Spacer(modifier = Modifier.height(FAB_CONTENT_SPACE))
+                    }
+                }
             }
         }
     }
@@ -253,6 +304,15 @@ fun TodoListScreen(
 
 /** Der Ladefehler ist kein Todo und braucht daher einen eigenen, kollisionsfreien Item-Key. */
 private const val LOAD_ERROR_KEY = "load-error"
+
+/** Aus demselben Grund wie [LOAD_ERROR_KEY]: der Platzhalter unter dem schwebenden Knopf. */
+private const val FAB_SPACE_KEY = "fab-space"
+
+/**
+ * Höhe des Platzhalters am Listenende: 56 dp für den schwebenden Knopf, dazu die 16 dp, die das
+ * Scaffold ohnehin um ihn legt, und noch einmal so viel als Rand.
+ */
+private val FAB_CONTENT_SPACE = 88.dp
 
 /**
  * Dauer, in der eine verschwindende Zeile ausblendet. Lang genug, dass die Bewegung auffällt, und
@@ -404,7 +464,8 @@ private fun TodoListScreenPreview() {
             listDialogActions = PREVIEW_LIST_DIALOG_ACTIONS,
             todoActions = PREVIEW_TODO_ACTIONS,
             editActions = PREVIEW_EDIT_ACTIONS,
-            snackbarActions = PREVIEW_SNACKBAR_ACTIONS
+            snackbarActions = PREVIEW_SNACKBAR_ACTIONS,
+            onCreateListFromTemplateClick = {}
         )
     }
 }
@@ -427,7 +488,8 @@ private fun TodoListScreenTemplatePreview() {
             listDialogActions = PREVIEW_LIST_DIALOG_ACTIONS,
             todoActions = PREVIEW_TODO_ACTIONS,
             editActions = PREVIEW_EDIT_ACTIONS,
-            snackbarActions = PREVIEW_SNACKBAR_ACTIONS
+            snackbarActions = PREVIEW_SNACKBAR_ACTIONS,
+            onCreateListFromTemplateClick = {}
         )
     }
 }
@@ -448,7 +510,8 @@ private fun TodoListScreenEmptyPreview() {
             listDialogActions = PREVIEW_LIST_DIALOG_ACTIONS,
             todoActions = PREVIEW_TODO_ACTIONS,
             editActions = PREVIEW_EDIT_ACTIONS,
-            snackbarActions = PREVIEW_SNACKBAR_ACTIONS
+            snackbarActions = PREVIEW_SNACKBAR_ACTIONS,
+            onCreateListFromTemplateClick = {}
         )
     }
 }
@@ -463,7 +526,6 @@ private val PREVIEW_TOP_BAR_ACTIONS = TodoListTopBarActions(
     onListSelected = {},
     onNewListClick = {},
     onNewTemplateClick = {},
-    onCreateListFromTemplateClick = {},
     onRenameListClick = {},
     onDeleteListClick = {},
     onSignOutClick = {}

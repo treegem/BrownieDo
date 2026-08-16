@@ -526,6 +526,46 @@ class TodoListScreenTest {
             .assertIsDisplayed()
     }
 
+    /**
+     * Der schwebende Knopf ist seit ADR 0038 der Weg zum Instanziieren — vorher war es ein Eintrag
+     * im Überlauf-Menü, also zwei Tipps und ohne jede Auffälligkeit.
+     *
+     * Gesucht wird über die `contentDescription` und **nicht** über den sichtbaren Text: Der
+     * Extended FAB faltet seinen Text-Slot nicht in den zusammengefassten Semantik-Knoten, deshalb
+     * setzt der Bildschirm die Beschriftung dort ausdrücklich. Findet dieser Test nichts, ist der
+     * Knopf auch für TalkBack namenlos.
+     */
+    @Test
+    fun theCreateListButtonInATemplateReportsTheTap() {
+        var clickCount = 0
+        setScreenContent(
+            uiState = openTemplate(),
+            onCreateListFromTemplateClick = { clickCount++ }
+        )
+
+        composeTestRule.onNodeWithContentDescription(createListLabel()).performClick()
+
+        assertEquals(1, clickCount)
+    }
+
+    /**
+     * Die Gegenprobe zum Test darüber: In einer Arbeitsliste gibt es nichts zu instanziieren. Ohne
+     * sie bliebe offen, ob der Knopf überhaupt vom Modus abhängt.
+     */
+    @Test
+    fun theCreateListButtonIsAbsentInAWorkingList() {
+        setScreenContent(
+            uiState = TodoListUiState(
+                lists = listOf(LIST),
+                selectedList = LIST,
+                isLoading = false,
+                todos = listOf(OPEN_TODO)
+            )
+        )
+
+        composeTestRule.onNodeWithContentDescription(createListLabel()).assertDoesNotExist()
+    }
+
     // --- Menge und Faktor (ADR 0037) ---
 
     @Test
@@ -610,6 +650,10 @@ class TodoListScreenTest {
             .assertDoesNotExist()
     }
 
+    /** Die Beschriftung des schwebenden Knopfs einer offenen Vorlage. */
+    private fun createListLabel(): String =
+        composeTestRule.activity.getString(R.string.todo_list_create_list_from_template)
+
     private fun quantityLabel(): String =
         composeTestRule.activity.getString(R.string.todo_list_quantity_label)
 
@@ -681,7 +725,8 @@ class TodoListScreenTest {
         listDialogActions: ListDialogActions = NO_LIST_DIALOG_ACTIONS,
         onMovedMessageShown: () -> Unit = {},
         onUndoDelete: () -> Unit = {},
-        onDeletedMessageShown: () -> Unit = {}
+        onDeletedMessageShown: () -> Unit = {},
+        onCreateListFromTemplateClick: () -> Unit = {}
     ) {
         composeTestRule.setContent {
             BrownieDoTheme {
@@ -696,7 +741,8 @@ class TodoListScreenTest {
                         onMovedMessageShown = onMovedMessageShown,
                         onUndoDelete = onUndoDelete,
                         onDeletedMessageShown = onDeletedMessageShown
-                    )
+                    ),
+                    onCreateListFromTemplateClick = onCreateListFromTemplateClick
                 )
             }
         }
@@ -716,7 +762,6 @@ class TodoListScreenTest {
             onListSelected = {},
             onNewListClick = {},
             onNewTemplateClick = {},
-            onCreateListFromTemplateClick = {},
             onRenameListClick = {},
             onDeleteListClick = {},
             onSignOutClick = {}

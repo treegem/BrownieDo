@@ -60,8 +60,6 @@ class MainActivity : ComponentActivity() {
                             onListSelected = todoListViewModel::onListSelected,
                             onNewListClick = todoListViewModel::onNewListClick,
                             onNewTemplateClick = todoListViewModel::onNewTemplateClick,
-                            onCreateListFromTemplateClick =
-                                todoListViewModel::onCreateListFromTemplateClick,
                             onRenameListClick = todoListViewModel::onRenameListClick,
                             onDeleteListClick = todoListViewModel::onDeleteListClick,
                             onSignOutClick = { appContainer.authRepository.signOut() }
@@ -125,7 +123,12 @@ class MainActivity : ComponentActivity() {
                         listDialogActions = listDialogActions,
                         todoActions = todoActions,
                         editActions = editActions,
-                        snackbarActions = snackbarActions
+                        snackbarActions = snackbarActions,
+                        // Einzeln statt in einem Halter, siehe TodoListScreen. Eine gebundene
+                        // Methodenreferenz vergleicht sich strukturell — der Bildschirm bleibt
+                        // auch ohne remember überspringbar.
+                        onCreateListFromTemplateClick =
+                            todoListViewModel::onCreateListFromTemplateClick
                     )
                 }
             }

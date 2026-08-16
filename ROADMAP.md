@@ -731,13 +731,31 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   sechstes Eingabefeld") greift nicht. Nachgezählt: Titel · Notiz · Priorität · Zielliste, dazu
   Löschen und — außerhalb einer Vorlage — der Termin
 - [x] Liste aus einer Vorlage erzeugen — Dialog mit Name (vorbelegt aus dem Vorlagennamen),
-  geteilt/privat wie beim normalen Anlegen, ausgelöst aus dem Überlauf-Menü, wenn eine Vorlage offen
-  ist. Danach springt die App in die neue Liste. **Die Vorlage bleibt unverändert stehen** — sie ist
-  der Stempel, nicht der Abdruck. (Hier stand „als einziger Anlegeweg, der öffnet" — inzwischen
-  öffnen alle drei, siehe den Punkt weiter unten.)
+  geteilt/privat wie beim normalen Anlegen, ausgelöst über den schwebenden Knopf, wenn eine Vorlage
+  offen ist. Danach springt die App in die neue Liste. **Die Vorlage bleibt unverändert stehen** —
+  sie ist der Stempel, nicht der Abdruck. (Hier stand „als einziger Anlegeweg, der öffnet" —
+  inzwischen öffnen alle drei, siehe den Punkt weiter unten; und „ausgelöst aus dem Überlauf-Menü" —
+  das gilt seit dem Punkt darunter nicht mehr.)
   **Ein Dialog trägt jetzt alle drei Anlegewege**, weil alle drei dieselben zwei Eingaben haben; es
   wechselt allein die Überschrift (`NewListKind`). Eine geteilte Vorlage ergibt eine geteilte Liste,
   ohne hinterlegten Partner fällt das auf „nur für mich" zurück
+- [x] **Der Weg dorthin ist ein schwebender Knopf, kein Menü-Eintrag mehr** — ein
+  `ExtendedFloatingActionButton` unten rechts mit Plus-Symbol und „Liste aus Vorlage …", sichtbar
+  nur bei offener Vorlage, in denselben Farben wie der Hinzufügen-Knopf der Eingabeleiste. Der
+  Eintrag im Überlauf-Menü ist ersatzlos entfallen: ein Weg, eine Stelle. Begründung in
+  [ADR 0038](docs/decisions/0038-instanziieren-als-schwebender-knopf.md).
+  **Damit ist eine Folgezeile von [ADR 0013](docs/decisions/0013-eingabefeld-in-der-bottombar-statt-fab.md)
+  überholt** („Der FAB-Platz unten rechts ist damit belegt") — sie hat den FAB mit der Leiste
+  verwechselt: Das `Scaffold` legt seinen `floatingActionButton` von sich aus **über** die
+  `bottomBar`, die Eingabeleiste bleibt unberührt. Verworfen war der FAB *als Ersatz* für sie, nicht
+  jeder FAB.
+  **Ein Detail, das kein Test findet:** Der Knopf schwebt über der Liste, `innerPadding` weiß nichts
+  von ihm — ohne einen Platzhalter am Listenende läge die letzte Zeile darunter und wäre nicht
+  antippbar. Als eigenes `item` gelöst und nicht als aufgeschlagenes `contentPadding`, damit die
+  seitlichen Insets unangetastet bleiben.
+  **Und eines, das ein Test doch gefunden hat:** Die Beschriftung steht zusätzlich als
+  `contentDescription` am Knopf — der Extended FAB faltet seinen Text-Slot nicht in den
+  Semantik-Knoten, für TalkBack wäre er sonst namenlos (siehe den Test-Punkt weiter unten)
 - [x] **Erst das Listen-Dokument, dann seine Aufgaben** — zwei Schreibvorgänge in fester Reihenfolge,
   keiner abgewartet, mit lokal vergebener Listen-id (`document()`). Nur der Partner-Nachschlag beim
   geteilten Fall bleibt `suspend`, der Rest funktioniert offline.
@@ -822,6 +840,22 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   und [ADR 0036](docs/decisions/0036-neue-liste-wird-geoeffnet-und-listener-wiederholt.md) je erneut
   gelaufen, beide Male alle 34 grün** — erwartungsgemäß, beide fassen nur Datenschicht und ViewModel
   an, nicht den Bildschirm
+- [x] Instrumentierte Tests zum schwebenden Knopf (ADR 0038) **am 2026-08-16 auf einem SM-S928B
+  gelaufen, alle 42 grün** (vorher 40). Zwei neue im `TodoListScreenTest`: der Knopf meldet seinen
+  Tipp in einer offenen Vorlage · die **Gegenprobe**, dass es ihn in einer Arbeitsliste nicht gibt.
+  Ohne die zweite belegt ein `assertDoesNotExist` nur, dass der Matcher nichts findet — nicht, dass
+  der Knopf überhaupt vom Modus abhängt.
+  **Der erste Anlauf ist gescheitert, und das war ein Fund, kein Testproblem:** `onNodeWithText`
+  fand den Knopf nicht („However, the unmerged tree contains '1' node"). Der Semantik-Baum auf dem
+  Gerät zeigte warum — der Extended FAB faltet seinen Text-Slot **nicht** in den zusammengefassten
+  Knoten, der trug nur `Role = Button`, weder `Text` noch `ContentDescription`. Für TalkBack war er
+  damit ein Knopf ohne Namen. Der Bildschirm setzt die Beschriftung jetzt ausdrücklich über
+  `Modifier.semantics`, und die Tests fassen ihn dort an. Ein `Button` verhält sich übrigens anders,
+  deshalb fiel es bei den vier Dialogknöpfen nie auf.
+  Canary-Gegenprobe mitgemacht: auf einen erfundenen Text gedreht scheitert der Test mit
+  „could not find any node that satisfies: (ContentDescription = 'CANARY Liste aus Vorlage …')" —
+  ein aufgelöster Matcher gegen einen echten Baum, nicht „No compose hierarchies found". Danach
+  zurückgedreht und erneut 42 grün
 - [ ] Auf dem Gerät prüfen. **Das ist hier kein Feinschliff, sondern der einzige Test des
   Batch-Fehlers oben:** Kein Unit-Test kennt die Security Rules, alle 133 blieben grün, während der
   Weg auf dem Gerät nicht funktionierte (ADR 0035). Zu prüfen: **Vorlage mit mehreren Einträgen
@@ -837,6 +871,13 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   Listen-Menü mit und ohne Vorlagen (die Überschriften dürfen ohne Vorlage nicht auftauchen) ·
   Bearbeiten-Dialog in einer Vorlage: kein Kalender-Knopf, Zielliste zeigt nur Vorlagen · hell und
   dunkel.
+  **Dazu der schwebende Knopf aus ADR 0038:** in einer Vorlage steht er unten rechts, in einer Liste
+  ist er weg · bis ans Listenende scrollen — die **letzte Zeile muss antippbar sein** und nicht unter
+  dem Knopf liegen · mit **offener Tastatur** einen Eintrag tippen, der Knopf wandert mit der Leiste
+  nach oben und verdeckt das Eingabefeld nicht · eine Snackbar (etwa nach einer Wischgeste) muss sich
+  **über** den Knopf legen · leere Vorlage: Knopf und Leerzustand-Text stören sich nicht · das
+  Überlauf-Menü trägt in einer Vorlage nur noch Umbenennen, Löschen und Abmelden · größte
+  Schriftskalierung: die Beschriftung „Liste aus Vorlage …" darf nicht abbrechen.
   Dabei einmal in die Firebase Console sehen: `lists/{neueId}` mit `members` und darunter die
   `todos` — **und wie das Vorlagen-Feld dort tatsächlich heißt.** Kotlin macht aus `var isTemplate`
   den Getter `isTemplate()`, und Firebase leitet daraus vermutlich `template` ab. Funktional harmlos,

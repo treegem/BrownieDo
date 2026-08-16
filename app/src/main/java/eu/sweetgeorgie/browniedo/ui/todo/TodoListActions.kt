@@ -25,17 +25,20 @@ import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
 /**
  * Was die TopAppBar auslöst: die Listen-Auswahl im Titel und das Überlauf-Menü.
  *
- * [onNewTemplateClick] und [onCreateListFromTemplateClick] sind die beiden Wege, die es ohne
- * Vorlagen nicht gäbe. Umbenennen und Löschen brauchen dagegen keine eigenen Rückrufe — sie
- * beziehen sich auf die offene Liste, und eine Vorlage *ist* eine, siehe
+ * [onNewTemplateClick] ist der einzige Weg hier, den es ohne Vorlagen nicht gäbe. Umbenennen und
+ * Löschen brauchen dagegen keine eigenen Rückrufe — sie beziehen sich auf die offene Liste, und
+ * eine Vorlage *ist* eine, siehe
  * docs/decisions/0034-vorlagen-sind-listen-mit-einem-flag.md.
+ *
+ * Eine Liste aus der Vorlage zu erzeugen steht **nicht** hier: Das ist seit
+ * docs/decisions/0038-instanziieren-als-schwebender-knopf.md der schwebende Knopf des Bildschirms
+ * und damit ein einzelner Parameter an [TodoListScreen].
  */
 @Immutable
 data class TodoListTopBarActions(
     val onListSelected: (TodoList) -> Unit,
     val onNewListClick: () -> Unit,
     val onNewTemplateClick: () -> Unit,
-    val onCreateListFromTemplateClick: () -> Unit,
     val onRenameListClick: () -> Unit,
     val onDeleteListClick: () -> Unit,
     val onSignOutClick: () -> Unit

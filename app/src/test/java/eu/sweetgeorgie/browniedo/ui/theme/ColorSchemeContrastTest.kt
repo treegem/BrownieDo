@@ -55,8 +55,9 @@ class ColorSchemeContrastTest {
             Triple("primary", scheme.primary, scheme.surfaceContainer),
             // Ladekreis und fokussiertes Eingabefeld.
             Triple("primary", scheme.primary, scheme.surface),
-            // Anmelde-Knopf, der Hinzufügen-Knopf in der Eingabeleiste und seit ADR 0032 die
-            // gefüllten Bestätigungsknöpfe aller Dialoge — die brauchen deshalb kein eigenes Paar.
+            // Anmelde-Knopf, der Hinzufügen-Knopf in der Eingabeleiste, seit ADR 0032 die
+            // gefüllten Bestätigungsknöpfe aller Dialoge und seit ADR 0038 der schwebende Knopf
+            // einer offenen Vorlage — die brauchen deshalb alle kein eigenes Paar.
             Triple("onPrimary", scheme.onPrimary, scheme.primary),
             Triple("onSurface", scheme.onSurface, scheme.surface),
             // Trägt bei erledigten Aufgaben Bedeutung, nicht nur Schmuck.

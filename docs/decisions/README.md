@@ -38,7 +38,7 @@ der den alten als „abgelöst" markiert.
 | [0010](0010-sortierung-im-client-statt-orderby.md) | Sortierung im Client statt `orderBy` | akzeptiert |
 | [0011](0011-schreibvorgaenge-nicht-abwarten.md) | Schreibvorgänge nicht auf den Server warten lassen | akzeptiert |
 | [0012](0012-scaffold-pro-bildschirm.md) | Scaffold pro Bildschirm statt app-weit | akzeptiert |
-| [0013](0013-eingabefeld-in-der-bottombar-statt-fab.md) | Eingabefeld in der `bottomBar` statt FAB mit Dialog | akzeptiert |
+| [0013](0013-eingabefeld-in-der-bottombar-statt-fab.md) | Eingabefeld in der `bottomBar` statt FAB mit Dialog | akzeptiert (ein Punkt durch 0038 abgelöst) |
 | [0014](0014-regeldateien-always-on.md) | Regeldateien always-on statt pfad-gebunden | akzeptiert |
 | [0015](0015-agents-md-als-gemeinsamer-einstieg.md) | `AGENTS.md` als gemeinsamer Agenten-Einstieg | akzeptiert |
 | [0016](0016-wischen-loescht-nur-erledigte-aufgaben.md) | Wischen löscht nur erledigte Aufgaben | akzeptiert |
@@ -63,3 +63,4 @@ der den alten als „abgelöst" markiert.
 | [0035](0035-instanziieren-schreibt-die-liste-vor-ihren-aufgaben.md) | Instanziieren schreibt die Liste vor ihren Aufgaben | akzeptiert |
 | [0036](0036-neue-liste-wird-geoeffnet-und-listener-wiederholt.md) | Jeder Anlegeweg öffnet, was er angelegt hat | akzeptiert |
 | [0037](0037-menge-am-eintrag-statt-zahl-im-titel.md) | Menge am Eintrag statt Zahl im Titel | akzeptiert |
+| [0038](0038-instanziieren-als-schwebender-knopf.md) | Instanziieren als schwebender Knopf statt Eintrag im Überlauf-Menü | akzeptiert |
