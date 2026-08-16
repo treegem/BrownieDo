@@ -332,7 +332,10 @@ fun TodoListScreen(
                             onMoveDown = moveDown?.let { (above, below) ->
                                 { todoActions.onTodoReordered(todo, above, below) }
                             },
-                            modifier = Modifier.longPressDraggableHandle(
+                            // Wandert bis an die Zeile selbst durch und nicht an den
+                            // Wisch-Container: Nur innerhalb der Klick-Kette gewinnt die Geste den
+                            // langen Druck, siehe den Kommentar an der Modifier-Kette in TodoRow.
+                            dragHandle = Modifier.longPressDraggableHandle(
                                 enabled = !todo.isDone,
                                 // Die Geste ist unauffällig — das Anheben muss man spüren, sonst
                                 // findet sie niemand. Dieselbe Abwägung wie beim Wischen (ADR 0016).

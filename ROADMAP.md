@@ -965,8 +965,8 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   **der Abseits-um-eins beim Zug nach unten** und dass eine Prioritätsänderung den Platz behält.
   **Der `todo()`-Helfer im `TodoOrderTest` bekam `sortOrder: Double? = null`, wodurch jeder ältere
   Test unverändert blieb** — dass sie alle grün bleiben, ist selbst schon der Beleg für den Rückfall
-- [x] Instrumentierte Tests **am 2026-08-16 auf einem SM-S928B gelaufen, alle 47 grün** (vorher 42).
-  Fünf neue im `TodoListScreenTest`, vier davon über die **TalkBack-Aktionen** statt über die Geste —
+- [x] Instrumentierte Tests **am 2026-08-16 auf einem SM-S928B gelaufen, alle 48 grün** (vorher 42).
+  Sechs neue im `TodoListScreenTest`, vier davon über die **TalkBack-Aktionen** statt über die Geste —
   die sind ohne Zeitfenster und ohne Animationsuhr auswertbar und laufen durch denselben Rückruf:
   Der Zug nach oben meldet die erwarteten Nachbarn · die erste Zeile einer Gruppe bietet kein „nach
   oben" (mit Gegenprobe, dass „nach unten" sehr wohl da ist) · die letzte bietet kein „nach unten" ·
@@ -978,6 +978,15 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   einem leeren `onLongClick`, das dem Tipp-Erkenner sagt, dass der lange Druck der Ziehgeste gehört.
   **Das ist der Fund, den kein Unit-Test hätte machen können**, und der Grund, warum dieser Test
   existiert.
+  **Und die erste Behebung war zur Hälfte falsch, aufgefallen erst beim Ausprobieren von Hand:** Das
+  `combinedClickable` liegt auf dem `ListItem`, also auf der ganzen Zeile — es verschluckte den langen
+  Druck, bevor die Ziehgeste am Vorfahren ihn sah. Ziehen ging danach **nur noch an der Checkbox**,
+  weil die einen eigenen Erkenner hat, aber keinen langen Druck kennt und ihn deshalb nach oben
+  durchreichte. Behoben, indem `longPressDraggableHandle` vom Wisch-Container an die Zeile selbst
+  wandert und dort **hinter** dem `combinedClickable` steht: Weiter hinten in der Kette heißt weiter
+  innen, und innen liegende Modifier bekommen die Zeigerereignisse zuerst. Kein Test hatte das
+  gemerkt — dafür gibt es jetzt `aShortTapOnTheTitleOpensTheEditDialog`, die Gegenprobe, dass die
+  Geste den kurzen Tipp nicht mitverschluckt
   Canary-Gegenprobe mitgemacht: auf einen erfundenen Titel gedreht scheitert der Test mit „could not
   find any node that satisfies: (Text … contains 'CANARY Brot holen')" — ein aufgelöster Matcher
   gegen einen echten Baum, nicht „No compose hierarchies found". Danach zurückgedreht und erneut 47

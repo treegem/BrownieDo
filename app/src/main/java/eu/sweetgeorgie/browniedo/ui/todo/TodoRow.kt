@@ -62,6 +62,7 @@ internal fun SwipeableTodoRow(
     onSwipedAway: () -> Unit,
     onMoveUp: (() -> Unit)?,
     onMoveDown: (() -> Unit)?,
+    dragHandle: Modifier,
     modifier: Modifier = Modifier
 ) {
     val swipeState = rememberSwipeToDismissBoxState(
@@ -107,7 +108,8 @@ internal fun SwipeableTodoRow(
             onDoneChange = onDoneChange,
             onClick = onClick,
             onMoveUp = onMoveUp,
-            onMoveDown = onMoveDown
+            onMoveDown = onMoveDown,
+            dragHandle = dragHandle
         )
     }
 }
@@ -141,6 +143,7 @@ private fun TodoRow(
     onClick: () -> Unit,
     onMoveUp: (() -> Unit)?,
     onMoveDown: (() -> Unit)?,
+    dragHandle: Modifier,
     modifier: Modifier = Modifier
 ) {
     val markerIconResId = todo.priority.markerIconResId()
@@ -173,14 +176,22 @@ private fun TodoRow(
         // TalkBack fokussiert (er fasst die Zeile zusammen), und auf einem Vorfahren deklarierte
         // Aktionen würden dort nicht angeboten.
         //
-        // `combinedClickable` statt `clickable`, und der leere `onLongClick` ist der ganze Zweck:
-        // Der lange Druck gehört der Ziehgeste, nicht dem Klick. Ohne ihn kennt der Tipp-Erkenner
-        // nur „gedrückt und losgelassen" und öffnet beim Loslassen den Bearbeiten-Dialog — man hebt
-        // die Zeile an, überlegt es sich anders, und bekommt einen Dialog. Der
-        // `longPressDraggableHandle` des Vorfahren verhindert das nicht, er verbraucht den Druck
-        // nicht. Belegt von `aLongPressWithoutMovementDoesNotOpenTheEditDialog`, der vorher rot war.
+        // Die Reihenfolge dieser drei ist der ganze Punkt, und sie ist auf dem Gerät erarbeitet:
+        //
+        // `combinedClickable` mit leerem `onLongClick` — der lange Druck gehört der Ziehgeste, nicht
+        // dem Klick. Ohne ihn kennt der Tipp-Erkenner nur „gedrückt und losgelassen" und öffnet beim
+        // Loslassen den Bearbeiten-Dialog: Man hebt die Zeile an, überlegt es sich anders, und
+        // bekommt einen Dialog.
+        //
+        // **Und [dragHandle] muss dahinter stehen, nicht am Vorfahren.** Ein Modifier weiter hinten
+        // in der Kette liegt weiter innen und bekommt die Zeigerereignisse zuerst — die Ziehgeste
+        // gewinnt damit den langen Druck gegen das `combinedClickable` darüber. Lag sie am
+        // `SwipeToDismissBox`, verschluckte das `combinedClickable` den Druck auf der ganzen Zeile,
+        // und ziehen ließ sich nur noch an der Checkbox: die trägt einen eigenen Erkenner, hat aber
+        // keinen langen Druck und reichte ihn deshalb nach oben durch.
         modifier = modifier
             .combinedClickable(onClick = onClick, onLongClick = {})
+            .then(dragHandle)
             .semantics { customActions = reorderActions },
         // Angedeutet, nicht ausgebreitet: eine Zeile mit Auslassungspunkten, siehe
         // docs/decisions/0030-notiz-als-zweite-zeile.md. Keine eigene Farbe — ListItem färbt den

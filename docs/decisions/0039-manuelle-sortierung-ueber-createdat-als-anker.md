@@ -168,3 +168,12 @@ Die instrumentierten Tests der Phase hängen deshalb an ihnen und nicht an der G
   Lösch-Animation wäre still wieder die Vorgabe.
 - Während einer Ziehgeste hält der Bildschirm eine vorläufige Reihenfolge lokal und zeigt eingehende
   Änderungen des Partners nicht. Das ist gewollt und endet einen Frame nach dem Ablegen.
+- **Drei Gesten teilen sich die Zeile, und ihre Reihenfolge in der Modifier-Kette ist Bedingung, nicht
+  Geschmack.** Am `ListItem` steht `combinedClickable` mit leerem `onLongClick` — ohne das öffnet ein
+  langer Druck beim Loslassen den Bearbeiten-Dialog. Dahinter, also weiter **innen**, steht der
+  `longPressDraggableHandle`; innen liegende Modifier bekommen die Zeigerereignisse zuerst und
+  gewinnen den langen Druck. Liegt die Geste dagegen weiter außen (etwa am `SwipeToDismissBox`),
+  verschluckt das `combinedClickable` den Druck auf der ganzen Zeile und ziehen lässt sich nur noch
+  an der Checkbox — die trägt einen eigenen Erkenner, kennt aber keinen langen Druck und reicht ihn
+  nach oben durch. Beide Fehler sind einmal passiert und werden jetzt von je einem instrumentierten
+  Test gehalten.

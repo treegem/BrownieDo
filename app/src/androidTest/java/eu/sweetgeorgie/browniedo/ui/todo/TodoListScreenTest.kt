@@ -688,6 +688,28 @@ class TodoListScreenTest {
         assertNull(edited)
     }
 
+    /**
+     * Die Gegenprobe zum Test darüber, und sie ist keine Zierde: Die Ziehgeste liegt seit dem
+     * Umbau **in** der Klick-Kette der Zeile. Verschlänge sie den kurzen Tipp, käme man an den
+     * Bearbeiten-Dialog gar nicht mehr heran — und kein anderer Test hätte das gemerkt.
+     */
+    @Test
+    fun aShortTapOnTheTitleOpensTheEditDialog() {
+        var edited: Todo? = null
+        setScreenContent(
+            uiState = TodoListUiState(
+                selectedList = LIST,
+                isLoading = false,
+                todos = SORTABLE_TODOS
+            ),
+            todoActions = NO_TODO_ACTIONS.copy(onEditTodoClick = { edited = it })
+        )
+
+        composeTestRule.onNodeWithText(OPEN_TODO.title).performClick()
+
+        assertEquals(OPEN_TODO.id, edited?.id)
+    }
+
     private fun label(labelResId: Int): String = composeTestRule.activity.getString(labelResId)
 
     /** Die Beschriftungen der Sortier-Aktionen, die TalkBack an dieser Zeile anbieten würde. */
