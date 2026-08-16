@@ -63,14 +63,25 @@ data class ListDialogActions(
     val onDeleteListDismiss: () -> Unit
 )
 
-/** Was die Eingabeleiste und die Zeilen der Liste auslösen. */
+/**
+ * Was die Eingabeleiste und die Zeilen der Liste auslösen.
+ *
+ * [onTodoReordered] nimmt die **Nachbarn** und keinen Index: Ein Index wäre mehrdeutig, sobald der
+ * Ladefehler-Eintrag oder der Platzhalter unter dem schwebenden Knopf in der `LazyColumn` steht, und
+ * die Nachbarn sind genau das, was die Domäne zum Rechnen braucht
+ * (docs/decisions/0039-manuelle-sortierung-ueber-createdat-als-anker.md). Beide sind die Nachbarn
+ * **nach** dem Ablegen; `null` heißt Anfang bzw. Ende der Prioritätsgruppe. Derselbe Rückruf trägt
+ * das Ziehen und die zwei TalkBack-Aktionen, es gibt also keine zweite Logik, die mitgepflegt werden
+ * müsste.
+ */
 @Immutable
 data class TodoActions(
     val onNewTodoTitleChange: (String) -> Unit,
     val onAddTodoClick: () -> Unit,
     val onTodoDoneChange: (Todo, Boolean) -> Unit,
     val onTodoSwipedAway: (Todo) -> Unit,
-    val onEditTodoClick: (Todo) -> Unit
+    val onEditTodoClick: (Todo) -> Unit,
+    val onTodoReordered: (todo: Todo, above: Todo?, below: Todo?) -> Unit
 )
 
 /**

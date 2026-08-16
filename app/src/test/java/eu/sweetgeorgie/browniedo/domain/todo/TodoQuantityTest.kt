@@ -139,7 +139,8 @@ class TodoQuantityTest {
             completedBy = null,
             completedAt = null,
             notes = null,
-            quantity = null
+            quantity = null,
+            sortOrder = null
         )
     }
 }

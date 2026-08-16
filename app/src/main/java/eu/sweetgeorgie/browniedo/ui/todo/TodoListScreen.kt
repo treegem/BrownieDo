@@ -18,7 +18,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,9 +37,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -53,7 +59,11 @@ import eu.sweetgeorgie.browniedo.domain.list.TodoList
 import eu.sweetgeorgie.browniedo.domain.todo.Todo
 import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
 import eu.sweetgeorgie.browniedo.ui.theme.BrownieDoTheme
+import kotlinx.coroutines.delay
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.time.Instant
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Der Aufgaben-Bildschirm. Die Rückrufe kommen gebündelt statt einzeln, siehe
@@ -80,6 +90,62 @@ fun TodoListScreen(
     modifier: Modifier = Modifier
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    val haptics = LocalHapticFeedback.current
+    val lazyListState = rememberLazyListState()
+
+    /*
+     * Die Reihenfolge, solange ein Finger auf der Zeile liegt. Bildschirmlokal und **nicht** im
+     * UiState: Das ist ein Finger auf dem Glas, keine Absicht — im UiState erbte es jede
+     * Aufräumpflicht, die dort schon dokumentiert ist (Listenwechsel, Fehler, Rückgängig), und
+     * müsste zusätzlich gegen jeden Schnappschuss abgeglichen werden. Auf die Listen-id gekeyt
+     * erledigt sich der einzige Fall, der wirklich zählt, von selbst.
+     *
+     * Ohne diesen Zustand bewegte sich beim Ziehen gar nichts: Die Zeile wandert nur, weil sich die
+     * gezeichnete Liste ändert.
+     */
+    var provisionalTodos by remember(uiState.selectedList?.id) {
+        mutableStateOf<List<Todo>?>(null)
+    }
+    val todos = provisionalTodos ?: uiState.todos
+
+    val reorderState = rememberReorderableLazyListState(lazyListState) { from, to ->
+        val current = provisionalTodos ?: uiState.todos
+        val dragged = current.firstOrNull { it.id == from.key }
+        val target = current.firstOrNull { it.id == to.key }
+        // Über den `key` und nicht über `from.index`: Die LazyColumn trägt zwei Einträge, die keine
+        // Aufgabe sind (der Ladefehler und der Platz unter dem schwebenden Knopf) — beide lösen zu
+        // keinem Todo auf und werden damit von derselben Prüfung abgewiesen, die die Gruppengrenze
+        // durchsetzt.
+        //
+        // Die Grenze wird **laufend verweigert und nicht geklemmt**: Die Zeile folgt dem Finger
+        // weiter (eine Zeile, die stehen bleibt, liest sich wie eine abgerissene Geste), nur der
+        // Tausch unterbleibt. Frei ziehen und erst beim Ablegen verwerfen wäre das Schlechteste —
+        // die ganze Liste ordnete sich sichtbar um und schnappte dann zurück.
+        if (dragged != null && target != null && target.sortsBeside(dragged)) {
+            provisionalTodos = current.toMutableList().apply {
+                add(indexOf(target), removeAt(indexOf(dragged)))
+            }
+        }
+    }
+
+    /*
+     * Die vorläufige Reihenfolge bleibt nach dem Ablegen stehen, bis der Firestore-Schnappschuss
+     * dieselbe liefert — sonst hüpfte die Zeile zurück und sofort wieder vor. Firestore wendet den
+     * Schreibvorgang lokal an, das ist meist derselbe oder der nächste Frame.
+     *
+     * Die Notbremse ist kein Beiwerk: Wird der Schreibvorgang abgelehnt, käme der passende
+     * Schnappschuss nie, und der Bildschirm bliebe für immer in einer Lüge stehen. Und solange
+     * gezogen wird, läuft überhaupt nichts davon — sonst räumte die Bremse mitten in einer langen
+     * Geste auf.
+     */
+    val provisionalIds = provisionalTodos?.map(Todo::id)
+
+    LaunchedEffect(provisionalIds, uiState.todos, reorderState.isAnyItemDragging) {
+        if (provisionalIds == null || reorderState.isAnyItemDragging) return@LaunchedEffect
+        if (uiState.todos.map(Todo::id) != provisionalIds) delay(PROVISIONAL_ORDER_TIMEOUT)
+        provisionalTodos = null
+    }
+
     // Auf die aufgelöste Meldung statt auf das Enum keyen: stringResource gehört in die
     // Composition, und so löst derselbe Fehler ein zweites Mal wieder eine Snackbar aus.
     val writeErrorMessage = uiState.error
@@ -207,7 +273,11 @@ fun TodoListScreen(
                 modifier = Modifier.padding(innerPadding)
             )
 
-            else -> LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = innerPadding) {
+            else -> LazyColumn(
+                state = lazyListState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = innerPadding
+            ) {
                 if (hasLoadError) {
                     item(key = LOAD_ERROR_KEY) {
                         Text(
@@ -220,29 +290,67 @@ fun TodoListScreen(
                         )
                     }
                 }
-                items(items = uiState.todos, key = Todo::id) { todo ->
-                    SwipeableTodoRow(
-                        todo = todo,
-                        deleteFailed = uiState.error == TodoListError.DELETE_FAILED,
-                        isTemplateEntry = uiState.isTemplateOpen,
-                        onDoneChange = { isDone -> todoActions.onTodoDoneChange(todo, isDone) },
-                        onClick = { todoActions.onEditTodoClick(todo) },
-                        onSwipedAway = { todoActions.onTodoSwipedAway(todo) },
-                        // Abgehakte Einträge sinken sofort nach unten. Ohne Bewegung sähe das
-                        // aus, als wäre die Liste gesprungen — die Animation zeigt, wohin.
+                itemsIndexed(items = todos, key = { _, todo -> todo.id }) { index, todo ->
+                    val moveUp = todos.moveUpNeighbours(index)
+                    val moveDown = todos.moveDownNeighbours(index)
+
+                    ReorderableItem(
+                        state = reorderState,
+                        key = todo.id,
+                        // Erledigte Aufgaben lassen sich nicht anheben: Ihr Block ist ein Protokoll
+                        // nach Erledigungszeitpunkt (ADR 0039).
+                        enabled = !todo.isDone,
+                        // **Das getunte Ausblenden muss hierher.** ReorderableItem legt selbst ein
+                        // `animateItem()` an; bliebe die Angabe unten an der Zeile stehen, hingen
+                        // zwei davon am selben Eintrag und die Lösch-Animation aus ADR 0031 wäre
+                        // still wieder die Vorgabe — ohne Compilerfehler und ohne roten Test.
                         //
-                        // Nur das Ausblenden bekommt eine eigene Dauer, Einblenden und Verschieben
-                        // behalten ihre Vorgabe-Federn. Grund: Die Vorgabe für das Ausblenden ist so
-                        // kurz, dass eine gelöschte Aufgabe schlicht weg ist — und weil das Löschen
-                        // jetzt umkehrbar ist (ADR 0031), soll man sehen, *dass* da etwas
-                        // verschwindet, um überhaupt nach dem „Rückgängig" zu greifen.
-                        modifier = Modifier.animateItem(
+                        // Abgehakte Einträge sinken sofort nach unten. Ohne Bewegung sähe das aus,
+                        // als wäre die Liste gesprungen — die Animation zeigt, wohin. Nur das
+                        // Ausblenden bekommt eine eigene Dauer, Einblenden und Verschieben behalten
+                        // ihre Vorgabe-Federn: Die Vorgabe fürs Ausblenden ist so kurz, dass eine
+                        // gelöschte Aufgabe schlicht weg ist — und weil das Löschen umkehrbar ist,
+                        // soll man sehen, *dass* etwas verschwindet, um nach dem „Rückgängig" zu
+                        // greifen.
+                        animateItemModifier = Modifier.animateItem(
                             fadeOutSpec = tween(
                                 durationMillis = REMOVAL_FADE_MILLIS,
                                 easing = REMOVAL_FADE_EASING
                             )
                         )
-                    )
+                    ) {
+                        SwipeableTodoRow(
+                            todo = todo,
+                            deleteFailed = uiState.error == TodoListError.DELETE_FAILED,
+                            isTemplateEntry = uiState.isTemplateOpen,
+                            onDoneChange = { isDone -> todoActions.onTodoDoneChange(todo, isDone) },
+                            onClick = { todoActions.onEditTodoClick(todo) },
+                            onSwipedAway = { todoActions.onTodoSwipedAway(todo) },
+                            onMoveUp = moveUp?.let { (above, below) ->
+                                { todoActions.onTodoReordered(todo, above, below) }
+                            },
+                            onMoveDown = moveDown?.let { (above, below) ->
+                                { todoActions.onTodoReordered(todo, above, below) }
+                            },
+                            modifier = Modifier.longPressDraggableHandle(
+                                enabled = !todo.isDone,
+                                // Die Geste ist unauffällig — das Anheben muss man spüren, sonst
+                                // findet sie niemand. Dieselbe Abwägung wie beim Wischen (ADR 0016).
+                                onDragStarted = {
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                },
+                                onDragStopped = {
+                                    provisionalTodos?.let { dropped ->
+                                        todoActions.onTodoReordered(
+                                            todo,
+                                            dropped.neighbourAbove(todo),
+                                            dropped.neighbourBelow(todo)
+                                        )
+                                    }
+                                }
+                            )
+                        )
+                    }
                 }
                 // Der schwebende Knopf liegt über der Liste und wüsste sonst niemand etwas davon:
                 // Ohne diesen Platz am Ende läge die letzte Zeile darunter und wäre nicht
@@ -301,6 +409,49 @@ fun TodoListScreen(
         )
     }
 }
+
+/*
+ * Die Nachbarn für einen Zug um genau eine Position, als Paar (darüber, darunter) — und zwar so, wie
+ * sie **nach** dem Zug dastehen, denn genau das erwartet `sortOrderBetween`. Null heißt: In diese
+ * Richtung geht nichts, die Aktion wird gar nicht erst angeboten.
+ *
+ * Ein Nachbar zählt nur, wenn er offen ist und dieselbe Priorität trägt — damit endet der Zug
+ * automatisch an der Gruppengrenze, ohne dass irgendwo Indexbereiche ausgerechnet werden müssten.
+ * Eine erledigte Aufgabe lässt sich gar nicht erst bewegen: Ihr Block ist ein Protokoll nach
+ * Erledigungszeitpunkt (ADR 0039).
+ */
+
+private fun List<Todo>.moveUpNeighbours(index: Int): Pair<Todo?, Todo?>? {
+    val todo = getOrNull(index)?.takeIf { !it.isDone } ?: return null
+    // Die Aufgabe rückt vor ihren bisherigen Vorgänger — der wird damit zu ihrem Nachbarn darunter.
+    val below = getOrNull(index - 1)?.takeIf { it.sortsBeside(todo) } ?: return null
+    return getOrNull(index - 2)?.takeIf { it.sortsBeside(todo) } to below
+}
+
+private fun List<Todo>.moveDownNeighbours(index: Int): Pair<Todo?, Todo?>? {
+    val todo = getOrNull(index)?.takeIf { !it.isDone } ?: return null
+    val above = getOrNull(index + 1)?.takeIf { it.sortsBeside(todo) } ?: return null
+    return above to getOrNull(index + 2)?.takeIf { it.sortsBeside(todo) }
+}
+
+private fun Todo.sortsBeside(other: Todo): Boolean = !isDone && priority == other.priority
+
+/*
+ * Die Nachbarn nach dem Ablegen — dieselbe Regel wie oben, nur aus der bereits umsortierten Liste
+ * gelesen statt um eine Position gerechnet.
+ */
+
+private fun List<Todo>.neighbourAbove(todo: Todo): Todo? =
+    getOrNull(indexOfFirst { it.id == todo.id } - 1)?.takeIf { it.sortsBeside(todo) }
+
+private fun List<Todo>.neighbourBelow(todo: Todo): Todo? =
+    getOrNull(indexOfFirst { it.id == todo.id } + 1)?.takeIf { it.sortsBeside(todo) }
+
+/**
+ * Wie lange die vorläufige Reihenfolge einem Schnappschuss Zeit gibt, der nie kommt. Nur der
+ * Fehlerfall landet hier — im Normalfall räumt der passende Schnappschuss sofort auf.
+ */
+private val PROVISIONAL_ORDER_TIMEOUT = 1.seconds
 
 /** Der Ladefehler ist kein Todo und braucht daher einen eigenen, kollisionsfreien Item-Key. */
 private const val LOAD_ERROR_KEY = "load-error"
@@ -549,7 +700,8 @@ private val PREVIEW_TODO_ACTIONS = TodoActions(
     onAddTodoClick = {},
     onTodoDoneChange = { _, _ -> },
     onTodoSwipedAway = {},
-    onEditTodoClick = {}
+    onEditTodoClick = {},
+    onTodoReordered = { _, _, _ -> }
 )
 
 private val PREVIEW_SNACKBAR_ACTIONS = SnackbarActions(
@@ -595,7 +747,8 @@ private val PREVIEW_TODOS = listOf(
         completedBy = null,
         completedAt = null,
         notes = "Die haltbare, nicht die frische — und zwei Packungen",
-        quantity = null
+        quantity = null,
+        sortOrder = null
     ),
     Todo(
         id = "todo-2",
@@ -607,7 +760,8 @@ private val PREVIEW_TODOS = listOf(
         completedBy = null,
         completedAt = null,
         notes = null,
-        quantity = null
+        quantity = null,
+        sortOrder = null
     ),
     Todo(
         id = "todo-3",
@@ -619,7 +773,8 @@ private val PREVIEW_TODOS = listOf(
         completedBy = null,
         completedAt = null,
         notes = null,
-        quantity = null
+        quantity = null,
+        sortOrder = null
     ),
     Todo(
         id = "todo-4",
@@ -631,6 +786,7 @@ private val PREVIEW_TODOS = listOf(
         completedBy = "uid-1",
         completedAt = PREVIEW_TIMESTAMP,
         notes = null,
-        quantity = null
+        quantity = null,
+        sortOrder = null
     )
 )

@@ -36,7 +36,13 @@ fun TodoDocument.toTodo(id: String): Todo? {
         notes = notes?.takeIf { it.isNotBlank() },
         // Dieselbe Vorsicht für die Menge: Null und Zero bedeuten beide „skaliert nicht", und mit
         // nur einer Form davon kommt der Rest ohne Sonderfall aus. Negatives ist ohnehin Unsinn.
-        quantity = quantity?.takeIf { it > 0 }
+        quantity = quantity?.takeIf { it > 0 },
+        // **Hier ausdrücklich nicht `it > 0`**: 0 und negative Werte sind gültige Plätze, die beim
+        // Ziehen ans Ende einer Gruppe ganz regulär entstehen. Geprüft wird nur auf endlich —
+        // Firestore speichert für ein Double-Feld auch NaN und Infinity, und ein in der Console von
+        // Hand eingetippter solcher Wert stünde sonst für immer ganz oben, weil Kotlin NaN über
+        // alles andere stellt.
+        sortOrder = sortOrder?.takeIf { it.isFinite() }
     )
 }
 
@@ -80,5 +86,6 @@ fun Todo.toDocument(): TodoDocument = TodoDocument(
     // Der Name, nicht die Position im Enum — dieselbe Regel wie in `updateTodo`.
     priority = priority.name,
     notes = notes,
-    quantity = quantity
+    quantity = quantity,
+    sortOrder = sortOrder
 )

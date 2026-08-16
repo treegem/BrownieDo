@@ -64,3 +64,4 @@ der den alten als „abgelöst" markiert.
 | [0036](0036-neue-liste-wird-geoeffnet-und-listener-wiederholt.md) | Jeder Anlegeweg öffnet, was er angelegt hat | akzeptiert |
 | [0037](0037-menge-am-eintrag-statt-zahl-im-titel.md) | Menge am Eintrag statt Zahl im Titel | akzeptiert |
 | [0038](0038-instanziieren-als-schwebender-knopf.md) | Instanziieren als schwebender Knopf statt Eintrag im Überlauf-Menü | akzeptiert |
+| [0039](0039-manuelle-sortierung-ueber-createdat-als-anker.md) | Manuelle Sortierung über `createdAt` als Anker, gezogen mit einer Bibliothek | akzeptiert |

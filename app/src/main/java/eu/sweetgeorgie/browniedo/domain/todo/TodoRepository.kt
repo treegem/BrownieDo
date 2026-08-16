@@ -85,4 +85,33 @@ interface TodoRepository {
      * (docs/decisions/0011-schreibvorgaenge-nicht-abwarten.md).
      */
     fun restoreTodo(listId: String, todo: Todo): Result<Unit>
+
+    /**
+     * Ordnet eine Aufgabe von Hand in ihre Prioritätsgruppe ein, siehe
+     * docs/decisions/0039-manuelle-sortierung-ueber-createdat-als-anker.md.
+     *
+     * [sortOrder] ist der **bereits gerechnete** Wert — gerechnet wird in der Domäne
+     * (`TodoSortOrder.kt`), das Repository schreibt nur, was es bekommt. Dieselbe Aufteilung wie bei
+     * der Menge (ADR 0037).
+     *
+     * Feldweise wie [setDone] und nicht als ganzes Dokument: Was der Partner gleichzeitig an Titel
+     * oder Notiz ändert, überlebt. Nicht abgewartet
+     * (docs/decisions/0011-schreibvorgaenge-nicht-abwarten.md), Sortieren funktioniert also offline.
+     */
+    fun setSortOrder(listId: String, todoId: String, sortOrder: Double): Result<Unit>
+
+    /**
+     * Vergibt die Plätze einer ganzen Prioritätsgruppe neu — **die Reparatur, nicht der Normalfall.**
+     *
+     * Gebraucht wird sie nur, wenn sich ein Platz nicht mehr als Zahl zwischen zwei Nachbarn
+     * ausdrücken lässt: zwei Nachbarn mit demselben Anker, oder eine Lücke, die durch wiederholtes
+     * Hineinziehen unter die Auflösung von `Double` geschrumpft ist. Beides erkennt
+     * `sortOrderBetween` daran, dass es null liefert.
+     *
+     * Ein Batch, damit die Gruppe nie halb umnummeriert dasteht — aber feldweise `update()` statt
+     * `set()`, damit auch hier überlebt, was der Partner gleichzeitig am Titel ändert. Eine
+     * Prioritätsgruppe ist menschengroß, das 500er-Limit eines Batches ist keine Schranke, die man
+     * hier erreicht.
+     */
+    fun renumberTodos(listId: String, sortOrders: Map<String, Double>): Result<Unit>
 }

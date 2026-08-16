@@ -55,6 +55,12 @@
     <string name="todo_list_priority_medium">Mittel</string>
     <string name="todo_list_priority_high">Hoch</string>
     <string name="todo_list_priority_content_description">Priorität: %1$s</string>
+    <!--
+        Die zwei TalkBack-Aktionen zum Sortieren von Hand. Ziehen ist mit TalkBack nicht bedienbar,
+        und anders als beim Löschen (ADR 0016) gäbe es sonst gar keinen zweiten Weg.
+    -->
+    <string name="todo_list_move_up">Nach oben verschieben</string>
+    <string name="todo_list_move_down">Nach unten verschieben</string>
     <string name="todo_list_target_list_label">Liste</string>
     <string name="todo_list_create_calendar_event">Termin anlegen</string>
     <string name="todo_list_moved_to">Nach „%1$s“ verschoben</string>

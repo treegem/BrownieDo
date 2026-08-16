@@ -26,7 +26,8 @@ class TodoMapperTest {
                 completedBy = "uid-partner",
                 completedAt = COMPLETED_AT,
                 notes = "Die haltbare, nicht die frische",
-                quantity = 2.0
+                quantity = 2.0,
+                sortOrder = 1_700_000_000_500.0
             ),
             todo
         )
@@ -149,7 +150,8 @@ class TodoMapperTest {
                 completedAt = Date.from(COMPLETED_AT),
                 priority = TodoPriority.HIGH.name,
                 notes = "Die haltbare, nicht die frische",
-                quantity = 2.0
+                quantity = 2.0,
+                sortOrder = 1_700_000_000_500.0
             ),
             todo?.toDocument()
         )
@@ -208,6 +210,48 @@ class TodoMapperTest {
         assertEquals(document.copy(updatedAt = null), roundTripped)
     }
 
+    /** Der Migrationsfall: Aufgaben von vor Phase 15 haben das Feld nicht. */
+    @Test
+    fun `reads an entry that has no sortOrder field at all`() {
+        val document = completeDocument().copy(sortOrder = null)
+
+        assertNull(document.toTodo(DOCUMENT_ID)?.sortOrder)
+    }
+
+    /**
+     * Die Gegenprobe zur Regel für die Menge, die alles `<= 0` verwirft: Beim Sortieren ist 0 ein
+     * Platz wie jeder andere, und negative Werte entstehen am Ende einer Gruppe ganz regulär. Wer
+     * hier aus Reflex `takeIf { it > 0 }` hinschreibt, wird von diesem Test gefangen.
+     */
+    @Test
+    fun `reads a sortOrder of zero or less as a real position`() {
+        assertEquals(0.0, completeDocument().copy(sortOrder = 0.0).toTodo(DOCUMENT_ID)?.sortOrder)
+        assertEquals(-5.0, completeDocument().copy(sortOrder = -5.0).toTodo(DOCUMENT_ID)?.sortOrder)
+    }
+
+    /**
+     * Firestore speichert für ein Double-Feld auch NaN und Infinity. Ein solcher Wert stünde sonst
+     * für immer ganz oben in seiner Gruppe, weil Kotlin NaN über alles andere stellt — und wäre in
+     * der App nicht mehr wegzuziehen.
+     */
+    @Test
+    fun `reads a sortOrder that is not a finite number as none`() {
+        assertNull(completeDocument().copy(sortOrder = Double.NaN).toTodo(DOCUMENT_ID)?.sortOrder)
+        assertNull(
+            completeDocument()
+                .copy(sortOrder = Double.POSITIVE_INFINITY)
+                .toTodo(DOCUMENT_ID)
+                ?.sortOrder
+        )
+    }
+
+    @Test
+    fun `an entry without a sortOrder survives being mapped to the domain and back`() {
+        val document = completeDocument().copy(sortOrder = null)
+
+        assertEquals(document.copy(updatedAt = null), document.toTodo(DOCUMENT_ID)?.toDocument())
+    }
+
     @Test
     fun `rejects a document whose server timestamps are still missing`() {
         assertNull(completeDocument().copy(createdAt = null).toTodo(DOCUMENT_ID))
@@ -228,7 +272,8 @@ class TodoMapperTest {
         completedAt = Date.from(COMPLETED_AT),
         priority = TodoPriority.HIGH.name,
         notes = "Die haltbare, nicht die frische",
-        quantity = 2.0
+        quantity = 2.0,
+        sortOrder = 1_700_000_000_500.0
     )
 
     private companion object {

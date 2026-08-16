@@ -18,6 +18,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import eu.sweetgeorgie.browniedo.R
 import eu.sweetgeorgie.browniedo.domain.list.TodoList
@@ -25,7 +27,9 @@ import eu.sweetgeorgie.browniedo.domain.todo.Todo
 import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
 import eu.sweetgeorgie.browniedo.ui.theme.BrownieDoTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -566,6 +570,145 @@ class TodoListScreenTest {
         composeTestRule.onNodeWithContentDescription(createListLabel()).assertDoesNotExist()
     }
 
+    // --- Von Hand sortieren (ADR 0039) ---
+
+    /*
+     * Geprüft wird über die TalkBack-Aktionen und nicht über die Ziehgeste, und das ist keine
+     * Notlösung: Die Aktionen laufen durch denselben Rückruf, sie sind ohne Zeitfenster und ohne
+     * Animationsuhr auswertbar, und sie sind zugleich der Weg, den ADR 0039 als den bedienbaren
+     * verlangt. Ob sich das Ziehen *anfühlt* wie es soll, beantwortet ohnehin nur das Gerät.
+     */
+
+    @Test
+    fun theMoveUpActionReportsTheNeighboursOfTheNewPlace() {
+        var reordered: Triple<Todo, Todo?, Todo?>? = null
+        setScreenContent(
+            uiState = TodoListUiState(
+                selectedList = LIST,
+                isLoading = false,
+                todos = SORTABLE_TODOS
+            ),
+            todoActions = NO_TODO_ACTIONS.copy(
+                onTodoReordered = { todo, above, below -> reordered = Triple(todo, above, below) }
+            )
+        )
+
+        // Der dritte Eintrag rückt eine Position nach oben — danach steht er zwischen dem ersten und
+        // dem zweiten.
+        performReorderAction(SORTABLE_TODOS[2].title, R.string.todo_list_move_up)
+
+        assertEquals(SORTABLE_TODOS[2].id, reordered?.first?.id)
+        assertEquals(SORTABLE_TODOS[0].id, reordered?.second?.id)
+        assertEquals(SORTABLE_TODOS[1].id, reordered?.third?.id)
+    }
+
+    /** Am oberen Rand der Gruppe gibt es nichts, wohin — die Aktion wird gar nicht erst angeboten. */
+    @Test
+    fun theFirstEntryOfAGroupOffersNoMoveUpAction() {
+        setScreenContent(
+            uiState = TodoListUiState(
+                selectedList = LIST,
+                isLoading = false,
+                todos = SORTABLE_TODOS
+            )
+        )
+
+        assertFalse(
+            reorderActionLabels(SORTABLE_TODOS[0].title)
+                .contains(label(R.string.todo_list_move_up))
+        )
+        // Die Gegenprobe in derselben Zeile: Nach unten geht sehr wohl etwas.
+        assertTrue(
+            reorderActionLabels(SORTABLE_TODOS[0].title)
+                .contains(label(R.string.todo_list_move_down))
+        )
+    }
+
+    /**
+     * Der letzte **offene** Eintrag ist zugleich das Ende seiner Gruppe: Darunter steht nur noch
+     * Erledigtes, und dorthin wird nicht sortiert.
+     */
+    @Test
+    fun theLastEntryOfAGroupOffersNoMoveDownAction() {
+        setScreenContent(
+            uiState = TodoListUiState(
+                selectedList = LIST,
+                isLoading = false,
+                todos = SORTABLE_TODOS
+            )
+        )
+
+        assertFalse(
+            reorderActionLabels(SORTABLE_TODOS[2].title)
+                .contains(label(R.string.todo_list_move_down))
+        )
+    }
+
+    /** Regel 1: Der erledigte Block ist ein Protokoll und wird nicht umsortiert. */
+    @Test
+    fun aFinishedEntryOffersNoReorderActionAtAll() {
+        setScreenContent(
+            uiState = TodoListUiState(
+                selectedList = LIST,
+                isLoading = false,
+                todos = SORTABLE_TODOS
+            )
+        )
+
+        assertTrue(reorderActionLabels(FINISHED_TODO.title).isEmpty())
+    }
+
+    /**
+     * Das einzige echte Gesten-Risiko der Phase: Die Ziehgeste muss dem `clickable` der Zeile den
+     * Druck abnehmen. Täte sie es nicht, öffnete jeder Anhebeversuch beim Loslassen den
+     * Bearbeiten-Dialog — und man käme gar nicht erst zum Ziehen.
+     *
+     * Bewusst **ohne** Bewegung: Geprüft wird, wer den Druck gewinnt, nicht wohin die Zeile wandert.
+     * Damit hängt der Test an keiner Animationsuhr und an keinem Zeitfenster.
+     */
+    @Test
+    fun aLongPressWithoutMovementDoesNotOpenTheEditDialog() {
+        var edited: Todo? = null
+        setScreenContent(
+            uiState = TodoListUiState(
+                selectedList = LIST,
+                isLoading = false,
+                todos = SORTABLE_TODOS
+            ),
+            todoActions = NO_TODO_ACTIONS.copy(onEditTodoClick = { edited = it })
+        )
+
+        composeTestRule.onNodeWithText(OPEN_TODO.title).performTouchInput {
+            down(center)
+            advanceEventTime(LONG_PRESS_MILLIS)
+            up()
+        }
+        composeTestRule.waitForIdle()
+
+        assertNull(edited)
+    }
+
+    private fun label(labelResId: Int): String = composeTestRule.activity.getString(labelResId)
+
+    /** Die Beschriftungen der Sortier-Aktionen, die TalkBack an dieser Zeile anbieten würde. */
+    private fun reorderActionLabels(title: String): List<String> =
+        composeTestRule.onNodeWithText(title)
+            .fetchSemanticsNode()
+            .config
+            .getOrNull(SemanticsActions.CustomActions)
+            .orEmpty()
+            .map { it.label }
+
+    private fun performReorderAction(title: String, labelResId: Int) {
+        val action = composeTestRule.onNodeWithText(title)
+            .fetchSemanticsNode()
+            .config[SemanticsActions.CustomActions]
+            .first { it.label == label(labelResId) }
+
+        composeTestRule.runOnUiThread { action.action() }
+        composeTestRule.waitForIdle()
+    }
+
     // --- Menge und Faktor (ADR 0037) ---
 
     @Test
@@ -751,6 +894,9 @@ class TodoListScreenTest {
     private companion object {
         const val DISMISS_TIMEOUT_MILLIS = 10_000L
 
+        /** Deutlich über der Systemschwelle für einen langen Druck (rund 500 ms). */
+        const val LONG_PRESS_MILLIS = 1_000L
+
         /*
          * Halter, die nichts tun — die Vorgabe für jeden Test, der den jeweiligen Bereich nicht
          * beobachtet. Die Halter selbst tragen bewusst keine Standardwerte, damit ein in
@@ -785,7 +931,8 @@ class TodoListScreenTest {
             onAddTodoClick = {},
             onTodoDoneChange = { _, _ -> },
             onTodoSwipedAway = {},
-            onEditTodoClick = {}
+            onEditTodoClick = {},
+            onTodoReordered = { _, _, _ -> }
         )
 
         val NO_EDIT_ACTIONS = TodoEditActions(
@@ -820,7 +967,8 @@ class TodoListScreenTest {
             completedBy = null,
             completedAt = null,
             notes = null,
-            quantity = null
+            quantity = null,
+            sortOrder = null
         )
 
         val TODO_WITH_NOTES = OPEN_TODO.copy(
@@ -844,5 +992,16 @@ class TodoListScreenTest {
         )
 
         val TODOS = listOf(OPEN_TODO, FINISHED_TODO)
+
+        /**
+         * Drei offene Einträge derselben Stufe, darunter ein erledigter — die Liste, in der sich von
+         * Hand sortieren lässt. Die Reihenfolge ist die, in der sie auf dem Bildschirm stehen.
+         */
+        val SORTABLE_TODOS = listOf(
+            OPEN_TODO,
+            TODO_WITH_NOTES,
+            OPEN_TODO.copy(id = "todo-third", title = "Brot holen"),
+            FINISHED_TODO
+        )
     }
 }

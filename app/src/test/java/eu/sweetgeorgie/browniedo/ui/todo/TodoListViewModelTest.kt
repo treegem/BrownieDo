@@ -9,6 +9,7 @@ import eu.sweetgeorgie.browniedo.domain.todo.Todo
 import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
 import eu.sweetgeorgie.browniedo.domain.todo.TodoRepository
 import eu.sweetgeorgie.browniedo.domain.todo.TodoUpdate
+import eu.sweetgeorgie.browniedo.domain.todo.effectiveOrder
 import eu.sweetgeorgie.browniedo.domain.user.Partner
 import eu.sweetgeorgie.browniedo.domain.user.PartnerRepository
 import java.time.Instant
@@ -880,6 +881,151 @@ class TodoListViewModelTest {
         advanceUntilIdle()
     }
 
+    // --- Von Hand sortieren (ADR 0039) ---
+
+    @Test
+    fun `dropping an entry between two neighbours writes the computed place`() =
+        runTest(testDispatcher) {
+            seedGroupInFirstList()
+
+            viewModel.onTodoReordered(THIRD_ENTRY, above = FIRST_ENTRY, below = SECOND_ENTRY)
+
+            val call = todoRepository.lastSetSortOrderCall
+            assertEquals(LIST_A.id, call?.listId)
+            assertEquals(THIRD_ENTRY.id, call?.todoId)
+            // Echt zwischen den beiden Ankern — die Zahl selbst rechnet die Domäne aus.
+            assertTrue(call!!.sortOrder < FIRST_ENTRY.effectiveOrder)
+            assertTrue(call.sortOrder > SECOND_ENTRY.effectiveOrder)
+        }
+
+    /**
+     * Der Abseits-um-eins, den jede Ziehimplementierung einmal einbaut: Beim Zug nach unten sind die
+     * Nachbarn die aus der Liste **ohne** die gezogene Aufgabe. Landet der Wert nicht zwischen
+     * genau diesem Paar, rutscht der Eintrag um eine Stelle zu wenig.
+     */
+    @Test
+    fun `dropping an entry one place down lands between the right pair`() =
+        runTest(testDispatcher) {
+            seedGroupInFirstList()
+
+            viewModel.onTodoReordered(FIRST_ENTRY, above = SECOND_ENTRY, below = THIRD_ENTRY)
+
+            val written = todoRepository.lastSetSortOrderCall!!.sortOrder
+            assertTrue(written < SECOND_ENTRY.effectiveOrder)
+            assertTrue(written > THIRD_ENTRY.effectiveOrder)
+        }
+
+    @Test
+    fun `dropping an entry at the top of its group puts it above the first neighbour`() =
+        runTest(testDispatcher) {
+            seedGroupInFirstList()
+
+            viewModel.onTodoReordered(THIRD_ENTRY, above = null, below = FIRST_ENTRY)
+
+            assertTrue(
+                todoRepository.lastSetSortOrderCall!!.sortOrder > FIRST_ENTRY.effectiveOrder
+            )
+        }
+
+    /** Regel 2, ein zweites Mal geprüft — die Oberfläche lässt den Zug gar nicht erst zu. */
+    @Test
+    fun `refuses to sort an entry next to a neighbour of another priority`() =
+        runTest(testDispatcher) {
+            seedGroupInFirstList()
+
+            viewModel.onTodoReordered(
+                FIRST_ENTRY,
+                above = URGENT_ENTRY,
+                below = null
+            )
+
+            assertEquals(0, todoRepository.setSortOrderCallCount)
+        }
+
+    /** Regel 1: Der erledigte Block ist ein Protokoll und wird nicht umsortiert. */
+    @Test
+    fun `refuses to sort a ticked entry`() = runTest(testDispatcher) {
+        seedGroupInFirstList()
+
+        viewModel.onTodoReordered(FINISHED_TODO_ENTRY, above = FIRST_ENTRY, below = SECOND_ENTRY)
+
+        assertEquals(0, todoRepository.setSortOrderCallCount)
+    }
+
+    @Test
+    fun `refuses to sort an entry next to a ticked neighbour`() = runTest(testDispatcher) {
+        seedGroupInFirstList()
+
+        viewModel.onTodoReordered(FIRST_ENTRY, above = FINISHED_TODO_ENTRY, below = null)
+
+        assertEquals(0, todoRepository.setSortOrderCallCount)
+    }
+
+    /**
+     * Lässt sich der Platz nicht als Zahl ausdrücken — hier zwei Nachbarn mit demselben Anker —,
+     * bekommt die ganze Gruppe frische Werte, statt dass der Zug wirkungslos verpufft.
+     */
+    @Test
+    fun `renumbers the group when the place cannot be expressed as a number`() =
+        runTest(testDispatcher) {
+            val twin = SECOND_ENTRY.copy(id = "todo-twin")
+            advanceUntilIdle()
+            todoRepository.emit(
+                LIST_A.id,
+                Result.success(listOf(FIRST_ENTRY, SECOND_ENTRY, twin))
+            )
+            advanceUntilIdle()
+
+            viewModel.onTodoReordered(FIRST_ENTRY, above = SECOND_ENTRY, below = twin)
+
+            val call = todoRepository.lastRenumberCall
+            assertEquals(LIST_A.id, call?.listId)
+            // Die ganze Gruppe, mit der gezogenen Aufgabe an ihrem neuen Platz.
+            assertEquals(
+                listOf(SECOND_ENTRY.id, FIRST_ENTRY.id, twin.id),
+                call?.sortOrders?.keys?.toList()
+            )
+            assertNull(todoRepository.lastSetSortOrderCall)
+        }
+
+    @Test
+    fun `a failing sort reports an update error`() = runTest(testDispatcher) {
+        seedGroupInFirstList()
+        todoRepository.setSortOrderResult = Result.failure(IllegalStateException("nope"))
+
+        viewModel.onTodoReordered(THIRD_ENTRY, above = FIRST_ENTRY, below = SECOND_ENTRY)
+
+        assertEquals(TodoListError.UPDATE_FAILED, viewModel.uiState.value.error)
+    }
+
+    /**
+     * Die Priorität im Bearbeiten-Dialog zu ändern **behält** den von Hand gewählten Platz: Ihn
+     * stillschweigend zu löschen zerstörte den Zug, den der Partner eine Sekunde vorher gemacht hat
+     * (ADR 0039).
+     */
+    @Test
+    fun `changing only the priority keeps the hand-sorted place`() = runTest(testDispatcher) {
+        val sorted = TODO_ENTRY.copy(sortOrder = 500.0)
+        seedEntryInFirstList(sorted)
+
+        viewModel.onEditTodoClick(sorted)
+        viewModel.onEditedPriorityChange(TodoPriority.HIGH)
+        viewModel.onEditedTargetListChange(LIST_B)
+        viewModel.onEditConfirm()
+
+        assertEquals(500.0, todoRepository.lastMoveTodoCall?.todo?.sortOrder)
+    }
+
+    /** Drei offene Einträge derselben Stufe, absteigend nach Alter — die Gruppe, in der gezogen wird. */
+    private fun TestScope.seedGroupInFirstList() {
+        advanceUntilIdle()
+        todoRepository.emit(
+            LIST_A.id,
+            Result.success(listOf(FIRST_ENTRY, SECOND_ENTRY, THIRD_ENTRY))
+        )
+        advanceUntilIdle()
+    }
+
     @Test
     fun `deleting an entry removes it and closes the dialog`() = runTest(testDispatcher) {
         advanceUntilIdle()
@@ -1400,7 +1546,8 @@ private val TODO_ENTRY = Todo(
     completedBy = null,
     completedAt = null,
     notes = null,
-    quantity = null
+    quantity = null,
+    sortOrder = null
 )
 
 /** Ein Vorlagen-Eintrag, der mitskaliert — und einer, der es ausdrücklich nicht tut. */
@@ -1408,6 +1555,20 @@ private val SHIRT_ENTRY = TODO_ENTRY.copy(id = "todo-shirt", title = "T-Shirt", 
 
 private val SHAMPOO_ENTRY =
     TODO_ENTRY.copy(id = "todo-shampoo", title = "Shampoo", quantity = null)
+
+/*
+ * Drei offene Einträge derselben Stufe, deren Anker absteigend sind — also genau die Reihenfolge,
+ * in der sie auch auf dem Bildschirm stehen. Der vierte trägt eine andere Stufe und ist die
+ * Gegenprobe für die Gruppengrenze.
+ */
+private val FIRST_ENTRY = TODO_ENTRY.copy(id = "todo-first", sortOrder = 300.0)
+
+private val SECOND_ENTRY = TODO_ENTRY.copy(id = "todo-second", sortOrder = 200.0)
+
+private val THIRD_ENTRY = TODO_ENTRY.copy(id = "todo-third", sortOrder = 100.0)
+
+private val URGENT_ENTRY =
+    TODO_ENTRY.copy(id = "todo-urgent", priority = TodoPriority.HIGH, sortOrder = 300.0)
 
 private val FINISHED_TODO_ENTRY = TODO_ENTRY.copy(
     isDone = true,
@@ -1432,6 +1593,10 @@ private data class DeleteCall(val listId: String, val todoId: String)
 
 private data class RestoreTodoCall(val listId: String, val todo: Todo)
 
+private data class SetSortOrderCall(val listId: String, val todoId: String, val sortOrder: Double)
+
+private data class RenumberCall(val listId: String, val sortOrders: Map<String, Double>)
+
 private class FakeTodoRepository : TodoRepository {
     var addResult: Result<Unit> = Result.success(Unit)
     var setDoneResult: Result<Unit> = Result.success(Unit)
@@ -1439,6 +1604,7 @@ private class FakeTodoRepository : TodoRepository {
     var moveTodoResult: Result<Unit> = Result.success(Unit)
     var deleteResult: Result<Unit> = Result.success(Unit)
     var restoreTodoResult: Result<Unit> = Result.success(Unit)
+    var setSortOrderResult: Result<Unit> = Result.success(Unit)
     var addCallCount = 0
         private set
     var lastAddCall: AddCall? = null
@@ -1452,6 +1618,12 @@ private class FakeTodoRepository : TodoRepository {
     var lastDeleteCall: DeleteCall? = null
         private set
     var lastRestoreTodoCall: RestoreTodoCall? = null
+        private set
+    var lastSetSortOrderCall: SetSortOrderCall? = null
+        private set
+    var setSortOrderCallCount = 0
+        private set
+    var lastRenumberCall: RenumberCall? = null
         private set
 
     /** Lists a flow was requested for, in order — that is what a list switch has to change. */
@@ -1505,6 +1677,17 @@ private class FakeTodoRepository : TodoRepository {
     override fun restoreTodo(listId: String, todo: Todo): Result<Unit> {
         lastRestoreTodoCall = RestoreTodoCall(listId, todo)
         return restoreTodoResult
+    }
+
+    override fun setSortOrder(listId: String, todoId: String, sortOrder: Double): Result<Unit> {
+        setSortOrderCallCount++
+        lastSetSortOrderCall = SetSortOrderCall(listId, todoId, sortOrder)
+        return setSortOrderResult
+    }
+
+    override fun renumberTodos(listId: String, sortOrders: Map<String, Double>): Result<Unit> {
+        lastRenumberCall = RenumberCall(listId, sortOrders)
+        return Result.success(Unit)
     }
 }
 

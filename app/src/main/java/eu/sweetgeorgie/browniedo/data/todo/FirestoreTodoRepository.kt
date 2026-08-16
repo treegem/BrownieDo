@@ -13,12 +13,14 @@ import eu.sweetgeorgie.browniedo.data.todo.TodoField.DONE
 import eu.sweetgeorgie.browniedo.data.todo.TodoField.NOTES
 import eu.sweetgeorgie.browniedo.data.todo.TodoField.PRIORITY
 import eu.sweetgeorgie.browniedo.data.todo.TodoField.QUANTITY
+import eu.sweetgeorgie.browniedo.data.todo.TodoField.SORT_ORDER
 import eu.sweetgeorgie.browniedo.data.todo.TodoField.TITLE
 import eu.sweetgeorgie.browniedo.data.todo.TodoField.UPDATED_AT
 import eu.sweetgeorgie.browniedo.domain.todo.Todo
 import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
 import eu.sweetgeorgie.browniedo.domain.todo.TodoRepository
 import eu.sweetgeorgie.browniedo.domain.todo.TodoUpdate
+import eu.sweetgeorgie.browniedo.domain.todo.effectiveOrder
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -190,6 +192,28 @@ class FirestoreTodoRepository(private val firestore: FirebaseFirestore) : TodoRe
     override fun restoreTodo(listId: String, todo: Todo): Result<Unit> =
         runCatching { todoCollection(listId).document(todo.id).set(todo.toDocument()) }.map { }
 
+    override fun setSortOrder(listId: String, todoId: String, sortOrder: Double): Result<Unit> =
+        runCatching {
+            todoCollection(listId).document(todoId).update(
+                // Feldweise wie in setDone, und aus demselben Grund muss UPDATED_AT von Hand
+                // mitgesetzt werden: @ServerTimestamp greift nur beim Schreiben ganzer Objekte
+                // (ADR 0006).
+                mapOf(SORT_ORDER to sortOrder, UPDATED_AT to FieldValue.serverTimestamp())
+            )
+        }.map { }
+
+    override fun renumberTodos(listId: String, sortOrders: Map<String, Double>): Result<Unit> =
+        runCatching {
+            val batch = firestore.batch()
+            sortOrders.forEach { (todoId, sortOrder) ->
+                batch.update(
+                    todoCollection(listId).document(todoId),
+                    mapOf(SORT_ORDER to sortOrder, UPDATED_AT to FieldValue.serverTimestamp())
+                )
+            }
+            batch.commit()
+        }.map { }
+
     private companion object {
         /**
          * Wie oft ein abgewiesener Listener neu aufgebaut wird. Zwei reichen: Es geht um das Fenster
@@ -231,9 +255,21 @@ internal val TODO_ORDER: Comparator<Todo> = Comparator { first, second ->
     }
 }
 
-/** Das Dringendste oben, bei gleicher Stufe die neueste Aufgabe. */
-private val OPEN_ORDER: Comparator<Todo> =
-    compareByDescending(Todo::priority).thenByDescending(Todo::createdAt)
+/**
+ * Das Dringendste oben, bei gleicher Stufe die von Hand gewählte Reihenfolge.
+ *
+ * `effectiveOrder` fällt auf den Anlagezeitpunkt zurück, solange niemand von Hand sortiert hat — der
+ * Vergleich ist dann **paarweise derselbe** wie der frühere `thenByDescending(Todo::createdAt)`, weil
+ * die Millisekunden monoton im Zeitpunkt sind. Das `thenByDescending(Todo::createdAt)` dahinter
+ * entscheidet weiterhin bei Gleichstand und ist damit kein Rest, sondern die alte letzte Instanz.
+ *
+ * Die Priorität steht davor und bleibt unangetastet: Von Hand sortiert wird **innerhalb** einer
+ * Stufe, nie über sie hinweg, siehe
+ * docs/decisions/0039-manuelle-sortierung-ueber-createdat-als-anker.md.
+ */
+private val OPEN_ORDER: Comparator<Todo> = compareByDescending(Todo::priority)
+    .thenByDescending(Todo::effectiveOrder)
+    .thenByDescending(Todo::createdAt)
 
 /**
  * Zuletzt abgehakt oben, Einträge ohne Erledigungszeitpunkt ans Ende.
@@ -245,6 +281,11 @@ private val OPEN_ORDER: Comparator<Todo> =
  * worden. So herum kehrt `reverseOrder()` nur die echten Zeitpunkte um, und `nullsLast` hängt die
  * fehlenden hinten an. Der letzte Schritt entscheidet nur noch zwischen zwei alten Einträgen und
  * lässt ihnen die Reihenfolge, die sie vor Phase 9 hatten.
+ *
+ * **Von Hand sortiert wird hier ausdrücklich nicht** (ADR 0039): Der erledigte Block ist ein
+ * Protokoll nach Erledigungszeitpunkt, keine Werkliste, die man umordnen wollte. Ein `sortOrder`
+ * bleibt an einer abgehakten Aufgabe zwar stehen, wirkt hier aber nicht — und gilt wieder, sobald
+ * sie erneut geöffnet wird.
  */
 private val FINISHED_ORDER: Comparator<Todo> =
     compareBy(nullsLast(reverseOrder<Instant>()), Todo::completedAt)

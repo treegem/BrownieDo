@@ -1,7 +1,7 @@
 package eu.sweetgeorgie.browniedo.ui.todo
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -16,11 +16,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -56,6 +60,8 @@ internal fun SwipeableTodoRow(
     onDoneChange: (Boolean) -> Unit,
     onClick: () -> Unit,
     onSwipedAway: () -> Unit,
+    onMoveUp: (() -> Unit)?,
+    onMoveDown: (() -> Unit)?,
     modifier: Modifier = Modifier
 ) {
     val swipeState = rememberSwipeToDismissBoxState(
@@ -99,7 +105,9 @@ internal fun SwipeableTodoRow(
             todo = todo,
             isTemplateEntry = isTemplateEntry,
             onDoneChange = onDoneChange,
-            onClick = onClick
+            onClick = onClick,
+            onMoveUp = onMoveUp,
+            onMoveDown = onMoveDown
         )
     }
 }
@@ -131,9 +139,21 @@ private fun TodoRow(
     isTemplateEntry: Boolean,
     onDoneChange: (Boolean) -> Unit,
     onClick: () -> Unit,
+    onMoveUp: (() -> Unit)?,
+    onMoveDown: (() -> Unit)?,
     modifier: Modifier = Modifier
 ) {
     val markerIconResId = todo.priority.markerIconResId()
+    val moveUpLabel = stringResource(R.string.todo_list_move_up)
+    val moveDownLabel = stringResource(R.string.todo_list_move_down)
+    // Was sich nicht bewegen lässt, wird gar nicht erst angeboten — sonst liest TalkBack an einer
+    // Gruppengrenze eine Aktion vor, die nichts tut.
+    val reorderActions = remember(onMoveUp, onMoveDown, moveUpLabel, moveDownLabel) {
+        listOfNotNull(
+            onMoveUp?.let { CustomAccessibilityAction(moveUpLabel) { it(); true } },
+            onMoveDown?.let { CustomAccessibilityAction(moveDownLabel) { it(); true } }
+        )
+    }
 
     ListItem(
         headlineContent = {
@@ -149,7 +169,19 @@ private fun TodoRow(
                 textDecoration = if (todo.isDone) TextDecoration.LineThrough else null
             )
         },
-        modifier = modifier.clickable(onClick = onClick),
+        // Die Semantik gehört **an diese Kette**, neben den Klick: Dieser Knoten ist der, den
+        // TalkBack fokussiert (er fasst die Zeile zusammen), und auf einem Vorfahren deklarierte
+        // Aktionen würden dort nicht angeboten.
+        //
+        // `combinedClickable` statt `clickable`, und der leere `onLongClick` ist der ganze Zweck:
+        // Der lange Druck gehört der Ziehgeste, nicht dem Klick. Ohne ihn kennt der Tipp-Erkenner
+        // nur „gedrückt und losgelassen" und öffnet beim Loslassen den Bearbeiten-Dialog — man hebt
+        // die Zeile an, überlegt es sich anders, und bekommt einen Dialog. Der
+        // `longPressDraggableHandle` des Vorfahren verhindert das nicht, er verbraucht den Druck
+        // nicht. Belegt von `aLongPressWithoutMovementDoesNotOpenTheEditDialog`, der vorher rot war.
+        modifier = modifier
+            .combinedClickable(onClick = onClick, onLongClick = {})
+            .semantics { customActions = reorderActions },
         // Angedeutet, nicht ausgebreitet: eine Zeile mit Auslassungspunkten, siehe
         // docs/decisions/0030-notiz-als-zweite-zeile.md. Keine eigene Farbe — ListItem färbt den
         // Slot schon auf onSurfaceVariant, und eine Farbe am inneren Text würde überschrieben.

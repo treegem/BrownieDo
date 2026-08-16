@@ -878,49 +878,112 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
 >
 > Gilt für Listen **und** Vorlagen gleichermaßen — eine Vorlage hat dieselbe Prioritäts- und jetzt
 > auch Sortier-Ebene wie eine Arbeitsliste.
-- [ ] `Todo` und `TodoDocument` um `sortOrder: Double?` erweitern, dazu `TodoField`. **Nullable, und
-  „noch nie manuell einsortiert" ist der Normalfall für Bestandsaufgaben** — dieselbe Antwort wie bei
-  Notiz und Menge, kein Rückfallwert und kein Nachziehen in der Console
+- [x] `Todo` und `TodoDocument` um `sortOrder: Double?` erweitern, dazu `TodoField`. **Nullable, und
+  „noch nie von Hand einsortiert" ist der Normalfall für Bestandsaufgaben** — dieselbe Antwort wie bei
+  Notiz und Menge, kein Rückfallwert im Dokument und kein Nachziehen in der Console
   ([ADR 0023](docs/decisions/0023-prioritaet-migration-und-sortierung.md) zum Gegenbeispiel, wo ein
-  Rückfallwert nötig war, weil `TodoPriority` nicht nullable ist)
-- [ ] `TODO_ORDER` erweitern: `OPEN_ORDER` vergleicht weiterhin zuerst nach `priority`
-  (`compareByDescending`, unangetastet — das ist Regel 2), danach nach `sortOrder` aufsteigend
-  (`nullsLast`), erst danach wie bisher nach `createdAt` absteigend als letzter Tie-Breaker.
-  `FINISHED_ORDER` bleibt **unangetastet** — erledigte Aufgaben sind ein Protokoll nach
-  Erledigungszeitpunkt, keine Werkliste, die man umordnen wollte, und Regel 1 verlangt ohnehin keine
-  Sortierbarkeit dort
-- [ ] Beim Anlegen (`addTodo`) sofort einen `sortOrder` vergeben, der die Aufgabe an die Spitze ihrer
-  Prioritätsgruppe setzt — das heutige Verhalten (neueste zuerst) bleibt damit die Vorgabe, bis jemand
-  von Hand einordnet. Ohne diesen Schritt bräuchte jede frisch angelegte Aufgabe eine Sonderbehandlung
-  im Comparator
-- [ ] Verschieben zwischen Listen und Instanziieren aus einer Vorlage nehmen `sortOrder` unverändert
-  mit — wie `priority`, `notes` und `quantity` schon
+  Rückfallwert nötig war, weil `TodoPriority` nicht nullable ist).
+  **Beim Lesen wird nur auf endlich geprüft, nicht auf `> 0`** — anders als bei der Menge sind 0 und
+  negative Werte gültige Plätze, die am Ende einer Gruppe regulär entstehen. NaN und Infinity fliegen
+  dagegen raus: Kotlin stellt NaN über alles, ein von Hand eingetippter solcher Wert stünde sonst für
+  immer ganz oben und wäre nicht mehr wegzuziehen
+- [x] **Der Anker fällt auf `createdAt` zurück — und der Entwurf mit `nullsLast` ist damit vom Tisch.**
+  Sortiert wird nach `effectiveOrder = sortOrder ?: createdAt.toEpochMilli()`, absteigend;
+  `OPEN_ORDER` vergleicht Priorität (unangetastet, Regel 2), dann diesen Anker, dann wie bisher
+  `createdAt` als letzte Instanz. `FINISHED_ORDER` und die äußere `isDone`-Unterscheidung bleiben
+  **unangetastet** (Regel 1).
+  **Hier stand „`sortOrder` aufsteigend mit `nullsLast`, Bestandsaufgaben ans Ende ihrer Gruppe" —
+  das war nicht umsetzbar**, und zwar genau im Normalfall nach dem Ausrollen: Eine Gruppe, in der
+  noch niemand gezogen hat, besteht nur aus `null` und hat keinen einzigen Zahlenanker. Jeder Wert
+  hätte die gezogene Aufgabe auf Platz 1 gehoben, egal wohin man zieht; den Nachbarn Werte zu geben
+  hieße, die ganze Gruppe neu zu nummerieren — genau das, was der Punkt darunter ausschließt. Die
+  ganze Ableitung steht in
+  [ADR 0039](docs/decisions/0039-manuelle-sortierung-ueber-createdat-als-anker.md)
+- [x] **`addTodo` bleibt unangetastet** — hier stand „vergibt sofort einen `sortOrder`". Mit dem
+  abgeleiteten Anker landet eine frisch angelegte Aufgabe **ohne jeden Schreibvorgang** oben, weil
+  ihre Millisekunden die größten sind. Damit entfällt auch die Signaturänderung, die der alte Punkt
+  erzwungen hätte
+- [x] Verschieben zwischen Listen, Instanziieren aus einer Vorlage und das Rückgängig zum Löschen
+  nehmen `sortOrder` unverändert mit — wie `priority`, `notes` und `quantity` schon
   ([ADR 0024](docs/decisions/0024-verschieben-behaelt-zustand.md),
-  [ADR 0026](docs/decisions/0026-verschieben-schreibt-createdat-selbst.md)). Ohne das fiele eine
-  verschobene Aufgabe in der Zielliste an eine zufällige Position gegenüber einer dort bereits von
-  Hand sortierten Nachbarschaft
-- [ ] Bedienung: Aufgabe per Ziehen (Long-Press-Drag) innerhalb ihrer Prioritätsgruppe neu einordnen.
-  Ein Ziehen über eine Gruppengrenze hinweg ändert nichts an der Priorität — es sortiert nur innerhalb
-  der eigenen Gruppe, oder ist über die Grenze hinweg gar nicht erst möglich (Regel 2)
-- [ ] Beim Ablegen wird **nur die gezogene Aufgabe neu geschrieben** — ein `sortOrder`, der zwischen
-  die neuen Nachbarn fällt (gebrochene Rangzahl statt Neunummerierung; am Gruppenanfang/-ende ein
-  fester Abstand zum einzigen Nachbarn). Kein Batch, keine Neuvergabe an unberührte Nachbarn — analog
-  zum sparsamen Schreiben beim Verschieben
-  ([ADR 0011](docs/decisions/0011-schreibvorgaenge-nicht-abwarten.md))
-- [ ] Bestandsaufgaben ohne `sortOrder` fallen ans Ende ihrer Prioritätsgruppe, untereinander
-  weiterhin nach `createdAt` geordnet — genau die heutige Reihenfolge, bis eine von ihnen selbst
-  gezogen wird
-- [ ] Security Rules gegenprüfen — vermutlich keine Änderung nötig, `todos` kennt bislang keine
-  Feldprüfung (wie bei Priorität, Notiz und Menge), aber ausdrücklich nachsehen und hier vermerken
-- [ ] ADR: **Manuelle Sortierung über eine gebrochene Rangzahl (`sortOrder`)** statt Neuschreiben
-  ganzer Gruppen bei jedem Zug — mit den Alternativen (ganzzahlige Positionen bei jedem Zug komplett
-  neu durchnummerieren; feste Reihenfolge über ein Firestore-Array statt eines Felds je Dokument; ein
-  fertiges Drag-and-Drop-Bibliothekspaket statt einer eigenen Geste)
-- [ ] Unit-Tests: `TODO_ORDER` mit gemischten `sortOrder`-Werten, mit und ohne das Feld, innerhalb
-  aller drei Prioritätsstufen · die Vergabe eines Werts beim Anlegen · das Mitführen beim Verschieben
-  und beim Instanziieren aus einer Vorlage
-- [ ] Instrumentierte Tests: Ziehen innerhalb einer Gruppe meldet die neue Reihenfolge; ein Ziehen über
-  eine Gruppengrenze hinweg ändert nichts (oder ist gar nicht erst auslösbar)
+  [ADR 0026](docs/decisions/0026-verschieben-schreibt-createdat-selbst.md)). Kostete keine Zeile
+  Extraarbeit: Alle drei laufen über `toDocument()`, und der Hin-und-zurück-Test im
+  `TodoMapperTest` hat das vergessene Feld beim ersten Lauf prompt gemeldet.
+  **Und weil der Anker zeitskaliert ist, ist das Ergebnis sinnvoll:** Eine alte, nie gezogene Aufgabe
+  landet in der Zielliste nach ihrem Alter — genau das, was der Geräteblick aus Phase 10 verlangt. In
+  einem Rangzahlraum hätte eine mitgebrachte 3.0 sie ans Ende geschleudert
+- [x] Bedienung: langer Druck auf die Zeile, gezogen wird innerhalb der eigenen Prioritätsgruppe.
+  **Die Grenze wird laufend verweigert, nicht geklemmt** — die Zeile folgt dem Finger weiter, nur der
+  Tausch unterbleibt. Eine Zeile, die stehen bleibt, liest sich wie eine abgerissene Geste; frei
+  ziehen und erst beim Ablegen verwerfen wäre noch schlechter, weil sich die ganze Liste sichtbar
+  umordnete und dann zurückschnappte. Erledigte Zeilen lassen sich gar nicht erst anheben
+- [x] **Umgesetzt mit `sh.calvin.reorderable`, nicht selbst gebaut.** Auto-Scroll am Rand, variable
+  Zeilenhöhen (die Notiz als zweite Zeile, ADR 0030) und das Festkleben am Finger sind die drei
+  schweren Teile; selbst gebaut wären es rund 300 Zeilen, die ohne Robolectric nur auf dem Gerät zu
+  debuggen und praktisch nicht regressionstestbar wären. Das schärft die Abhängigkeits-Skepsis, statt
+  ihr zu widersprechen — Hilt hatte eine offensichtliche Alternative (ADR 0004), diese Geste hat
+  keine. Der Rauchtest vor der Übernahme lief sauber: Gradle hebt ihre Compose-Foundation von 1.7.0
+  auf die 1.11.4 der BOM, und die Integration kompilierte auf Anhieb.
+  **Kein Ziehgriff:** `trailingContent` trägt den Prioritätspfeil nur bei hoch und niedrig, bei mittel
+  nichts, erledigte Zeilen bekämen gar keinen — der rechte Rand fransete aus und änderte sich beim
+  Abhaken. Stattdessen eine Haptik beim Anheben, dieselbe Abwägung wie beim Wischen (ADR 0016)
+- [x] Beim Ablegen wird **nur die gezogene Aufgabe neu geschrieben** — feldweise über `setSortOrder`,
+  mit dem Wert zwischen den neuen Nachbarn; am Rand einer Gruppe ein fester Abstand von einer Sekunde
+  zum einzigen Nachbarn. Kein Batch, keine Neuvergabe an unberührte Nachbarn (ADR 0011).
+  **Mit einer Ausnahme, die es geben muss:** Lässt sich der Platz nicht als Zahl ausdrücken, bekommt
+  die Gruppe über `renumberTodos` frische Werte. Das trifft zwei Fälle mit einem Prädikat — zwei
+  Nachbarn mit demselben Anker (dieselbe Millisekunde, beide nie gezogen) und eine Lücke, die durch
+  wiederholtes Hineinziehen aufgebraucht ist (bei einer Millisekunde Abstand nach zwölf Halbierungen).
+  Ohne diesen Zweig wäre der Zustand dauerhaft, unsichtbar und für die Nutzer nicht behebbar
+- [x] Bestandsaufgaben ohne `sortOrder` stehen genau da, wo sie vorher standen — und zwar
+  **paarweise dauerhaft**, nicht nur beim ersten Start: Ihr Vergleich hängt nur an ihren beiden
+  Anlagezeitpunkten. Eine bessere Migrationsgeschichte, als Notiz und Menge sie hatten
+- [x] **Barrierefreiheit: zwei `CustomAccessibilityAction` je offener Zeile** („Nach oben/unten
+  verschieben"). Nicht Kür, sondern Pflicht — ADR 0016 kam mit einer nicht bedienbaren Wischgeste nur
+  durch, *weil* Löschen einen zweiten Weg behielt; Sortieren hätte gar keinen. Beide laufen durch
+  **denselben** Rückruf wie das Ziehen, es gibt also keine zweite Logik. An einer Gruppengrenze
+  entfällt die jeweilige Aktion, damit TalkBack nichts Folgenloses anbietet.
+  Die Semantik sitzt an der Modifier-Kette des `ListItem` neben dem `clickable` — dessen Knoten ist
+  der, den TalkBack fokussiert; auf einem Vorfahren deklarierte Aktionen würden dort nicht auftauchen
+- [x] **Security Rules gegengeprüft — keine Änderung nötig, kein Schritt in der Firebase Console.**
+  `todos` kennt `read, write` für alle Mitglieder ohne jede Feldprüfung, genau wie bei Priorität,
+  Notiz und Menge. Ein zusätzliches Feld ist damit bereits erlaubt
+- [x] ADR: **Manuelle Sortierung über `createdAt` als Anker, gezogen mit einer Bibliothek** —
+  [ADR 0039](docs/decisions/0039-manuelle-sortierung-ueber-createdat-als-anker.md), mit den
+  verworfenen Alternativen (`nullsLast` samt Neunummerierung beim ersten Zug; ganzzahlige Rangzahlen;
+  **LexoRank/gebrochene Indizes über Zeichenketten** wie bei Jira und Figma — erschöpfen die
+  Genauigkeit nie, können dafür aber nicht auf `createdAt` zurückfallen, und genau das ist der Grund
+  für den `Double`; Reihenfolge als Array am Listen-Dokument; selbst gebaute Geste; Ziehgriff statt
+  langem Druck; den `sortOrder` beim Ändern der Priorität löschen)
+- [x] Unit-Tests — **200 grün** (vorher 167). Neu: der ganze `TodoSortOrderTest` (Rückfall auf
+  `createdAt` · **0 und negativ sind echte Plätze**, die Gegenprobe zur Mengenregel · echt dazwischen ·
+  oben · unten · ohne Nachbarn · **gleiche Anker werden verweigert** · **zwölf Ablagen in die Lücke
+  einer Millisekunde, die dreizehnte wird verweigert** — das Gegenstück zum `0,1 × 3`-Fall aus
+  ADR 0037 · Neunummerieren) · im `TodoOrderTest` sechs Fälle, darunter die Ausroll-Absicherung und
+  je eine Gegenprobe für Regel 1 und Regel 2 · im `TodoMapperTest` das fehlende Feld, die Null- und
+  Negativwerte, NaN/Infinity und ein Hin-und-zurück ohne das Feld · im ViewModel acht Fälle, darunter
+  **der Abseits-um-eins beim Zug nach unten** und dass eine Prioritätsänderung den Platz behält.
+  **Der `todo()`-Helfer im `TodoOrderTest` bekam `sortOrder: Double? = null`, wodurch jeder ältere
+  Test unverändert blieb** — dass sie alle grün bleiben, ist selbst schon der Beleg für den Rückfall
+- [x] Instrumentierte Tests **am 2026-08-16 auf einem SM-S928B gelaufen, alle 47 grün** (vorher 42).
+  Fünf neue im `TodoListScreenTest`, vier davon über die **TalkBack-Aktionen** statt über die Geste —
+  die sind ohne Zeitfenster und ohne Animationsuhr auswertbar und laufen durch denselben Rückruf:
+  Der Zug nach oben meldet die erwarteten Nachbarn · die erste Zeile einer Gruppe bietet kein „nach
+  oben" (mit Gegenprobe, dass „nach unten" sehr wohl da ist) · die letzte bietet kein „nach unten" ·
+  eine erledigte Zeile bietet gar nichts.
+  **Der fünfte war der einzige echte Gesten-Test — und er war beim ersten Lauf rot, zu Recht:**
+  `longPressDraggableHandle` nimmt dem `clickable` der Zeile den Druck **nicht** ab. Ein langer
+  Druck ohne Bewegung öffnete beim Loslassen den Bearbeiten-Dialog: Man hebt die Zeile an, spürt die
+  Haptik, überlegt es sich anders — und bekommt einen Dialog. Behoben mit `combinedClickable` und
+  einem leeren `onLongClick`, das dem Tipp-Erkenner sagt, dass der lange Druck der Ziehgeste gehört.
+  **Das ist der Fund, den kein Unit-Test hätte machen können**, und der Grund, warum dieser Test
+  existiert.
+  Canary-Gegenprobe mitgemacht: auf einen erfundenen Titel gedreht scheitert der Test mit „could not
+  find any node that satisfies: (Text … contains 'CANARY Brot holen')" — ein aufgelöster Matcher
+  gegen einen echten Baum, nicht „No compose hierarchies found". Danach zurückgedreht und erneut 47
+  grün.
+  **Nebenbei zu prüfen beim Geräteblick:** `combinedClickable` hängt eine `OnLongClick`-Semantik an
+  die Zeile, die nichts tut — TalkBack könnte sie als Aktion ankündigen
 
 ### Handprüfungen auf dem Gerät
 > Alles, was **nur von Hand** geht, aus allen Phasen hier zusammengezogen: echte Firestore-Daten,
@@ -1036,11 +1099,16 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   [ADR 0033](docs/decisions/0033-bearbeiten-bleibt-ein-dialog.md)**, und hier fällt das Urteil, ob
   Bearbeiten ein Dialog bleiben darf
 - [ ] **(Phase 15)** Manuelles Sortieren — Ziehen innerhalb einer Prioritätsgruppe fühlt sich flüssig
-  an, kein sichtbares Ruckeln beim Ablegen · ein Ziehversuch über eine Gruppengrenze hinweg ändert
-  nichts an der Priorität · in einer Vorlage genauso ausprobieren wie in einer Arbeitsliste · eine
-  alte Aufgabe ohne `sortOrder` erscheint weiterhin am Ende ihrer Gruppe, bis sie selbst gezogen wird
-  · offline sortieren und wieder verbinden · App-Neustart behält die gezogene Reihenfolge · hell und
-  dunkel
+  an, **kein sichtbares Ruckeln beim Ablegen** (dafür hält der Bildschirm die Reihenfolge lokal, bis
+  der Firestore-Schnappschuss sie bestätigt — das ist der Punkt, den kein Test sieht) · ein
+  Ziehversuch über eine Gruppengrenze hinweg ändert nichts, und die Zeile folgt dabei weiter dem
+  Finger · **erledigte Zeilen lassen sich gar nicht erst anheben** · die Haptik beim Anheben ist
+  spürbar · in einer Vorlage genauso wie in einer Arbeitsliste · eine alte Aufgabe ohne `sortOrder`
+  steht weiter da, wo sie stand, bis sie selbst gezogen wird · **eine lange Liste ziehen, bis der
+  Rand erreicht ist** — scrollt sie mit? · offline sortieren und wieder verbinden · App-Neustart
+  behält die Reihenfolge · einmal mit TalkBack über die zwei Aktionen · hell und dunkel.
+  **Und der Blick, der die Bibliothek beurteilt:** Wischen zum Löschen und das Antippen zum
+  Bearbeiten müssen unverändert funktionieren — beide teilen sich die Zeile jetzt mit der Ziehgeste
 
 #### Mit zwei Handys
 - [x] **(Phase 0)** Beide Galaxy-Phones als Testgeräte einrichten (Entwickleroptionen +

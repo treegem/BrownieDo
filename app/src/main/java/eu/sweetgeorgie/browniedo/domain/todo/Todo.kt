@@ -39,5 +39,18 @@ data class Todo(
      * In einer Arbeitsliste steht hier null: Beim Instanziieren wandert die gerechnete Menge in den
      * Titel, das Feld selbst nicht mit.
      */
-    val quantity: Double?
+    val quantity: Double?,
+    /**
+     * Der von Hand vergebene Platz **innerhalb der Prioritätsstufe**, siehe
+     * docs/decisions/0039-manuelle-sortierung-ueber-createdat-als-anker.md. Größer heißt weiter oben.
+     *
+     * Null heißt „nie von Hand einsortiert" und ist der Normalfall — dann gilt der Anlagezeitpunkt,
+     * und die Reihenfolge ist dieselbe wie vor Phase 15. Anders als bei der Priorität braucht es
+     * deshalb keinen Rückfallwert im Dokument: Die Umrechnung steht als `effectiveOrder` in
+     * TodoSortOrder.kt und gilt für jede Aufgabe.
+     *
+     * **Anders als [quantity] sind 0 und negative Werte gültig** — sie sind gültige Plätze und dürfen
+     * beim Lesen nicht weggeworfen werden.
+     */
+    val sortOrder: Double?
 )

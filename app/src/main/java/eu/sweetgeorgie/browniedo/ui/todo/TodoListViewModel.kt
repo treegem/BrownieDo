@@ -11,7 +11,9 @@ import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
 import eu.sweetgeorgie.browniedo.domain.todo.TodoRepository
 import eu.sweetgeorgie.browniedo.domain.todo.TodoUpdate
 import eu.sweetgeorgie.browniedo.domain.todo.formatQuantity
+import eu.sweetgeorgie.browniedo.domain.todo.renumberedSortOrders
 import eu.sweetgeorgie.browniedo.domain.todo.scaledBy
+import eu.sweetgeorgie.browniedo.domain.todo.sortOrderBetween
 import eu.sweetgeorgie.browniedo.domain.todo.toPositiveDecimalOrNull
 import eu.sweetgeorgie.browniedo.domain.user.PartnerRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -365,6 +367,52 @@ class TodoListViewModel(
         todoRepository.setDone(listId, todo.id, isDone, completedBy).onFailure {
             mutableUiState.update { it.copy(error = TodoListError.UPDATE_FAILED) }
         }
+    }
+
+    /**
+     * Ordnet [todo] zwischen [above] und [below] ein — beides die Nachbarn **nach** dem Ablegen, aus
+     * der Liste ohne die gezogene Aufgabe. Trägt das Ziehen und die zwei TalkBack-Aktionen
+     * gleichermaßen, siehe docs/decisions/0039-manuelle-sortierung-ueber-createdat-als-anker.md.
+     *
+     * Die Regel steht hier ein **zweites** Mal, obwohl die Oberfläche einen unerlaubten Zug gar nicht
+     * erst zulässt: dieselbe zweite Verteidigungslinie wie bei `isDone` und beim Verschieben — und
+     * anders als die Geste ist sie ohne Gerät prüfbar. Erledigte Aufgaben sind nicht sortierbar
+     * (ihr Block ist ein Protokoll), und ein Nachbar aus einer anderen Stufe hieße, die Priorität zu
+     * übergehen.
+     */
+    fun onTodoReordered(todo: Todo, above: Todo?, below: Todo?) {
+        val listId = selectedListId.value ?: return
+        if (todo.isDone) return
+        if (!above.fitsBeside(todo) || !below.fitsBeside(todo)) return
+
+        val sortOrder = sortOrderBetween(above, below)
+        val result = if (sortOrder != null) {
+            todoRepository.setSortOrder(listId, todo.id, sortOrder)
+        } else {
+            // Der Platz lässt sich nicht mehr als Zahl ausdrücken — die ganze Gruppe bekommt frische
+            // Werte. Passiert praktisch nie, aber ohne diesen Zweig bliebe der Zug wirkungslos, und
+            // zwar dauerhaft und unerklärlich.
+            todoRepository.renumberTodos(listId, renumberedSortOrders(reordered(todo, above)))
+        }
+        result.onFailure {
+            mutableUiState.update { it.copy(error = TodoListError.UPDATE_FAILED) }
+        }
+    }
+
+    /** Ein Nachbar passt, wenn es ihn nicht gibt oder er offen ist und dieselbe Stufe trägt. */
+    private fun Todo?.fitsBeside(todo: Todo): Boolean =
+        this == null || (!isDone && priority == todo.priority)
+
+    /**
+     * Die Prioritätsgruppe von [todo] in der Reihenfolge **nach** dem Zug — die Vorlage für das
+     * Neunummerieren. [above] ist der Nachbar, hinter den die Aufgabe rückt; ohne ihn kommt sie an
+     * den Anfang.
+     */
+    private fun reordered(todo: Todo, above: Todo?): List<Todo> {
+        val group = mutableUiState.value.todos
+            .filter { !it.isDone && it.priority == todo.priority && it.id != todo.id }
+        val index = above?.let { group.indexOfFirst { entry -> entry.id == it.id } + 1 } ?: 0
+        return group.toMutableList().apply { add(index, todo) }
     }
 
     fun onEditTodoClick(todo: Todo) {

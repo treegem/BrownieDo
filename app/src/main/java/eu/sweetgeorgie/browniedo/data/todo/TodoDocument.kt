@@ -56,7 +56,18 @@ data class TodoDocument(
      * Hand in der Console als Ganzzahl eingetippt, liegt in Firestore ein `Long` — dessen Mapper
      * wandelt das für ein `Double`-Feld um.
      */
-    var quantity: Double? = null
+    var quantity: Double? = null,
+    /**
+     * Der von Hand vergebene Platz innerhalb der Prioritätsstufe, siehe
+     * docs/decisions/0039-manuelle-sortierung-ueber-createdat-als-anker.md. Nullable mit Standardwert
+     * `null` wie [notes] und [quantity], und wieder trägt beides die Migration: Aufgaben von vor
+     * Phase 15 haben das Feld nicht, und „nie von Hand einsortiert" ist die richtige Antwort.
+     *
+     * Die Werte liegen im Zahlenraum der Millisekunden seit 1970, weil genau das der Rückfallwert
+     * ist, wenn das Feld fehlt. In der Console sieht ein Wert deshalb aus wie ein Zeitstempel — das
+     * ist Absicht und keine Verwechslung.
+     */
+    var sortOrder: Double? = null
 )
 
 /**
@@ -72,4 +83,5 @@ internal object TodoField {
     const val PRIORITY = "priority"
     const val NOTES = "notes"
     const val QUANTITY = "quantity"
+    const val SORT_ORDER = "sortOrder"
 }

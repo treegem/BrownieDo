@@ -85,7 +85,8 @@ class MainActivity : ComponentActivity() {
                             onAddTodoClick = todoListViewModel::addTodo,
                             onTodoDoneChange = todoListViewModel::onTodoDoneChange,
                             onTodoSwipedAway = todoListViewModel::onTodoSwipedAway,
-                            onEditTodoClick = todoListViewModel::onEditTodoClick
+                            onEditTodoClick = todoListViewModel::onEditTodoClick,
+                            onTodoReordered = todoListViewModel::onTodoReordered
                         )
                     }
                     val editActions = remember(todoListViewModel) {

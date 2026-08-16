@@ -37,7 +37,7 @@ android {
         targetSdk = 37
         // Steigt bei jeder mittleren oder größeren Änderung, nicht erst beim Verteilen — die Regel
         // samt Abgrenzung steht in AGENTS.md unter „Erwartungen an eine Änderung".
-        versionCode = 12
+        versionCode = 13
         versionName = "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -110,6 +110,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.googleid)
     implementation(libs.kotlinx.coroutines.play.services)
+    implementation(libs.reorderable)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
