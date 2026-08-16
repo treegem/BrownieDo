@@ -69,13 +69,17 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 
 > **Legende:** `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt · `[-]` zurückgestellt
 > (blockiert durch etwas Äußeres, der Grund steht am Punkt)
+>
+> **Was von Hand auf einem Gerät zu prüfen ist, steht nicht in seiner Phase**, sondern gesammelt
+> unter „Handprüfungen auf dem Gerät" — getrennt danach, ob ein Handy reicht oder zwei nötig sind.
+> Jeder Punkt dort nennt seine Phase. Die Phasen selbst tragen nur, was am Schreibtisch entsteht:
+> Code, Tests, Entscheidungen und die Schritte in der Firebase Console.
 
 ### Phase 0 – Vorbereitung & Setup
 - [x] Android Studio installieren (inkl. Android SDK & Emulator)
 - [x] GitHub Copilot Plugin in Android Studio installieren und einloggen
 - [x] Neues Projekt anlegen: **Empty Activity** (Compose), Sprache Kotlin, Package `eu.sweetgeorgie.browniedo`
 - [x] Git-Repository initialisieren & auf GitHub veröffentlichen (`Share Project on GitHub`)
-- [x] Beide Galaxy-Phones als Testgeräte einrichten (Entwickleroptionen + USB-Debugging)
 
 ### Phase 1 – Firebase-Projekt aufsetzen
 - [x] Firebase-Projekt in der Firebase Console erstellen (Free/Spark-Tier)
@@ -88,7 +92,6 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 ### Phase 2 – Authentifizierung (wer darf auf die Liste?)
 - [x] Firebase Auth aktivieren (Google-Login als einziger Anbieter)
 - [x] Einfache Login-/Anmelde-Oberfläche bauen (Compose)
-- [x] Beide Partner melden sich einmal via Google an (legt die zwei Accounts automatisch an)
 - [x] Login-Zustand in der App halten (angemeldet / nicht angemeldet)
 
 ### Phase 3 – Datenmodell & Firestore-Struktur
@@ -117,10 +120,6 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 ### Phase 5 – Synchronisation & Offline (der KERN der App)
 - [x] Firestore **Offline-Persistenz** aktivieren — auf Android standardmäßig aktiv, kein Zutun nötig
 - [x] **Realtime-Listener** einbinden (Liste aktualisiert sich automatisch)
-- [x] Offline-Szenario testen: einer offline ändern → wieder online → synct beim anderen — auf zwei
-  Geräten durchgespielt, auch mit einem Handy vorübergehend im Flugmodus
-- [ ] Konflikt-Verhalten prüfen (Last-Write-Wins über `updatedAt`) — beide Geräte ändern *dasselbe*
-  Feld, während eines offline ist; noch nicht gezielt provoziert
 
 ### Phase 6 – UI-Feinschliff
 - [x] Aufgeräumtes Layout (Material 3) — TopAppBar mit Overflow-Menü, Eingabefeld als `bottomBar`
@@ -147,8 +146,6 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   ([ADR 0021](docs/decisions/0021-eigene-farbpalette-statt-dynamic-color.md))
 
 ### Phase 7 – Test & Verteilung an euch zwei
-- [x] Auf beiden Galaxy-Phones testen — signierte APK installiert, Google-Login durchgespielt und
-  der Sync zwischen beiden Geräten belegt (siehe Phase 5)
 - [x] Signierte APK bauen (Keystore NICHT committen!) — `signingConfig` liest die Zugangsdaten aus
   einer nicht eingecheckten `keystore.properties`, siehe
   [ADR 0017](docs/decisions/0017-signatur-zugangsdaten-aus-keystore-properties.md). Kein App
@@ -157,7 +154,6 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 - [x] **SHA-1 des Release-Keystores in der Firebase Console hinterlegen** — erledigt und auf dem
   Gerät bestätigt: `google-services.json` trägt jetzt beide Fingerabdrücke (Debug und Release),
   der Google-Login in der signierten APK funktioniert
-- [x] Direkt auf beide Geräte installieren (Sideload)
 - [x] **`versionCode` gehoben** — auf `2` (`versionName` „1.1"), zusammen mit dem Release, das Phase 11
   und 12 auf das zweite Handy bringt. Damit dieser Punkt nicht wiederkehrt, ist die Regel
   **verschärft und in die Erwartungen an *jede* Änderung gewandert**: Der `versionCode` steigt bei
@@ -184,16 +180,6 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 - [x] Zuletzt gewählte Liste über App-Neustarts hinweg merken — DataStore Preferences, pro Gerät,
   mit Rückfall auf die erste Liste
   ([ADR 0018](docs/decisions/0018-datastore-fuer-die-zuletzt-gewaehlte-liste.md))
-- [x] Auf dem Gerät prüfen: umschalten und App neu starten — belegt auf einem SM-S928B mit einer
-  zweiten, von Hand angelegten Liste. Die Auswahl zeigt beide Listen mit der aktuellen farblich
-  hervorgehoben, und nach `am force-stop` plus Neustart steht dieselbe Liste wieder offen. Im
-  DataStore der App liegt `selected_list.preferences_pb` mit `selected_list_id → second-shared`
-- [x] Offline starten — belegt bei aktivem Flugmodus: Die Listen-Query wird aus Firestores lokalem
-  Cache beantwortet, der Listenname steht, kein Ladefehler
-- [x] Symbole und Sortierung auf dem Gerät belegt — mit drei Listen zeigt das Menü das
-  Einzelperson-Symbol für die private und das Gruppen-Symbol für die beiden geteilten, und die
-  Reihenfolge ist alphabetisch (Gemeinsam → Private Liste → Zweite Liste). Damit greift auch
-  `LIST_ORDER` aus [ADR 0010](docs/decisions/0010-sortierung-im-client-statt-orderby.md) sichtbar
 
 #### Phase 8b – Listen anlegen, umbenennen, löschen
 > Die Reihenfolge ist hier nicht beliebig: Ohne die Regeländerung scheitert jeder Schreibvorgang.
@@ -213,13 +199,6 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 - [x] Verhalten festlegen, wenn die gerade geöffnete Liste verschwindet — der Rückfall aus 8a greift;
   war es die letzte Liste, wird ein hängender Ladefehler jetzt aufgeräumt, damit er nicht den
   Hinweis „Noch keine Liste" verdrängt
-- [x] Auf dem Gerät prüfen — belegt auf einem SM-S928B: geteilte Liste angelegt (erscheint mit
-  Gruppen-Symbol, die Partner-uid wurde also mitgeschrieben) · umbenannt und zurückbenannt · eine
-  Liste **mit zwei Aufgaben** gelöscht, ohne Fehler, danach Rückfall auf die erste verbleibende
-  Liste. Der Anlegen-Dialog zeigt „Geteilt mit <Name>" aus der `users`-Collection, die
-  `exists()`-Leseregel greift also
-- [x] Auch der private Pfad ist auf dem Gerät belegt — private Liste aus der App angelegt und in
-  Firestore wiedergefunden; `members` trägt dort erwartungsgemäß nur die eigene uid
 
 ### Phase 9 – Priorität für Aufgaben
 > Drei Stufen: niedrig · mittel · hoch. Neue Aufgaben stehen auf mittel, bestehende gelten als
@@ -258,10 +237,6 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   gemischten `completedAt`-Zeitpunkten, ViewModel — 82 Unit-Tests grün. Der instrumentierte Test
   deckt Markierung, fehlende Markierung bei „mittel" und die Segment-Auswahl ab; **am 2026-08-12 auf
   einem SM-S928B gelaufen und grün**
-- [ ] Auf dem Gerät prüfen — alte Aufgabe ohne die neuen Felder erscheint und sitzt am Ende des
-  erledigten Blocks · eine Aufgabe auf „hoch" setzen und steigen sehen · zwei Aufgaben in bekannter
-  Reihenfolge abhaken und den erledigten Block prüfen · hell und dunkel · und nachsehen, ob die
-  drei Segment-Beschriftungen im Dialog abgeschnitten werden
 
 ### Phase 10 – Aufgaben zwischen Listen verschieben
 > Ziel darf jede Liste sein, in deren `members` die eigene uid steht — geteilte wie private. Das
@@ -309,15 +284,7 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
 - [x] **Das `Popup`-im-`Dialog`-Risiko ist damit vom Tisch** — `pickingAnotherListInTheEditDialogReportsIt`
   öffnet das Aufklappmenü im Dialog und tippt einen Eintrag an, auf dem Gerät grün. Der Ausweg über
   `ExposedDropdownMenuBox` wird nicht gebraucht. Was der Test *nicht* zeigt, ist wie das Menü aussieht
-  — das bleibt beim Punkt unten
-- [ ] Auf dem Gerät prüfen — in eine geteilte und in eine private Liste verschieben, auf beiden
-  Geräten nachsehen · eine **erledigte** Aufgabe verschieben (muss abgehakt ankommen, mit
-  `completedBy` und `completedAt`, an derselben Stelle im erledigten Block) · eine alte Aufgabe
-  verschieben und prüfen, dass sie in der Zielliste **nicht** nach oben springt · der Fall „nur eine
-  Liste" · Snackbar-Text, hell und dunkel · offline verschieben und wieder verbinden · und ein Blick
-  darauf, wie das Aufklappmenü im Dialog *aussieht* (dass es aufgeht, steht seit dem Testlauf fest,
-  siehe den Punkt darüber). Das bleibt Handarbeit: Es geht um zwei Geräte, echte Firestore-Daten und
-  darum, wie es aussieht — nichts davon prüft ein instrumentierter Test
+  — das bleibt Handarbeit und steht unter „Handprüfungen auf dem Gerät"
 
 ### Phase 11 – Aus einer Aufgabe einen Termin machen
 > Der Termin gehört in den Google Kalender, **nicht** in BrownieDo: Eine Fälligkeit in der App zieht
@@ -366,13 +333,6 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   **Nebenbei gelernt:** Ein zweites, `offline` gemeldetes Gerät in `adb devices` überspringt Gradle
   von allein („Skipping device … Device is OFFLINE"); `ANDROID_SERIAL` zu setzen half dagegen
   nicht, sondern brach den Lauf mit „Connected device with serial … not found" ab
-- [x] Auf dem Gerät geprüft (2026-08-12, SM-S928B) — Termin aus einer Aufgabe angelegt und im
-  Gmail-Kalender wiedergefunden, der Intent landet also im richtigen Konto (das war der eigentliche
-  Fallstrick, weil auf einem Galaxy zwei Apps ihn bedienen) · zurück in der App steht der Dialog
-  noch offen und die Aufgabe unverändert da · Titel mit Umlauten kommen vollständig an.
-  **Nicht angesehen: hell und dunkel.** Auf Wunsch trotzdem abgehakt — die Aktionszeile nimmt ihre
-  Farben aus `TextButton` und `ColorSchemeContrastTest` deckt die Schemata ab, ein Blick darauf
-  bleibt aber nachzuholen
 
 ### Phase 12 – Notiz an einer Aufgabe
 > Ein Backlog-Eintrag lebt Wochen. Ein Titel allein hat dann oft verloren, was eigentlich gemeint
@@ -422,11 +382,6 @@ mit dem des Partners zusammengeführt. Genau deshalb gibt es eine zentrale Cloud
   zurück und der nächste Versuch scheitert mit „Failed to install APK(s)" plus
   `DELETE_FAILED_INTERNAL_ERROR` beim Test-APK. Einfach erneut starten, sobald das Gerät wieder
   stabil hängt — es braucht kein Deinstallieren von Hand
-- [x] Auf dem Gerät geprüft (2026-08-12, SM-S928B) — lange Notiz und eine mit Zeilenumbrüchen ·
-  Dialog mit offener Tastatur, das `verticalScroll` greift · Zeile mit und ohne Notiz nebeneinander,
-  offen und erledigt, hell und dunkel · alte Aufgabe ohne das Feld bearbeitet und ihr eine Notiz
-  gegeben · Notiz gelöscht und beim Partner nachgesehen · Aufgabe mit Notiz verschoben, ohne und mit
-  gleichzeitiger Änderung. **Damit ist auch die aus Phase 11 offene Hell/Dunkel-Sicht nachgeholt**
 
 ### Phase 13 – Nacharbeit aus dem Best-Practice-Durchgang (2026-08-12)
 > Ergebnis eines Durchgangs durch Oberfläche und Code nach Phase 12, ohne Anlass in einem konkreten
@@ -476,14 +431,6 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   einen erfundenen Text gedreht scheitert der Test mit „Assert failed: The component with Text +
   InputText + EditableText contains 'CANARY …' is not displayed!" — ein aufgelöster Matcher gegen
   einen echten Baum, nicht „No compose hierarchies found". Danach zurückgedreht und erneut 25 grün
-- [x] Auf dem Gerät geprüft (2026-08-12, SM-S928B) — löschen und zurückholen, im Dialog **und** per
-  Wischgeste · beim Partner nachgesehen, dass die Aufgabe an derselben Stelle wieder auftaucht (nicht
-  oben) · eine **erledigte** Aufgabe zurückgeholt · zwei Löschungen schnell hintereinander · Liste
-  gewechselt, während die Snackbar stand · offline gelöscht und zurückgeholt · Anzeigedauer,
-  hell und dunkel.
-  **Die vorsorgliche Rücksetzung des Wischzustands in `TodoRow` hat sich damit bewährt:** Eine
-  weggewischte und zurückgeholte Zeile steht an ihrem Platz, keine leere Fläche. Ob es die Vorsorge
-  wirklich gebraucht hätte, sagt der Lauf nicht — sie bleibt, weil der Fehlerfall unsichtbar wäre
 - [x] **Das Verschwinden sichtbar machen** — aufgefallen beim Durchspielen: Die Zeile war *instantan*
   weg, was zu einem umkehrbaren Löschen nicht passt; wer nichts verschwinden sieht, greift auch nicht
   nach dem „Rückgängig". Jetzt blendet sie in 800 ms **linear** aus
@@ -548,13 +495,6 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   Canary-Gegenprobe mitgemacht: auf einen erfundenen Text gedreht scheitert der Test mit „could not
   find any node that satisfies: ((hasAnyAncestorThat(IsDialog is defined)) && (Text … contains
   'CANARY …'))" — aufgelöster Matcher gegen einen echten Baum, nicht „No compose hierarchies found"
-- [x] Auf dem Gerät prüfen — **der Umbruch ist weg** (`[Abbrechen] [Speichern]` in einer Zeile, auch
-  bei großer Schrift; ein gefüllter Knopf ist rund 24 dp breiter als ein Textknopf) · alle vier
-  Dialoge hell und dunkel, besonders die gefüllte Fläche im dunklen Schema — dort ist das Grün hell
-  und könnte als Block wirken · „Liste löschen?" in `error`/`onError` · Bearbeiten-Dialog **mit
-  offener Tastatur**: Löschen liegt jetzt im scrollenden Inhalt und kann aus dem Bild rutschen (für
-  TalkBack unkritisch, der Fokus scrollt mit — für Sehende ist das die eigentliche Frage) · einmal
-  TalkBack über den Löschen-Knopf
 
 #### Zuschnitt des Bearbeiten-Dialogs
 - [x] **Bearbeiten als eigener Bildschirm — entschieden: bleibt ein Dialog**, mit benannten Auslösern,
@@ -611,18 +551,6 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   Dialogen also in **14 sp**, während dasselbe Feld in der Eingabeleiste 16 sp hat; im leeren Feld war
   die Beschriftung damit *größer* als der Text, den man dann tippt. Alle vier Felder setzen jetzt
   `bodyLarge`
-- [ ] Auf dem Gerät prüfen — **das Aufklappmenü der Zielliste** ist das Neue: öffnet über dem Dialog,
-  nicht abgeschnitten, auf Feldbreite, mit offener und geschlossener Tastatur. Besonders: **ein Tipp
-  auf „Speichern" bei offenem Menü** — das `ExposedDropdownMenu` ist anders als das bisherige
-  `DropdownMenu` **nicht berührungsmodal**, schließt der Tipp also nur das Menü oder speichert er
-  zugleich? (Ausweg wäre `properties = PopupProperties(focusable = true)`) · der Fall „nur eine Liste"
-  im **dunklen** Schema, wo ein abgeblendetes M3-Feld mit 38 % Alpha arbeitet, während das Projekt
-  sonst deckendes `onSurfaceVariant` benutzt · Tastatur: erster Buchstabe groß in Titel und Notiz, die
-  Enter-Taste im Titel heißt „Fertig" und **speichert nicht**, und **Enter in der Notiz erzeugt
-  weiterhin einen Zeilenumbruch** — das ist die Regression, die diese Änderung einführen könnte · alle
-  vier Dialoge bei Schriftskalierung 1,0 und größter, hell und dunkel.
-  **Der letzte Punkt ist gleichzeitig Auslöser 4 aus ADR 0033** — hier fällt das Urteil, ob der Dialog
-  weiter trägt
 
 #### Kleinere Oberflächen-Punkte
 - [ ] **Klick-Semantik fehlt am TopAppBar-Titel:** Er benutzt `Modifier.clickable` ohne `Role.Button`
@@ -856,34 +784,6 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   „could not find any node that satisfies: (ContentDescription = 'CANARY Liste aus Vorlage …')" —
   ein aufgelöster Matcher gegen einen echten Baum, nicht „No compose hierarchies found". Danach
   zurückgedreht und erneut 42 grün
-- [ ] Auf dem Gerät prüfen. **Das ist hier kein Feinschliff, sondern der einzige Test des
-  Batch-Fehlers oben:** Kein Unit-Test kennt die Security Rules, alle 133 blieben grün, während der
-  Weg auf dem Gerät nicht funktionierte (ADR 0035). Zu prüfen: **Vorlage mit mehreren Einträgen
-  instanziieren — die Liste erscheint unter „Listen" und trägt alle Einträge** · dieselbe Vorlage ein
-  zweites Mal instanziieren, beide Listen stehen nebeneinander · Reihenfolge der Einträge stimmt mit
-  der Vorlage überein und die neue Liste ist offen (nichts abgehakt) · **mehrmals hintereinander
-  instanziieren** — der Fehlalarm aus ADR 0036 trat nur „manchmal" auf, ein einzelner Durchlauf
-  beweist also wenig · **eine Liste und eine Vorlage anlegen und prüfen, dass man direkt darin
-  landet** · **leere** Vorlage instanziieren · geteilte Vorlage instanziieren und beim Partner nachsehen · privat instanziieren ·
-  **offline instanziieren und wieder verbinden** — der Punkt, an dem die Reihenfolge-Annahme des Fixes
-  wirklich geprüft wird · Vorlage löschen, während eine daraus erzeugte Liste offen ist (die Liste
-  muss bleiben) · die letzte Arbeitsliste löschen, während nur noch eine Vorlage übrig ist · das
-  Listen-Menü mit und ohne Vorlagen (die Überschriften dürfen ohne Vorlage nicht auftauchen) ·
-  Bearbeiten-Dialog in einer Vorlage: kein Kalender-Knopf, Zielliste zeigt nur Vorlagen · hell und
-  dunkel.
-  **Dazu der schwebende Knopf aus ADR 0038:** in einer Vorlage steht er unten rechts, in einer Liste
-  ist er weg · bis ans Listenende scrollen — die **letzte Zeile muss antippbar sein** und nicht unter
-  dem Knopf liegen · mit **offener Tastatur** einen Eintrag tippen, der Knopf wandert mit der Leiste
-  nach oben und verdeckt das Eingabefeld nicht · eine Snackbar (etwa nach einer Wischgeste) muss sich
-  **über** den Knopf legen · leere Vorlage: Knopf und Leerzustand-Text stören sich nicht · das
-  Überlauf-Menü trägt in einer Vorlage nur noch Umbenennen, Löschen und Abmelden · größte
-  Schriftskalierung: die Beschriftung „Liste aus Vorlage …" darf nicht abbrechen.
-  Dabei einmal in die Firebase Console sehen: `lists/{neueId}` mit `members` und darunter die
-  `todos` — **und wie das Vorlagen-Feld dort tatsächlich heißt.** Kotlin macht aus `var isTemplate`
-  den Getter `isTemplate()`, und Firebase leitet daraus vermutlich `template` ab. Funktional harmlos,
-  weil Lesen und Schreiben symmetrisch sind; stimmt es aber nicht, weichen KDoc und ADR vom Bestand
-  ab, und ein `@PropertyName` ist jetzt noch billig — mit mehr angelegten Vorlagen wird es eine
-  Migration
 
 #### Phase 14b – Menge und Faktor
 > Der Sinn der Vorlage für eine Reise: Man schreibt sie für **einen Tag** (Faktor 1) und
@@ -943,7 +843,7 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   Alternativen (führende Zahl parsen samt Schalter; Menge als dauerhaftes Feld auch in der erzeugten
   Liste; die Anzahl der Einträge vervielfachen; `NumberFormat`)
 
-#### Tests und Geräteblick für 14b
+#### Tests für 14b
 - [x] Unit-Tests — **167 grün** (vorher 136). Neu: der ganze `TodoQuantityTest` (Komma- und
   Punkt-Eingabe · leer, Buchstaben, Null und Negatives werden abgelehnt · „3" statt „3,0" · **der
   Fließkomma-Fall `0,1 × 3`** · Skalieren mit ganzer Zahl und mit Kommazahl · Faktor 1 · Eintrag ohne
@@ -963,17 +863,141 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   **Nebenbei gelernt:** Der Lauf ging diesmal **über WLAN**, und das ging gut — der Fallstrick aus
   „Querlaufend" greift dabei aber schärfer: Ohne Kabel hilft „Aktiv lassen" nicht, es hängt allein an
   `screen_off_timeout` (hier 10 Minuten, also reichlich). Vorher prüfen lohnt
-- [ ] Auf dem Gerät prüfen — Vorlage mit gemischten Einträgen (mit und ohne Menge), **Faktor 3** →
-  „3 T-Shirt", Shampoo unverändert · **Faktor 2,5** · eine Menge mit Komma eintippen (das liefert die
-  deutsche Tastatur) · Faktor 1 ergibt, was in der Vorlage steht · Unlesbares in Menge und Faktor →
-  Knopf abgeblendet · die erzeugte Liste ist gewöhnlich: „3 T-Shirt" von Hand auf „2 T-Shirt" ändern
-  · eine Aufgabe mit Menge verschieben, ohne und mit gleichzeitiger Änderung · hell und dunkel.
+
+### Handprüfungen auf dem Gerät
+> Alles, was **nur von Hand** geht, aus allen Phasen hier zusammengezogen: echte Firestore-Daten,
+> echtes Aussehen, echte Tastatur. Kein instrumentierter Test ersetzt das, und keine dieser Zeilen
+> steht noch in ihrer Phase — die Phase nennt jeder Punkt selbst.
+>
+> Aufgeteilt danach, **was man dafür braucht**. Wer ein Handy zur Hand hat, arbeitet den ersten
+> Abschnitt ab; der zweite wartet auf die Gelegenheit, dass beide Geräte zusammenkommen. Das ist der
+> einzige Unterschied — die Trennung sagt nichts über Wichtigkeit.
+
+#### Mit einem Handy
+- [x] **(Phase 8a)** Umschalten und App neu starten — belegt auf einem SM-S928B mit einer zweiten,
+  von Hand angelegten Liste. Die Auswahl zeigt beide Listen mit der aktuellen farblich hervorgehoben,
+  und nach `am force-stop` plus Neustart steht dieselbe Liste wieder offen. Im DataStore der App
+  liegt `selected_list.preferences_pb` mit `selected_list_id → second-shared`
+- [x] **(Phase 8a)** Offline starten — belegt bei aktivem Flugmodus: Die Listen-Query wird aus
+  Firestores lokalem Cache beantwortet, der Listenname steht, kein Ladefehler
+- [x] **(Phase 8a)** Symbole und Sortierung — mit drei Listen zeigt das Menü das Einzelperson-Symbol
+  für die private und das Gruppen-Symbol für die beiden geteilten, und die Reihenfolge ist
+  alphabetisch (Gemeinsam → Private Liste → Zweite Liste). Damit greift auch `LIST_ORDER` aus
+  [ADR 0010](docs/decisions/0010-sortierung-im-client-statt-orderby.md) sichtbar
+- [x] **(Phase 8b)** Listen anlegen, umbenennen, löschen — belegt auf einem SM-S928B: geteilte Liste
+  angelegt (erscheint mit Gruppen-Symbol, die Partner-uid wurde also mitgeschrieben) · umbenannt und
+  zurückbenannt · eine Liste **mit zwei Aufgaben** gelöscht, ohne Fehler, danach Rückfall auf die
+  erste verbleibende Liste. Der Anlegen-Dialog zeigt „Geteilt mit <Name>" aus der `users`-Collection,
+  die `exists()`-Leseregel greift also
+- [x] **(Phase 8b)** Auch der private Pfad ist belegt — private Liste aus der App angelegt und in
+  Firestore wiedergefunden; `members` trägt dort erwartungsgemäß nur die eigene uid
+- [ ] **(Phase 9)** Priorität — alte Aufgabe ohne die neuen Felder erscheint und sitzt am Ende des
+  erledigten Blocks · eine Aufgabe auf „hoch" setzen und steigen sehen · zwei Aufgaben in bekannter
+  Reihenfolge abhaken und den erledigten Block prüfen · hell und dunkel · und nachsehen, ob die drei
+  Segment-Beschriftungen im Dialog abgeschnitten werden
+- [ ] **(Phase 10)** Verschieben — eine **erledigte** Aufgabe verschieben (muss abgehakt ankommen,
+  mit `completedBy` und `completedAt`, an derselben Stelle im erledigten Block) · eine alte Aufgabe
+  verschieben und prüfen, dass sie in der Zielliste **nicht** nach oben springt · der Fall „nur eine
+  Liste" · Snackbar-Text, hell und dunkel · offline verschieben und wieder verbinden · und ein Blick
+  darauf, wie das Aufklappmenü im Dialog *aussieht* (dass es aufgeht, steht seit dem Testlauf in
+  Phase 10 fest)
+- [x] **(Phase 11)** Kalender-Termin (2026-08-12, SM-S928B) — Termin aus einer Aufgabe angelegt und
+  im Gmail-Kalender wiedergefunden, der Intent landet also im richtigen Konto (das war der
+  eigentliche Fallstrick, weil auf einem Galaxy zwei Apps ihn bedienen) · zurück in der App steht der
+  Dialog noch offen und die Aufgabe unverändert da · Titel mit Umlauten kommen vollständig an.
+  **Hell und dunkel blieb damals ungesehen** und ist mit dem Punkt aus Phase 12 nachgeholt
+- [x] **(Phase 12)** Notiz (2026-08-12, SM-S928B) — lange Notiz und eine mit Zeilenumbrüchen · Dialog
+  mit offener Tastatur, das `verticalScroll` greift · Zeile mit und ohne Notiz nebeneinander, offen
+  und erledigt, hell und dunkel · alte Aufgabe ohne das Feld bearbeitet und ihr eine Notiz gegeben ·
+  Aufgabe mit Notiz verschoben, ohne und mit gleichzeitiger Änderung. **Damit ist auch die aus
+  Phase 11 offene Hell/Dunkel-Sicht nachgeholt**
+- [x] **(Phase 13)** Löschen mit Rückgängig (2026-08-12, SM-S928B) — löschen und zurückholen, im
+  Dialog **und** per Wischgeste · eine **erledigte** Aufgabe zurückgeholt · zwei Löschungen schnell
+  hintereinander · Liste gewechselt, während die Snackbar stand · offline gelöscht und zurückgeholt ·
+  Anzeigedauer, hell und dunkel.
+  **Die vorsorgliche Rücksetzung des Wischzustands in `TodoRow` hat sich damit bewährt:** Eine
+  weggewischte und zurückgeholte Zeile steht an ihrem Platz, keine leere Fläche. Ob es die Vorsorge
+  wirklich gebraucht hätte, sagt der Lauf nicht — sie bleibt, weil der Fehlerfall unsichtbar wäre
+- [x] **(Phase 13)** Knopfzeile und gefüllte Bestätigung — **der Umbruch ist weg**
+  (`[Abbrechen] [Speichern]` in einer Zeile, auch bei großer Schrift; ein gefüllter Knopf ist rund
+  24 dp breiter als ein Textknopf) · alle vier Dialoge hell und dunkel, besonders die gefüllte Fläche
+  im dunklen Schema — dort ist das Grün hell und könnte als Block wirken · „Liste löschen?" in
+  `error`/`onError` · Bearbeiten-Dialog **mit offener Tastatur**: Löschen liegt jetzt im scrollenden
+  Inhalt und kann aus dem Bild rutschen (für TalkBack unkritisch, der Fokus scrollt mit — für Sehende
+  ist das die eigentliche Frage) · einmal TalkBack über den Löschen-Knopf
+- [ ] **(Phase 13)** Zuschnitt des Bearbeiten-Dialogs — **das Aufklappmenü der Zielliste** ist das
+  Neue: öffnet über dem Dialog, nicht abgeschnitten, auf Feldbreite, mit offener und geschlossener
+  Tastatur. Besonders: **ein Tipp auf „Speichern" bei offenem Menü** — das `ExposedDropdownMenu` ist
+  anders als das bisherige `DropdownMenu` **nicht berührungsmodal**, schließt der Tipp also nur das
+  Menü oder speichert er zugleich? (Ausweg wäre `properties = PopupProperties(focusable = true)`) ·
+  der Fall „nur eine Liste" im **dunklen** Schema, wo ein abgeblendetes M3-Feld mit 38 % Alpha
+  arbeitet, während das Projekt sonst deckendes `onSurfaceVariant` benutzt · Tastatur: erster
+  Buchstabe groß in Titel und Notiz, die Enter-Taste im Titel heißt „Fertig" und **speichert nicht**,
+  und **Enter in der Notiz erzeugt weiterhin einen Zeilenumbruch** — das ist die Regression, die
+  diese Änderung einführen könnte · alle vier Dialoge bei Schriftskalierung 1,0 und größter, hell und
+  dunkel.
+  **Der letzte Punkt ist gleichzeitig Auslöser 4 aus ADR 0033** — hier fällt das Urteil, ob der
+  Dialog weiter trägt
+- [ ] **(Phase 14a)** Vorlagen. **Das ist hier kein Feinschliff, sondern der einzige Test des
+  Batch-Fehlers aus Phase 14a:** Kein Unit-Test kennt die Security Rules, alle 133 blieben grün,
+  während der Weg auf dem Gerät nicht funktionierte (ADR 0035). Zu prüfen: **Vorlage mit mehreren
+  Einträgen instanziieren — die Liste erscheint unter „Listen" und trägt alle Einträge** · dieselbe
+  Vorlage ein zweites Mal instanziieren, beide Listen stehen nebeneinander · Reihenfolge der Einträge
+  stimmt mit der Vorlage überein und die neue Liste ist offen (nichts abgehakt) · **mehrmals
+  hintereinander instanziieren** — der Fehlalarm aus ADR 0036 trat nur „manchmal" auf, ein einzelner
+  Durchlauf beweist also wenig · **eine Liste und eine Vorlage anlegen und prüfen, dass man direkt
+  darin landet** · **leere** Vorlage instanziieren · privat instanziieren · **offline instanziieren
+  und wieder verbinden** — der Punkt, an dem die Reihenfolge-Annahme des Fixes wirklich geprüft wird ·
+  Vorlage löschen, während eine daraus erzeugte Liste offen ist (die Liste muss bleiben) · die letzte
+  Arbeitsliste löschen, während nur noch eine Vorlage übrig ist · das Listen-Menü mit und ohne
+  Vorlagen (die Überschriften dürfen ohne Vorlage nicht auftauchen) · Bearbeiten-Dialog in einer
+  Vorlage: kein Kalender-Knopf, Zielliste zeigt nur Vorlagen · hell und dunkel.
+  **Dazu der schwebende Knopf aus ADR 0038:** in einer Vorlage steht er unten rechts, in einer Liste
+  ist er weg · bis ans Listenende scrollen — die **letzte Zeile muss antippbar sein** und nicht unter
+  dem Knopf liegen · mit **offener Tastatur** einen Eintrag tippen, der Knopf wandert mit der Leiste
+  nach oben und verdeckt das Eingabefeld nicht · eine Snackbar (etwa nach einer Wischgeste) muss sich
+  **über** den Knopf legen · leere Vorlage: Knopf und Leerzustand-Text stören sich nicht · das
+  Überlauf-Menü trägt in einer Vorlage nur noch Umbenennen, Löschen und Abmelden · größte
+  Schriftskalierung: die Beschriftung „Liste aus Vorlage …" darf nicht abbrechen.
+  Dabei einmal in die Firebase Console sehen: `lists/{neueId}` mit `members` und darunter die
+  `todos` — **und wie das Vorlagen-Feld dort tatsächlich heißt.** Kotlin macht aus `var isTemplate`
+  den Getter `isTemplate()`, und Firebase leitet daraus vermutlich `template` ab. Funktional harmlos,
+  weil Lesen und Schreiben symmetrisch sind; stimmt es aber nicht, weichen KDoc und ADR vom Bestand
+  ab, und ein `@PropertyName` ist jetzt noch billig — mit mehr angelegten Vorlagen wird es eine
+  Migration
+- [ ] **(Phase 14b)** Menge und Faktor — Vorlage mit gemischten Einträgen (mit und ohne Menge),
+  **Faktor 3** → „3 T-Shirt", Shampoo unverändert · **Faktor 2,5** · eine Menge mit Komma eintippen
+  (das liefert die deutsche Tastatur) · Faktor 1 ergibt, was in der Vorlage steht · Unlesbares in
+  Menge und Faktor → Knopf abgeblendet · die erzeugte Liste ist gewöhnlich: „3 T-Shirt" von Hand auf
+  „2 T-Shirt" ändern · eine Aufgabe mit Menge verschieben, ohne und mit gleichzeitiger Änderung ·
+  hell und dunkel.
   Dabei in der Firebase Console nachsehen, ob eine von Hand als **Ganzzahl** eingetippte Menge
   gelesen wird (Firestore legt sie dann als `Long` ab).
   **Und der Blick, der mehr beantwortet als 14b:** der Bearbeiten-Dialog bei Schriftskalierung ≥ 1,3
   mit offener Tastatur — das ist **Auslöser 4 aus
   [ADR 0033](docs/decisions/0033-bearbeiten-bleibt-ein-dialog.md)**, und hier fällt das Urteil, ob
   Bearbeiten ein Dialog bleiben darf
+
+#### Mit zwei Handys
+- [x] **(Phase 0)** Beide Galaxy-Phones als Testgeräte einrichten (Entwickleroptionen +
+  USB-Debugging)
+- [x] **(Phase 2)** Beide Partner melden sich einmal via Google an (legt die zwei Accounts
+  automatisch an)
+- [x] **(Phase 5)** Offline-Szenario: einer offline ändern → wieder online → synct beim anderen — auf
+  zwei Geräten durchgespielt, auch mit einem Handy vorübergehend im Flugmodus
+- [ ] **(Phase 5)** Konflikt-Verhalten prüfen (Last-Write-Wins über `updatedAt`) — beide Geräte
+  ändern *dasselbe* Feld, während eines offline ist; noch nicht gezielt provoziert.
+  **Der einzige offene Punkt am nicht verhandelbaren Kern der App**
+- [x] **(Phase 7)** Auf beiden Galaxy-Phones testen — signierte APK installiert, Google-Login
+  durchgespielt und der Sync zwischen beiden Geräten belegt (siehe den Punkt zu Phase 5)
+- [x] **(Phase 7)** Direkt auf beide Geräte installieren (Sideload)
+- [ ] **(Phase 10)** In eine geteilte und in eine private Liste verschieben, **auf beiden Geräten
+  nachsehen**
+- [x] **(Phase 12)** Notiz gelöscht und beim Partner nachgesehen
+- [x] **(Phase 13)** Beim Partner nachgesehen, dass eine zurückgeholte Aufgabe an derselben Stelle
+  wieder auftaucht — **nicht oben**. Das ist der eigentliche Beleg dafür, dass das Rückgängig auf
+  dieselbe Dokument-id schreibt und `createdAt` behält (ADR 0031)
+- [ ] **(Phase 14a)** Geteilte Vorlage instanziieren und beim Partner nachsehen
 
 ### Querlaufend – Werkzeuge & Doku
 > Läuft neben den Phasen und gehört zu keiner.
