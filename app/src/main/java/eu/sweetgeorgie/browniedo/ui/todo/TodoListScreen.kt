@@ -212,6 +212,7 @@ fun TodoListScreen(
             partner = uiState.partner,
             onNameChange = listDialogActions.onNewListNameChange,
             onSharedChange = listDialogActions.onNewListSharedChange,
+            onFactorChange = listDialogActions.onNewListFactorChange,
             onConfirm = listDialogActions.onNewListConfirm,
             onDismiss = listDialogActions.onNewListDismiss
         )
@@ -239,6 +240,7 @@ fun TodoListScreen(
         EditTodoDialog(
             title = editedTodo.title,
             notes = editedTodo.notes,
+            quantity = editedTodo.quantity,
             priority = editedTodo.priority,
             // Nur Gleichartiges als Ziel — die Regel steht im UiState, nicht hier.
             lists = uiState.targetLists,
@@ -470,6 +472,7 @@ private val PREVIEW_TOP_BAR_ACTIONS = TodoListTopBarActions(
 private val PREVIEW_LIST_DIALOG_ACTIONS = ListDialogActions(
     onNewListNameChange = {},
     onNewListSharedChange = {},
+    onNewListFactorChange = {},
     onNewListConfirm = {},
     onNewListDismiss = {},
     onRenamedListNameChange = {},
@@ -497,6 +500,7 @@ private val PREVIEW_SNACKBAR_ACTIONS = SnackbarActions(
 private val PREVIEW_EDIT_ACTIONS = TodoEditActions(
     onTitleChange = {},
     onNotesChange = {},
+    onQuantityChange = {},
     onPriorityChange = {},
     onTargetListChange = {},
     onCalendarEventClick = {},
@@ -528,7 +532,8 @@ private val PREVIEW_TODOS = listOf(
         updatedAt = PREVIEW_TIMESTAMP,
         completedBy = null,
         completedAt = null,
-        notes = "Die haltbare, nicht die frische — und zwei Packungen"
+        notes = "Die haltbare, nicht die frische — und zwei Packungen",
+        quantity = null
     ),
     Todo(
         id = "todo-2",
@@ -539,7 +544,8 @@ private val PREVIEW_TODOS = listOf(
         updatedAt = PREVIEW_TIMESTAMP,
         completedBy = null,
         completedAt = null,
-        notes = null
+        notes = null,
+        quantity = null
     ),
     Todo(
         id = "todo-3",
@@ -550,7 +556,8 @@ private val PREVIEW_TODOS = listOf(
         updatedAt = PREVIEW_TIMESTAMP,
         completedBy = null,
         completedAt = null,
-        notes = null
+        notes = null,
+        quantity = null
     ),
     Todo(
         id = "todo-4",
@@ -561,6 +568,7 @@ private val PREVIEW_TODOS = listOf(
         updatedAt = PREVIEW_TIMESTAMP,
         completedBy = "uid-1",
         completedAt = PREVIEW_TIMESTAMP,
-        notes = null
+        notes = null,
+        quantity = null
     )
 )

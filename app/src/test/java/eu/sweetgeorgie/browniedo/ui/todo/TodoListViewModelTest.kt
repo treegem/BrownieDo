@@ -8,6 +8,7 @@ import eu.sweetgeorgie.browniedo.domain.list.TodoList
 import eu.sweetgeorgie.browniedo.domain.todo.Todo
 import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
 import eu.sweetgeorgie.browniedo.domain.todo.TodoRepository
+import eu.sweetgeorgie.browniedo.domain.todo.TodoUpdate
 import eu.sweetgeorgie.browniedo.domain.user.Partner
 import eu.sweetgeorgie.browniedo.domain.user.PartnerRepository
 import java.time.Instant
@@ -464,7 +465,8 @@ class TodoListViewModelTest {
                     // Die Zielliste startet auf der Liste, in der die Aufgabe steht: „Speichern"
                     // schreibt dann an Ort und Stelle.
                     targetListId = LIST_A.id,
-                    notes = "Die haltbare"
+                    notes = "Die haltbare",
+                    quantity = ""
                 ),
                 viewModel.uiState.value.editedTodo
             )
@@ -493,9 +495,12 @@ class TodoListViewModelTest {
                 UpdateTodoCall(
                     LIST_A.id,
                     TODO_ENTRY.id,
-                    "Brot kaufen",
-                    TodoPriority.MEDIUM,
-                    notes = null
+                    TodoUpdate(
+                        title = "Brot kaufen",
+                        priority = TodoPriority.MEDIUM,
+                        notes = null,
+                        quantity = null
+                    )
                 ),
                 todoRepository.lastUpdateTodoCall
             )
@@ -516,9 +521,12 @@ class TodoListViewModelTest {
                 UpdateTodoCall(
                     LIST_A.id,
                     TODO_ENTRY.id,
-                    TODO_ENTRY.title,
-                    TodoPriority.HIGH,
-                    notes = null
+                    TodoUpdate(
+                        title = TODO_ENTRY.title,
+                        priority = TodoPriority.HIGH,
+                        notes = null,
+                        quantity = null
+                    )
                 ),
                 todoRepository.lastUpdateTodoCall
             )
@@ -545,7 +553,7 @@ class TodoListViewModelTest {
 
         assertEquals(
             "Die haltbare, nicht die frische",
-            todoRepository.lastUpdateTodoCall?.notes
+            todoRepository.lastUpdateTodoCall?.update?.notes
         )
     }
 
@@ -558,7 +566,7 @@ class TodoListViewModelTest {
         viewModel.onEditConfirm()
 
         // „Keine Notiz" hat genau eine Form, und die ist null.
-        assertNull(todoRepository.lastUpdateTodoCall?.notes)
+        assertNull(todoRepository.lastUpdateTodoCall?.update?.notes)
     }
 
     @Test
@@ -570,6 +578,67 @@ class TodoListViewModelTest {
 
         assertNull(todoRepository.lastUpdateTodoCall)
         assertEquals("Die haltbare", viewModel.uiState.value.editedTodo?.notes)
+    }
+
+    // --- Menge am Eintrag (ADR 0037) ---
+
+    @Test
+    fun `opening the edit dialog shows the current quantity`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+
+        viewModel.onEditTodoClick(TODO_ENTRY.copy(quantity = 1.5))
+
+        // Formatiert, nicht `toString()`: Im Feld steht „1,5" und nicht „1.5".
+        assertEquals("1,5", viewModel.uiState.value.editedTodo?.quantity)
+    }
+
+    @Test
+    fun `an entry without a quantity opens with an empty quantity field`() =
+        runTest(testDispatcher) {
+            advanceUntilIdle()
+
+            viewModel.onEditTodoClick(TODO_ENTRY)
+
+            assertEquals("", viewModel.uiState.value.editedTodo?.quantity)
+        }
+
+    @Test
+    fun `saving an edit writes the typed quantity`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onEditedQuantityChange("2,5")
+        viewModel.onEditConfirm()
+
+        assertEquals(2.5, todoRepository.lastUpdateTodoCall?.update?.quantity!!, 0.0)
+    }
+
+    @Test
+    fun `emptying the quantity writes null instead of zero`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+
+        viewModel.onEditTodoClick(TODO_ENTRY.copy(quantity = 2.0))
+        viewModel.onEditedQuantityChange("  ")
+        viewModel.onEditConfirm()
+
+        // Leer heißt „skaliert nicht" — und das hat genau eine Form.
+        assertNull(todoRepository.lastUpdateTodoCall?.update?.quantity)
+    }
+
+    /**
+     * Die zweite Verteidigungslinie hinter dem abgeblendeten Knopf: Was nicht als Zahl lesbar ist,
+     * wird gar nicht geschrieben — sonst ginge stillschweigend „keine Menge" raus.
+     */
+    @Test
+    fun `an unreadable quantity is not written`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+
+        viewModel.onEditTodoClick(TODO_ENTRY)
+        viewModel.onEditedQuantityChange("zwei")
+        viewModel.onEditConfirm()
+
+        assertNull(todoRepository.lastUpdateTodoCall)
+        assertNotNull(viewModel.uiState.value.editedTodo)
     }
 
     @Test
@@ -685,6 +754,36 @@ class TodoListViewModelTest {
         viewModel.onEditConfirm()
 
         assertNull(todoRepository.lastMoveTodoCall?.todo?.notes)
+    }
+
+    /**
+     * Derselbe Fallstrick wie bei der Notiz in Phase 12, jetzt für die Menge: Die verschobene Aufgabe
+     * kommt aus dem Snapshot, und was der Dialog besitzt, muss darauf überschrieben werden — sonst
+     * reiste die *alte* Menge mit. Kein Mapper-Test findet das.
+     */
+    @Test
+    fun `a move carries the edited quantity`() = runTest(testDispatcher) {
+        val entryWithQuantity = TODO_ENTRY.copy(quantity = 1.0)
+        seedEntryInFirstList(entryWithQuantity)
+
+        viewModel.onEditTodoClick(entryWithQuantity)
+        viewModel.onEditedQuantityChange("4")
+        viewModel.onEditedTargetListChange(LIST_B)
+        viewModel.onEditConfirm()
+
+        assertEquals(4.0, todoRepository.lastMoveTodoCall?.todo?.quantity!!, 0.0)
+    }
+
+    @Test
+    fun `a move carries the stored quantity when it was not edited`() = runTest(testDispatcher) {
+        val entryWithQuantity = TODO_ENTRY.copy(quantity = 1.5)
+        seedEntryInFirstList(entryWithQuantity)
+
+        viewModel.onEditTodoClick(entryWithQuantity)
+        viewModel.onEditedTargetListChange(LIST_B)
+        viewModel.onEditConfirm()
+
+        assertEquals(1.5, todoRepository.lastMoveTodoCall?.todo?.quantity!!, 0.0)
     }
 
     @Test
@@ -1191,6 +1290,73 @@ class TodoListViewModelTest {
         assertEquals(TodoListError.MOVE_FAILED, viewModel.uiState.value.error)
     }
 
+    // --- Faktor beim Instanziieren (ADR 0037) ---
+
+    @Test
+    fun `instantiating scales the entries that carry a quantity`() = runTest(testDispatcher) {
+        openTemplate(entries = listOf(SHIRT_ENTRY, SHAMPOO_ENTRY))
+
+        viewModel.onCreateListFromTemplateClick()
+        viewModel.onNewListFactorChange("3")
+        viewModel.onNewListConfirm()
+        advanceUntilIdle()
+
+        val titles = listRepository.lastCreateFromTemplateCall?.todos?.map(Todo::title)
+        // Drei Tage heißen drei T-Shirts, aber nicht drei Shampoo.
+        assertEquals(listOf("3 T-Shirt", "Shampoo"), titles)
+    }
+
+    @Test
+    fun `the scaled amount does not travel as a field`() = runTest(testDispatcher) {
+        openTemplate(entries = listOf(SHIRT_ENTRY))
+
+        viewModel.onCreateListFromTemplateClick()
+        viewModel.onNewListFactorChange("3")
+        viewModel.onNewListConfirm()
+        advanceUntilIdle()
+
+        // Was entsteht, ist eine gewöhnliche Liste ohne Sonderregeln.
+        assertNull(listRepository.lastCreateFromTemplateCall?.todos?.single()?.quantity)
+    }
+
+    @Test
+    fun `a factor with a comma is accepted`() = runTest(testDispatcher) {
+        openTemplate(entries = listOf(SHIRT_ENTRY.copy(quantity = 2.0)))
+
+        viewModel.onCreateListFromTemplateClick()
+        viewModel.onNewListFactorChange("2,5")
+        viewModel.onNewListConfirm()
+        advanceUntilIdle()
+
+        assertEquals("5 T-Shirt", listRepository.lastCreateFromTemplateCall?.todos?.single()?.title)
+    }
+
+    /** Der Normalfall bleibt der billigste: Faktor 1 ergibt, was in der Vorlage steht. */
+    @Test
+    fun `the default factor of one writes the amount unchanged`() = runTest(testDispatcher) {
+        openTemplate(entries = listOf(SHIRT_ENTRY))
+
+        viewModel.onCreateListFromTemplateClick()
+        viewModel.onNewListConfirm()
+        advanceUntilIdle()
+
+        assertEquals("1 T-Shirt", listRepository.lastCreateFromTemplateCall?.todos?.single()?.title)
+    }
+
+    @Test
+    fun `an unreadable factor creates nothing`() = runTest(testDispatcher) {
+        openTemplate()
+
+        viewModel.onCreateListFromTemplateClick()
+        viewModel.onNewListFactorChange("drei")
+        viewModel.onNewListConfirm()
+        advanceUntilIdle()
+
+        assertNull(listRepository.lastCreateFromTemplateCall)
+        // Der Dialog bleibt offen, damit der eingetippte Name nicht verloren geht.
+        assertNotNull(viewModel.uiState.value.newList)
+    }
+
     /** Öffnet die Vorlage mit ihren Einträgen — der Ausgangspunkt der Vorlagen-Tests. */
     private fun TestScope.openTemplate(entries: List<Todo> = listOf(TODO_ENTRY)) {
         listRepository.emit(Result.success(listOf(TEMPLATE, SECOND_TEMPLATE, LIST_A, LIST_B)))
@@ -1233,8 +1399,15 @@ private val TODO_ENTRY = Todo(
     updatedAt = Instant.parse("2026-08-07T20:00:00Z"),
     completedBy = null,
     completedAt = null,
-    notes = null
+    notes = null,
+    quantity = null
 )
+
+/** Ein Vorlagen-Eintrag, der mitskaliert — und einer, der es ausdrücklich nicht tut. */
+private val SHIRT_ENTRY = TODO_ENTRY.copy(id = "todo-shirt", title = "T-Shirt", quantity = 1.0)
+
+private val SHAMPOO_ENTRY =
+    TODO_ENTRY.copy(id = "todo-shampoo", title = "Shampoo", quantity = null)
 
 private val FINISHED_TODO_ENTRY = TODO_ENTRY.copy(
     isDone = true,
@@ -1251,13 +1424,7 @@ private data class SetDoneCall(
     val completedBy: String?
 )
 
-private data class UpdateTodoCall(
-    val listId: String,
-    val todoId: String,
-    val title: String,
-    val priority: TodoPriority,
-    val notes: String?
-)
+private data class UpdateTodoCall(val listId: String, val todoId: String, val update: TodoUpdate)
 
 private data class MoveTodoCall(val fromListId: String, val toListId: String, val todo: Todo)
 
@@ -1320,14 +1487,8 @@ private class FakeTodoRepository : TodoRepository {
         return setDoneResult
     }
 
-    override fun updateTodo(
-        listId: String,
-        todoId: String,
-        title: String,
-        priority: TodoPriority,
-        notes: String?
-    ): Result<Unit> {
-        lastUpdateTodoCall = UpdateTodoCall(listId, todoId, title, priority, notes)
+    override fun updateTodo(listId: String, todoId: String, update: TodoUpdate): Result<Unit> {
+        lastUpdateTodoCall = UpdateTodoCall(listId, todoId, update)
         return updateTodoResult
     }
 

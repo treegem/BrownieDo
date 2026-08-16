@@ -37,20 +37,14 @@ interface TodoRepository {
     fun setDone(listId: String, todoId: String, isDone: Boolean, completedBy: String?): Result<Unit>
 
     /**
-     * Writes what the edit dialog owns — title, priority and notes — in a single update, so that one
-     * save is one write. What that means for concurrent edits is in
+     * Writes what the edit dialog owns in a single update, so that one save is one write. What that
+     * means for concurrent edits is in
      * docs/decisions/0025-titel-und-prioritaet-in-einem-schreibvorgang.md.
      *
-     * [notes] `null` löscht die Notiz. Aufrufer geben ihre Argumente benannt an: [title] und [notes]
-     * sind beide `String` und stünden sonst vertauschbar nebeneinander.
+     * Die Felder kommen als [TodoUpdate] statt einzeln — mit der Menge wären es sechs Argumente
+     * geworden, und benannte Argumente tragen das nicht mehr.
      */
-    fun updateTodo(
-        listId: String,
-        todoId: String,
-        title: String,
-        priority: TodoPriority,
-        notes: String?
-    ): Result<Unit>
+    fun updateTodo(listId: String, todoId: String, update: TodoUpdate): Result<Unit>
 
     /**
      * Moves an entry from [fromListId] to [toListId]. Firestore has no move: the document is

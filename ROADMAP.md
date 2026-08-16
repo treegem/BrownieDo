@@ -664,9 +664,10 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   ist damit bearbeitbar, nimmt aber **kein** Drittel mit: Sortiert wird innerhalb eines ViewModels,
   nicht auf zwei verteilt. Umgekehrt ist „über ~600 Zeilen" jetzt selbst ein Auslöser für den
   Bildschirm
-- [ ] `updateTodo` hat mit der Notiz **fünf Parameter, zwei davon `String`**. Die Aufrufstellen
-  arbeiten benannt, das trägt. Kommt ein weiteres Feld dazu, ist ein Wertobjekt fällig statt eines
-  sechsten Parameters
+- [x] `updateTodo` hatte mit der Notiz **fünf Parameter, zwei davon `String`** — mit der Menge wären
+  es sechs geworden. Der hier angekündigte Auslöser ist in Phase 14b eingetreten und eingelöst:
+  `TodoUpdate` bündelt jetzt, was der Bearbeiten-Dialog besitzt
+  ([ADR 0037](docs/decisions/0037-menge-am-eintrag-statt-zahl-im-titel.md))
 - [ ] **Abstände stehen als Literale** (`8.dp`, `16.dp`, `24.dp`, `32.dp`) über mehrere Dateien
   verteilt. `standards.instructions.md` nennt „duplicated dimensions instead of resources"
   ausdrücklich als SHOULD FIX. In Compose ist ein eigenes `Spacing`-Objekt im Theme üblicher als
@@ -847,54 +848,91 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
 > Der Sinn der Vorlage für eine Reise: Man schreibt sie für **einen Tag** (Faktor 1) und
 > instanziiert sie für drei. Skaliert wird der **Text eines Eintrags** („1 T-Shirt" → „3 T-Shirt"),
 > nicht die Anzahl der Einträge — nur so gehen Kommazahlen.
-- [ ] `Todo` und `TodoDocument` um `quantity: Double?` erweitern, dazu `TodoField`. **Nullable, und
+- [x] `Todo` und `TodoDocument` um `quantity: Double?` erweitern, dazu `TodoField`. **Nullable, und
   das Vorhandensein ist der Schalter:** Ein Eintrag mit Menge skaliert, einer ohne bleibt, wie er
   ist — Shampoo wird nicht dreifach eingepackt. Damit braucht es kein zweites Feld „skaliert" und
   keinen Schalter im Dialog. Fehlt das Feld, ist es null; wie bei der Notiz (Phase 12) ist null
   bereits die richtige Antwort und kein Rückfallwert nötig
-  ([ADR 0023](docs/decisions/0023-prioritaet-migration-und-sortierung.md) zum Gegenbeispiel)
-- [ ] Mengenfeld im Bearbeiten-Dialog, **nur im Vorlagen-Modus** — an dem Platz, den „Termin
-  anlegen" dort nicht belegt (14a). `KeyboardType.Decimal`, und **Komma wie Punkt werden
-  angenommen**: Die deutsche Tastatur liefert das Komma, `toDouble()` versteht nur den Punkt
-- [ ] Faktor-Feld im Instanziieren-Dialog, Vorgabe 1, dieselbe Eingaberegel. Bei Faktor 1 kommt
+  ([ADR 0023](docs/decisions/0023-prioritaet-migration-und-sortierung.md) zum Gegenbeispiel).
+  **Beim Lesen wird zusätzlich alles ≤ 0 zu null** — das kann beim Editieren in der Console
+  entstehen, und „skaliert nicht" soll nur eine Form haben
+- [x] Mengenfeld im Bearbeiten-Dialog, **nur im Vorlagen-Modus** — als eigene Zeile direkt unter dem
+  Titel, weil die Menge zu ihm gehört. `KeyboardType.Decimal`, und **Komma wie Punkt werden
+  angenommen**: Die deutsche Tastatur liefert das Komma, `toDouble()` versteht nur den Punkt. Der
+  Platz ist da, weil in einer Vorlage „Termin anlegen" wegfällt (14a) — **kein Modus trägt damit mehr
+  Eingaben als vor Phase 14**, Auslöser 1 aus ADR 0033 greift weiterhin nicht
+- [x] **Die Vorlagen-Zeile zeigt die Menge als Präfix** — „1 T-Shirt", also genau so, wie der Eintrag
+  in der erzeugten Liste heißen wird, und über dieselbe Formatierung. Stand vorher nicht hier und ist
+  trotzdem das Wichtigste an der Zeile: Ohne die Anzeige ist nicht zu sehen, welche Einträge
+  überhaupt mitskalieren — und das ist die eine Frage, die man an eine Vorlage hat
+- [x] Faktor-Feld im Instanziieren-Dialog, Vorgabe 1, dieselbe Eingaberegel. Bei Faktor 1 kommt
   dasselbe heraus wie in der Vorlage — der Normalfall bleibt der billigste
-- [ ] **Die Skalierung ist eine reine Funktion in `domain/todo`**, kein Use-Case und kein
-  Repository-Zusatz: Menge mal Faktor, Ergebnis als Präfix vor den Titel („3 T-Shirt"). Ohne
-  Android-Typ, ohne Firestore, für sich testbar — und damit die Stelle, an der die drei Regeln
-  unten genau einmal stehen. Das ViewModel skaliert, bevor es das Repository ruft; das Repository
-  schreibt nur, was es bekommt
-- [ ] **Die Menge landet im Titel und nicht als Feld in der erzeugten Liste** — was entsteht, ist
+- [x] **Unlesbare Eingabe blendet den Bestätigen-Knopf ab**, wie heute schon ein leerer Titel; im
+  ViewModel steht dieselbe Prüfung ein zweites Mal als Verteidigungslinie. **Ein leeres Mengenfeld
+  bleibt gültig** — leer heißt „skaliert nicht", das ist der Schalter. Beim Faktor ist leer dagegen
+  nicht in Ordnung, dort muss eine Zahl stehen
+- [x] **Die Skalierung ist eine reine Funktion in `domain/todo`**, kein Use-Case und kein
+  Repository-Zusatz: `TodoQuantity.kt` trägt Lesen, Formatieren und Skalieren. Ohne Android-Typ, ohne
+  Firestore, für sich testbar — und damit die Stelle, an der die drei Regeln genau einmal stehen. Das
+  ViewModel skaliert, bevor es das Repository ruft; das Repository schreibt nur, was es bekommt
+- [x] **Die Menge landet im Titel und nicht als Feld in der erzeugten Liste** — was entsteht, ist
   eine ganz gewöhnliche Liste ohne Sonderregeln, und „aus 3 mach 2" ist dort eine Textänderung.
   Deshalb trägt auch nur die Vorlage das Feld
-- [ ] **Exakt rechnen, Nachkommastellen nur wenn nötig**: „3 T-Shirt" statt „3,0 T-Shirt", aber
-  „1,5 Rolle" bleibt 1,5. Ausgabe mit deutschem Komma. **Der Fallstrick ist das Binärformat:**
-  `0.1 * 3` ist in `Double` 0,30000000000000004, und das darf nicht in einem Titel landen — vor der
-  Ausgabe auf wenige Stellen runden (oder gleich mit `BigDecimal` rechnen). Der Fall gehört in die
-  Tests, nicht in die Hoffnung
-- [ ] `quantity` wandert beim Verschieben und beim Rückgängig mit — das verlangt
+- [x] **Exakt rechnen, Nachkommastellen nur wenn nötig**: „3" statt „3,0", aber „1,5" bleibt 1,5.
+  Ausgabe mit deutschem Komma. Der Fallstrick ist das Binärformat — `0.1 * 3` ist in `Double`
+  0,30000000000000004 —, deshalb wird über `BigDecimal` gerechnet und auf zwei Stellen gerundet.
+  **Formatiert wird von Hand mit Komma und nicht über `NumberFormat`:** Sonst hinge die Ausgabe an
+  der Geräte-Locale, und ein auf Englisch gestelltes Handy schriebe „1.5" in eine deutschsprachige
+  App
+- [x] `quantity` wandert beim Verschieben und beim Rückgängig mit — das verlangt
   [ADR 0024](docs/decisions/0024-verschieben-behaelt-zustand.md) für jedes neue Feld. Es hängt an
   **zwei** Stellen, und die zweite ist der Fallstrick aus Phase 12: `toDocument()` nimmt es mit
   (das sichert der Hin-und-zurück-Test), **und `onEditConfirm` muss die Menge aus dem Dialog auf den
   Snapshot überschreiben** — sonst reist beim gleichzeitigen Verschieben und Ändern die alte Menge
-  mit. Eigener ViewModel-Test, kein Mapper-Test findet das
-- [ ] **`updateTodo` bekäme damit einen sechsten Parameter — jetzt ist das Wertobjekt fällig.** Der
-  offene Punkt unter „Code" in Phase 13 hat genau diesen Auslöser benannt; er wird hier eingelöst
-  und nicht umgangen
-- [ ] ADR: **Menge am Eintrag statt Zahl im Titel**, mit der Skalierungs- und Rundungsregel und den
-  verworfenen Alternativen (führende Zahl parsen samt Schalter; Menge als dauerhaftes Feld auch in
-  der erzeugten Liste)
+  mit. Eigener ViewModel-Test, kein Mapper-Test findet das.
+  **Dazu eine Stelle, die nicht auf der Liste stand:** Der Puffer im Dialog wird *unabhängig vom
+  Modus* vorbelegt. Nur das sichtbare Feld hängt am Modus — sonst löschte ein Speichern in einer
+  Arbeitsliste eine vorhandene Menge still weg
+- [x] **`updateTodo` hat ein Wertobjekt bekommen.** Es wären sechs Parameter geworden, zwei davon
+  `String`; der offene Punkt unter „Code" in Phase 13 hat genau diesen Auslöser benannt und ist damit
+  eingelöst. `TodoUpdate` bündelt, was der Dialog besitzt — **nicht zu verwechseln mit `TodoEdit`**
+  in der UI-Schicht, das den Tippstand trägt (Textpuffer auch für Zahlen)
+- [x] ADR: **Menge am Eintrag statt Zahl im Titel** —
+  [ADR 0037](docs/decisions/0037-menge-am-eintrag-statt-zahl-im-titel.md), mit den verworfenen
+  Alternativen (führende Zahl parsen samt Schalter; Menge als dauerhaftes Feld auch in der erzeugten
+  Liste; die Anzahl der Einträge vervielfachen; `NumberFormat`)
 
 #### Tests und Geräteblick für 14b
-- [ ] Unit-Tests — Mapper mit und ohne das Mengenfeld plus Hin-und-zurück fürs Verschieben · die
-  Skalierung für sich (ganze Zahl · Kommazahl · Faktor 1 · Eintrag ohne Menge bleibt unberührt · der
-  Fließkomma-Fall oben · Komma- und Punkt-Eingabe) · im ViewModel die Menge im Bearbeiten-Dialog und
-  ihr Mitwandern beim Verschieben
-- [ ] Instrumentierte Tests — Mengenfeld nur im Vorlagen-Modus und meldet seine Eingabe · das
-  Faktor-Feld im Instanziieren-Dialog. **Die Canary-Gegenprobe gehört dazu**, und Listennamen werden
-  auf den Dialog eingegrenzt, weil derselbe Name in der TopAppBar steht
-- [ ] Auf dem Gerät prüfen — Faktor 3 und Faktor 2,5 · ein Eintrag ohne Menge bleibt unverändert ·
-  eine Menge mit Komma eingeben · und der Blick auf den Bearbeiten-Dialog bei Schriftskalierung ≥ 1,3
-  mit offener Tastatur, der zugleich **Auslöser 4 aus ADR 0033** beantwortet
+- [x] Unit-Tests — **167 grün** (vorher 136). Neu: der ganze `TodoQuantityTest` (Komma- und
+  Punkt-Eingabe · leer, Buchstaben, Null und Negatives werden abgelehnt · „3" statt „3,0" · **der
+  Fließkomma-Fall `0,1 × 3`** · Skalieren mit ganzer Zahl und mit Kommazahl · Faktor 1 · Eintrag ohne
+  Menge bleibt unberührt und wird nicht einmal kopiert · die Menge fällt beim Skalieren weg) · Mapper
+  mit Menge, **ohne das Feld** und mit Null/Negativ, dazu ein Hin-und-zurück ohne das Feld · im
+  ViewModel die Vorbelegung als „1,5", das Speichern über `TodoUpdate`, das Leeren zu null, die
+  abgewiesene Unlesbarkeit, **zwei Verschiebe-Fälle** (Menge mitgeführt · Menge gleichzeitig
+  geändert) und fünf Faktor-Fälle
+- [x] Instrumentierte Tests **am 2026-08-16 auf einem SM-S928B gelaufen, alle 40 grün** (vorher 34).
+  Sechs neue im `TodoListScreenTest`: Mengenfeld meldet seine Eingabe · **Gegenprobe**, dass es in
+  einer Arbeitsliste fehlt · Vorlagen-Zeile zeigt das Präfix · „Speichern" abgeblendet bei unlesbarer
+  Menge · Faktor-Feld im Instanziieren-Dialog · **Gegenprobe**, dass es beim Anlegen einer normalen
+  Liste fehlt. Canary-Gegenprobe mitgemacht: `aTemplateRowShowsTheQuantityInFrontOfTheTitle` auf
+  einen erfundenen Text gedreht scheitert mit „Assert failed: The component with Text + InputText +
+  EditableText contains 'CANARY 2 Milch kaufen' … is not displayed!" — aufgelöster Matcher gegen
+  einen echten Baum, nicht „No compose hierarchies found". Danach zurückgedreht und erneut 40 grün.
+  **Nebenbei gelernt:** Der Lauf ging diesmal **über WLAN**, und das ging gut — der Fallstrick aus
+  „Querlaufend" greift dabei aber schärfer: Ohne Kabel hilft „Aktiv lassen" nicht, es hängt allein an
+  `screen_off_timeout` (hier 10 Minuten, also reichlich). Vorher prüfen lohnt
+- [ ] Auf dem Gerät prüfen — Vorlage mit gemischten Einträgen (mit und ohne Menge), **Faktor 3** →
+  „3 T-Shirt", Shampoo unverändert · **Faktor 2,5** · eine Menge mit Komma eintippen (das liefert die
+  deutsche Tastatur) · Faktor 1 ergibt, was in der Vorlage steht · Unlesbares in Menge und Faktor →
+  Knopf abgeblendet · die erzeugte Liste ist gewöhnlich: „3 T-Shirt" von Hand auf „2 T-Shirt" ändern
+  · eine Aufgabe mit Menge verschieben, ohne und mit gleichzeitiger Änderung · hell und dunkel.
+  Dabei in der Firebase Console nachsehen, ob eine von Hand als **Ganzzahl** eingetippte Menge
+  gelesen wird (Firestore legt sie dann als `Long` ab).
+  **Und der Blick, der mehr beantwortet als 14b:** der Bearbeiten-Dialog bei Schriftskalierung ≥ 1,3
+  mit offener Tastatur — das ist **Auslöser 4 aus
+  [ADR 0033](docs/decisions/0033-bearbeiten-bleibt-ein-dialog.md)**, und hier fällt das Urteil, ob
+  Bearbeiten ein Dialog bleiben darf
 
 ### Querlaufend – Werkzeuge & Doku
 > Läuft neben den Phasen und gehört zu keiner.

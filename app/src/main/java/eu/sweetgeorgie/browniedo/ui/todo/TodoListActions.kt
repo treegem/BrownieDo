@@ -50,6 +50,7 @@ data class TodoListTopBarActions(
 data class ListDialogActions(
     val onNewListNameChange: (String) -> Unit,
     val onNewListSharedChange: (Boolean) -> Unit,
+    val onNewListFactorChange: (String) -> Unit,
     val onNewListConfirm: () -> Unit,
     val onNewListDismiss: () -> Unit,
     val onRenamedListNameChange: (String) -> Unit,
@@ -83,6 +84,7 @@ data class TodoActions(
 data class TodoEditActions(
     val onTitleChange: (String) -> Unit,
     val onNotesChange: (String) -> Unit,
+    val onQuantityChange: (String) -> Unit,
     val onPriorityChange: (TodoPriority) -> Unit,
     val onTargetListChange: (TodoList) -> Unit,
     val onCalendarEventClick: (String) -> Unit,

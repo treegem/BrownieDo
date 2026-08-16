@@ -95,13 +95,20 @@ data class TodoListUiState(
  * [notes] ist **nicht** nullable, anders als [Todo.notes]: Das hier ist der Puffer des Textfelds,
  * und ein Textfeld braucht einen String. Leer heißt „keine Notiz"; die Übersetzung nach null
  * passiert beim Speichern, an einer Stelle.
+ *
+ * [quantity] ist aus demselben Grund ein String und keine Zahl — ein Textfeld trägt auch bei einer
+ * Menge Text, samt halb getippter Zwischenstände. Leer heißt „keine Menge", also „skaliert nicht",
+ * siehe docs/decisions/0037-menge-am-eintrag-statt-zahl-im-titel.md. **Vorbelegt wird der Puffer
+ * unabhängig davon, ob eine Vorlage offen ist:** Nur das *Feld* im Dialog ist moduspflichtig, sonst
+ * löschte ein Speichern in einer Arbeitsliste eine vorhandene Menge still weg.
  */
 data class TodoEdit(
     val todoId: String,
     val title: String,
     val priority: TodoPriority,
     val targetListId: String,
-    val notes: String
+    val notes: String,
+    val quantity: String
 )
 
 /**
@@ -115,7 +122,13 @@ data class TodoEdit(
 data class NewList(
     val name: String = "",
     val shared: Boolean = false,
-    val kind: NewListKind = NewListKind.LIST
+    val kind: NewListKind = NewListKind.LIST,
+    /**
+     * Womit die Mengen der Vorlage multipliziert werden — nur für [NewListKind.FROM_TEMPLATE], sonst
+     * unbenutzt. Ein Textpuffer wie [TodoEdit.quantity], und die Vorgabe „1" ist der Normalfall: Sie
+     * ergibt genau das, was in der Vorlage steht.
+     */
+    val factor: String = "1"
 )
 
 /**

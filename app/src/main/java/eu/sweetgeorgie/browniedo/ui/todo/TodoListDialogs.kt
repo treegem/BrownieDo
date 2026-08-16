@@ -42,10 +42,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import eu.sweetgeorgie.browniedo.R
 import eu.sweetgeorgie.browniedo.domain.list.TodoList
 import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
+import eu.sweetgeorgie.browniedo.domain.todo.toPositiveDecimalOrNull
 import eu.sweetgeorgie.browniedo.domain.user.Partner
 
 /**
@@ -72,6 +74,23 @@ private val DIALOG_MULTILINE_KEYBOARD_OPTIONS =
     KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
 
 /**
+ * Für Menge und Faktor. `Decimal` blendet die Zifferntastatur samt Trennzeichen ein — welches das
+ * ist, hängt von der Tastatur ab, weshalb
+ * [eu.sweetgeorgie.browniedo.domain.todo.toPositiveDecimalOrNull] Komma **und** Punkt annimmt.
+ * Großschreibung wäre hier sinnlos, `Done` bleibt wie an den übrigen einzeiligen Feldern.
+ */
+private val DIALOG_DECIMAL_KEYBOARD_OPTIONS =
+    KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done)
+
+/**
+ * Ob ein Mengen- oder Faktor-Feld gespeichert werden darf. **Leer ist für die Menge gültig** — es
+ * heißt „skaliert nicht" und ist der Schalter aus
+ * docs/decisions/0037-menge-am-eintrag-statt-zahl-im-titel.md. Der Faktor prüft zusätzlich auf
+ * „nicht leer", weil dort jede Eingabe eine Zahl sein muss.
+ */
+private fun String.isUsableAmount(): Boolean = isBlank() || toPositiveDecimalOrNull() != null
+
+/**
  * Der Schriftstil für die Eingabe in einem Dialogfeld.
  *
  * Muss angegeben werden: `OutlinedTextField` erbt seinen `textStyle` von `LocalTextStyle`, und der
@@ -93,6 +112,7 @@ internal fun NewListDialog(
     partner: Partner?,
     onNameChange: (String) -> Unit,
     onSharedChange: (Boolean) -> Unit,
+    onFactorChange: (String) -> Unit,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -124,10 +144,28 @@ internal fun NewListDialog(
                     enabled = partner != null,
                     onClick = { onSharedChange(true) }
                 )
+                // Nur beim Instanziieren: Ohne Vorlage gibt es keine Mengen, die sich skalieren
+                // ließen. Bei Faktor 1 kommt heraus, was in der Vorlage steht.
+                if (newList.kind == NewListKind.FROM_TEMPLATE) {
+                    OutlinedTextField(
+                        value = newList.factor,
+                        onValueChange = onFactorChange,
+                        label = { Text(text = stringResource(R.string.todo_list_factor_label)) },
+                        singleLine = true,
+                        keyboardOptions = DIALOG_DECIMAL_KEYBOARD_OPTIONS,
+                        textStyle = dialogTextStyle,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         },
         confirmButton = {
-            Button(onClick = onConfirm, enabled = newList.name.isNotBlank()) {
+            // Ein leerer Faktor ist anders als eine leere Menge **nicht** in Ordnung: Hier muss eine
+            // Zahl stehen, sonst wüsste niemand, womit gerechnet wird.
+            val factorIsUsable = newList.kind != NewListKind.FROM_TEMPLATE ||
+                (newList.factor.isNotBlank() && newList.factor.isUsableAmount())
+
+            Button(onClick = onConfirm, enabled = newList.name.isNotBlank() && factorIsUsable) {
                 Text(text = stringResource(R.string.todo_list_create))
             }
         },
@@ -278,6 +316,7 @@ internal fun DeleteListDialog(
 internal fun EditTodoDialog(
     title: String,
     notes: String,
+    quantity: String,
     priority: TodoPriority,
     lists: List<TodoList>,
     targetListId: String,
@@ -304,6 +343,27 @@ internal fun EditTodoDialog(
                     textStyle = dialogTextStyle,
                     modifier = Modifier.fillMaxWidth()
                 )
+                // Direkt unter dem Titel, weil die Menge zu ihm gehört: Aus „T-Shirt" mit Menge 1
+                // wird beim Instanziieren „3 T-Shirt". Nur in einer Vorlage — in einer Arbeitsliste
+                // ist die Zahl längst Teil des Titels (ADR 0037). Der Platz dafür ist da, weil hier
+                // „Termin anlegen" wegfällt (ADR 0034).
+                if (isTemplateEntry) {
+                    OutlinedTextField(
+                        value = quantity,
+                        onValueChange = actions.onQuantityChange,
+                        label = { Text(text = stringResource(R.string.todo_list_quantity_label)) },
+                        // Leer ist die häufigste und eine völlig gültige Antwort — sie heißt
+                        // „skaliert nicht". Der Hinweis sagt das, damit niemand eine 1 eintippt,
+                        // nur weil das Feld leer aussieht.
+                        supportingText = {
+                            Text(text = stringResource(R.string.todo_list_quantity_hint))
+                        },
+                        singleLine = true,
+                        keyboardOptions = DIALOG_DECIMAL_KEYBOARD_OPTIONS,
+                        textStyle = dialogTextStyle,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
                 // Mehrzeilig, weil ein Backlog-Eintrag nach Wochen mehr braucht als eine Zeile —
                 // und mit Obergrenze, damit eine lange Notiz den Dialog nicht auffrisst.
                 OutlinedTextField(
@@ -379,7 +439,12 @@ internal fun EditTodoDialog(
             }
         },
         confirmButton = {
-            Button(onClick = actions.onConfirm, enabled = title.isNotBlank()) {
+            // Eine unlesbare Menge hält das Speichern zurück, genau wie ein leerer Titel — sonst
+            // ginge stillschweigend „keine Menge" raus, obwohl jemand etwas eingetippt hat.
+            Button(
+                onClick = actions.onConfirm,
+                enabled = title.isNotBlank() && quantity.isUsableAmount()
+            ) {
                 Text(text = stringResource(R.string.todo_list_save))
             }
         },

@@ -29,5 +29,15 @@ data class Todo(
      *
      * Aufgaben von vor Phase 12 tragen das Feld nicht und werden ebenfalls zu null gelesen.
      */
-    val notes: String?
+    val notes: String?,
+    /**
+     * Die Menge eines **Vorlagen-Eintrags** — und ihr Vorhandensein ist zugleich der Schalter: Ein
+     * Eintrag mit Menge wird beim Instanziieren mit dem Faktor multipliziert, einer ohne bleibt, wie
+     * er ist. Drei Tage heißen drei T-Shirts, aber nicht drei Shampoo. Siehe
+     * docs/decisions/0037-menge-am-eintrag-statt-zahl-im-titel.md.
+     *
+     * In einer Arbeitsliste steht hier null: Beim Instanziieren wandert die gerechnete Menge in den
+     * Titel, das Feld selbst nicht mit.
+     */
+    val quantity: Double?
 )

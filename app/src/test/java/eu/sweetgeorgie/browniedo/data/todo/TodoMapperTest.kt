@@ -25,7 +25,8 @@ class TodoMapperTest {
                 updatedAt = UPDATED_AT,
                 completedBy = "uid-partner",
                 completedAt = COMPLETED_AT,
-                notes = "Die haltbare, nicht die frische"
+                notes = "Die haltbare, nicht die frische",
+                quantity = 2.0
             ),
             todo
         )
@@ -78,6 +79,38 @@ class TodoMapperTest {
     }
 
     @Test
+    fun `reads an entry that has no quantity field at all`() {
+        // Der Migrationsfall wie bei der Notiz: Aufgaben von vor Phase 14b tragen das Feld nicht,
+        // und „keine Menge" ist die richtige Antwort — sie skalieren einfach nicht mit.
+        val document = completeDocument().copy(quantity = null)
+
+        val todo = document.toTodo(DOCUMENT_ID)
+
+        assertNotNull(todo)
+        assertNull(todo?.quantity)
+    }
+
+    @Test
+    fun `reads a quantity of zero or less as no quantity`() {
+        // Kann beim Editieren in der Console entstehen. Null und Zero hießen sonst dasselbe in zwei
+        // Formen, und jede Rechenstelle bräuchte einen Sonderfall.
+        assertNull(completeDocument().copy(quantity = 0.0).toTodo(DOCUMENT_ID)?.quantity)
+        assertNull(completeDocument().copy(quantity = -1.0).toTodo(DOCUMENT_ID)?.quantity)
+    }
+
+    @Test
+    fun `an entry without a quantity survives being mapped to the domain and back`() {
+        // Die Menge muss beim Verschieben und beim Rückgängig mitwandern (ADR 0024) — und ihr Fehlen
+        // darf die Aufgabe dabei nicht hängen lassen.
+        val document = completeDocument().copy(quantity = null)
+
+        assertEquals(
+            document.copy(updatedAt = null),
+            document.toTodo(DOCUMENT_ID)?.toDocument()
+        )
+    }
+
+    @Test
     fun `reads every priority it knows`() {
         TodoPriority.entries.forEach { priority ->
             val document = completeDocument().copy(priority = priority.name)
@@ -115,7 +148,8 @@ class TodoMapperTest {
                 completedBy = "uid-partner",
                 completedAt = Date.from(COMPLETED_AT),
                 priority = TodoPriority.HIGH.name,
-                notes = "Die haltbare, nicht die frische"
+                notes = "Die haltbare, nicht die frische",
+                quantity = 2.0
             ),
             todo?.toDocument()
         )
@@ -193,7 +227,8 @@ class TodoMapperTest {
         completedBy = "uid-partner",
         completedAt = Date.from(COMPLETED_AT),
         priority = TodoPriority.HIGH.name,
-        notes = "Die haltbare, nicht die frische"
+        notes = "Die haltbare, nicht die frische",
+        quantity = 2.0
     )
 
     private companion object {

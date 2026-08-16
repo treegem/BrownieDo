@@ -150,8 +150,9 @@ class TodoOrderTest {
             updatedAt = createdAt,
             completedBy = "uid-partner".takeIf { isDone },
             completedAt = completedAtMillis?.let(Instant::ofEpochMilli),
-            // Die Notiz ordnet nichts — TODO_ORDER fasst sie nicht an.
-            notes = null
+            // Notiz und Menge ordnen nichts — TODO_ORDER fasst beide nicht an.
+            notes = null,
+            quantity = null
         )
     }
 }

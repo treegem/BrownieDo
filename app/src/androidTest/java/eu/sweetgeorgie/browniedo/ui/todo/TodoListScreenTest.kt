@@ -213,7 +213,8 @@ class TodoListScreenTest {
                     title = URGENT_TODO.title,
                     priority = TodoPriority.HIGH,
                     targetListId = LIST.id,
-                    notes = ""
+                    notes = "",
+                    quantity = ""
                 )
             )
         )
@@ -235,7 +236,8 @@ class TodoListScreenTest {
                     title = OPEN_TODO.title,
                     priority = TodoPriority.MEDIUM,
                     targetListId = LIST.id,
-                    notes = ""
+                    notes = "",
+                    quantity = ""
                 )
             ),
             editActions = NO_EDIT_ACTIONS.copy(onPriorityChange = { picked = it })
@@ -524,6 +526,96 @@ class TodoListScreenTest {
             .assertIsDisplayed()
     }
 
+    // --- Menge und Faktor (ADR 0037) ---
+
+    @Test
+    fun theQuantityFieldInATemplateReportsWhatIsTyped() {
+        var typed: String? = null
+        setScreenContent(
+            uiState = editingInTemplate(),
+            editActions = NO_EDIT_ACTIONS.copy(onQuantityChange = { typed = it })
+        )
+
+        composeTestRule.onNode(hasAnyAncestor(isDialog()) and hasText(quantityLabel()))
+            .performTextInput("3")
+
+        assertEquals("3", typed)
+    }
+
+    /**
+     * Die Gegenprobe zum Test darüber: In einer Arbeitsliste ist die Zahl längst Teil des Titels, das
+     * Feld hat dort nichts zu suchen. Ohne diese Zusicherung bliebe offen, ob das Feld überhaupt vom
+     * Modus abhängt.
+     */
+    @Test
+    fun theQuantityFieldIsAbsentInAWorkingList() {
+        setScreenContent(uiState = editingIn(LIST, lists = listOf(LIST)))
+
+        composeTestRule.onNode(hasAnyAncestor(isDialog()) and hasText(quantityLabel()))
+            .assertDoesNotExist()
+    }
+
+    @Test
+    fun aTemplateRowShowsTheQuantityInFrontOfTheTitle() {
+        val state = openTemplate()
+        setScreenContent(uiState = state.copy(todos = listOf(OPEN_TODO.copy(quantity = 2.0))))
+
+        // Genau so wird der Eintrag in der erzeugten Liste heißen.
+        composeTestRule.onNodeWithText("2 ${OPEN_TODO.title}").assertIsDisplayed()
+    }
+
+    @Test
+    fun theSaveButtonIsDisabledWhileTheQuantityIsUnreadable() {
+        var confirmCount = 0
+        val state = editingInTemplate()
+        setScreenContent(
+            uiState = state.copy(editedTodo = state.editedTodo?.copy(quantity = "zwei")),
+            editActions = NO_EDIT_ACTIONS.copy(onConfirm = { confirmCount++ })
+        )
+
+        val label = composeTestRule.activity.getString(R.string.todo_list_save)
+        val saveButton = composeTestRule.onNode(hasAnyAncestor(isDialog()) and hasText(label))
+        saveButton.assertIsNotEnabled()
+        saveButton.performClick()
+
+        assertEquals(0, confirmCount)
+    }
+
+    @Test
+    fun theFactorFieldIsShownWhenInstantiatingATemplate() {
+        var typed: String? = null
+        val state = openTemplate()
+        setScreenContent(
+            uiState = state.copy(
+                // Leer statt der Vorgabe „1", damit der Test die Eingabe misst und nicht das
+                // Anhängen an einen vorhandenen Wert.
+                newList = NewList(name = TEMPLATE.name, kind = NewListKind.FROM_TEMPLATE, factor = "")
+            ),
+            listDialogActions = NO_LIST_DIALOG_ACTIONS.copy(onNewListFactorChange = { typed = it })
+        )
+
+        composeTestRule.onNode(hasAnyAncestor(isDialog()) and hasText(factorLabel()))
+            .performTextInput("3")
+
+        assertEquals("3", typed)
+    }
+
+    /** Ohne Vorlage gibt es keine Mengen — und damit nichts, was ein Faktor tun könnte. */
+    @Test
+    fun theFactorFieldIsAbsentWhenCreatingAPlainList() {
+        val state = openTemplate()
+        setScreenContent(uiState = state.copy(newList = NewList(kind = NewListKind.LIST)))
+
+        composeTestRule.onNode(hasAnyAncestor(isDialog()) and hasText(factorLabel()))
+            .assertDoesNotExist()
+    }
+
+    private fun quantityLabel(): String =
+        composeTestRule.activity.getString(R.string.todo_list_quantity_label)
+
+    private fun factorLabel(): String =
+        composeTestRule.activity.getString(R.string.todo_list_factor_label)
+
     /** Eine offene Vorlage mit einem Eintrag — der Ausgangspunkt der Vorlagen-Tests. */
     private fun openTemplate() = TodoListUiState(
         lists = listOf(LIST),
@@ -541,7 +633,8 @@ class TodoListScreenTest {
                 title = OPEN_TODO.title,
                 priority = TodoPriority.MEDIUM,
                 targetListId = TEMPLATE.id,
-                notes = ""
+                notes = "",
+                quantity = ""
             )
         )
     }
@@ -556,7 +649,8 @@ class TodoListScreenTest {
             title = OPEN_TODO.title,
             priority = TodoPriority.MEDIUM,
             targetListId = list.id,
-            notes = ""
+            notes = "",
+            quantity = ""
         )
     )
 
@@ -584,6 +678,7 @@ class TodoListScreenTest {
         onErrorShown: () -> Unit = {},
         todoActions: TodoActions = NO_TODO_ACTIONS,
         editActions: TodoEditActions = NO_EDIT_ACTIONS,
+        listDialogActions: ListDialogActions = NO_LIST_DIALOG_ACTIONS,
         onMovedMessageShown: () -> Unit = {},
         onUndoDelete: () -> Unit = {},
         onDeletedMessageShown: () -> Unit = {}
@@ -593,7 +688,7 @@ class TodoListScreenTest {
                 TodoListScreen(
                     uiState = uiState,
                     topBarActions = NO_TOP_BAR_ACTIONS,
-                    listDialogActions = NO_LIST_DIALOG_ACTIONS,
+                    listDialogActions = listDialogActions,
                     todoActions = todoActions,
                     editActions = editActions,
                     snackbarActions = SnackbarActions(
@@ -630,6 +725,7 @@ class TodoListScreenTest {
         val NO_LIST_DIALOG_ACTIONS = ListDialogActions(
             onNewListNameChange = {},
             onNewListSharedChange = {},
+            onNewListFactorChange = {},
             onNewListConfirm = {},
             onNewListDismiss = {},
             onRenamedListNameChange = {},
@@ -650,6 +746,7 @@ class TodoListScreenTest {
         val NO_EDIT_ACTIONS = TodoEditActions(
             onTitleChange = {},
             onNotesChange = {},
+            onQuantityChange = {},
             onPriorityChange = {},
             onTargetListChange = {},
             onCalendarEventClick = {},
@@ -677,7 +774,8 @@ class TodoListScreenTest {
             updatedAt = TIMESTAMP,
             completedBy = null,
             completedAt = null,
-            notes = null
+            notes = null,
+            quantity = null
         )
 
         val TODO_WITH_NOTES = OPEN_TODO.copy(

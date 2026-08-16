@@ -71,6 +71,7 @@ class MainActivity : ComponentActivity() {
                         ListDialogActions(
                             onNewListNameChange = todoListViewModel::onNewListNameChange,
                             onNewListSharedChange = todoListViewModel::onNewListSharedChange,
+                            onNewListFactorChange = todoListViewModel::onNewListFactorChange,
                             onNewListConfirm = todoListViewModel::onNewListConfirm,
                             onNewListDismiss = todoListViewModel::onNewListDismiss,
                             onRenamedListNameChange = todoListViewModel::onRenamedListNameChange,
@@ -93,6 +94,7 @@ class MainActivity : ComponentActivity() {
                         TodoEditActions(
                             onTitleChange = todoListViewModel::onEditedTitleChange,
                             onNotesChange = todoListViewModel::onEditedNotesChange,
+                            onQuantityChange = todoListViewModel::onEditedQuantityChange,
                             onPriorityChange = todoListViewModel::onEditedPriorityChange,
                             onTargetListChange = todoListViewModel::onEditedTargetListChange,
                             // Der Kalender-Intent lebt in der UI-Schicht (ADR 0027); nur sein

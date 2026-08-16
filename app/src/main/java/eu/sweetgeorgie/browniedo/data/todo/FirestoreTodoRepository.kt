@@ -12,11 +12,13 @@ import eu.sweetgeorgie.browniedo.data.todo.TodoField.COMPLETED_BY
 import eu.sweetgeorgie.browniedo.data.todo.TodoField.DONE
 import eu.sweetgeorgie.browniedo.data.todo.TodoField.NOTES
 import eu.sweetgeorgie.browniedo.data.todo.TodoField.PRIORITY
+import eu.sweetgeorgie.browniedo.data.todo.TodoField.QUANTITY
 import eu.sweetgeorgie.browniedo.data.todo.TodoField.TITLE
 import eu.sweetgeorgie.browniedo.data.todo.TodoField.UPDATED_AT
 import eu.sweetgeorgie.browniedo.domain.todo.Todo
 import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
 import eu.sweetgeorgie.browniedo.domain.todo.TodoRepository
+import eu.sweetgeorgie.browniedo.domain.todo.TodoUpdate
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -25,6 +27,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.retryWhen
 import java.time.Instant
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Reads and writes the entries at `lists/{listId}/todos`, see
@@ -56,7 +60,9 @@ class FirestoreTodoRepository(private val firestore: FirebaseFirestore) : TodoRe
         .retryWhen { _, attempt ->
             if (attempt >= LISTEN_RETRIES) return@retryWhen false
             // Steigend, damit der zweite Versuch nicht in dieselbe Lücke fällt wie der erste.
-            delay(LISTEN_RETRY_DELAY_MILLIS * (attempt + 1))
+            // `attempt` ist durch die Zeile darüber auf [LISTEN_RETRIES] begrenzt, `toInt` also
+            // gefahrlos — `Duration` multipliziert nur mit Int oder Double.
+            delay(LISTEN_RETRY_DELAY * (attempt + 1).toInt())
             true
         }
         // Erst wenn die Versuche aufgebraucht sind, ist es wirklich ein Fehler. Ab hier gilt
@@ -122,26 +128,22 @@ class FirestoreTodoRepository(private val firestore: FirebaseFirestore) : TodoRe
             )
         }.map { }
 
-    override fun updateTodo(
-        listId: String,
-        todoId: String,
-        title: String,
-        priority: TodoPriority,
-        notes: String?
-    ): Result<Unit> =
+    override fun updateTodo(listId: String, todoId: String, update: TodoUpdate): Result<Unit> =
         runCatching {
             todoCollection(listId).document(todoId).update(
                 mapOf(
-                    TITLE to title,
+                    TITLE to update.title,
                     // Der Name, nicht die Position im Enum: Eine spätere Umsortierung der Stufen
                     // darf gespeicherte Aufgaben nicht umdeuten.
-                    PRIORITY to priority.name,
+                    PRIORITY to update.priority.name,
                     // Eine gelöschte Notiz wird zu null geschrieben und **nicht** mit
                     // FieldValue.delete() entfernt: Beides liest sich später gleich, aber so
                     // zerfällt der Bestand nicht in „Feld fehlt" und „Feld ist null". Dass eine
                     // alte Aufgabe das Feld noch gar nicht hat, stört update() nicht — es legt
                     // fehlende Felder an und scheitert nur an einem fehlenden Dokument.
-                    NOTES to notes,
+                    NOTES to update.notes,
+                    // Dieselbe Regel für die Menge: geleert heißt null, nicht „Feld weg".
+                    QUANTITY to update.quantity,
                     UPDATED_AT to FieldValue.serverTimestamp()
                 )
             )
@@ -196,8 +198,13 @@ class FirestoreTodoRepository(private val firestore: FirebaseFirestore) : TodoRe
          */
         const val LISTEN_RETRIES = 2
 
-        /** Grundabstand zwischen zwei Versuchen; der zweite wartet doppelt so lang. */
-        const val LISTEN_RETRY_DELAY_MILLIS = 700L
+        /**
+         * Grundabstand zwischen zwei Versuchen; der zweite wartet doppelt so lang.
+         *
+         * Als [Duration] und nicht als `Long`: So steht die Einheit im Typ statt im Namen, und
+         * `delay` braucht seine veraltete Millisekunden-Überladung nicht.
+         */
+        val LISTEN_RETRY_DELAY: Duration = 700.milliseconds
     }
 }
 

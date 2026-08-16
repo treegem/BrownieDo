@@ -45,7 +45,18 @@ data class TodoDocument(
      * bei der Priorität braucht es hier auch keinen Rückfallwert, weil „keine Notiz" die richtige
      * Antwort ist und nicht ein Ersatz für eine fehlende.
      */
-    var notes: String? = null
+    var notes: String? = null,
+    /**
+     * Die Menge eines Vorlagen-Eintrags, siehe
+     * docs/decisions/0037-menge-am-eintrag-statt-zahl-im-titel.md. Nullable mit Standardwert `null`,
+     * und beides trägt wie bei [notes] die Migration: Aufgaben von vor Phase 14b haben das Feld
+     * nicht, und „keine Menge" ist die richtige Antwort statt eines Ersatzwerts.
+     *
+     * `Double` und nicht `Long`, damit Halbe möglich sind („0,5 Rolle pro Tag"). Wird das Feld von
+     * Hand in der Console als Ganzzahl eingetippt, liegt in Firestore ein `Long` — dessen Mapper
+     * wandelt das für ein `Double`-Feld um.
+     */
+    var quantity: Double? = null
 )
 
 /**
@@ -60,4 +71,5 @@ internal object TodoField {
     const val COMPLETED_AT = "completedAt"
     const val PRIORITY = "priority"
     const val NOTES = "notes"
+    const val QUANTITY = "quantity"
 }

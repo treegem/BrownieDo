@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import eu.sweetgeorgie.browniedo.R
 import eu.sweetgeorgie.browniedo.domain.todo.Todo
 import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
+import eu.sweetgeorgie.browniedo.domain.todo.formatQuantity
 
 /**
  * Anteil der Zeilenbreite, über den eine erledigte Aufgabe gezogen werden muss, damit sie gelöscht
@@ -137,7 +138,14 @@ private fun TodoRow(
     ListItem(
         headlineContent = {
             Text(
-                text = todo.title,
+                // In einer Vorlage steht die Menge vor dem Titel — genau so, wie der Eintrag in der
+                // erzeugten Liste heißen wird („1 T-Shirt"). Ohne das wäre nicht zu sehen, welche
+                // Einträge überhaupt mitskalieren, und das ist die eine Frage, die man an eine
+                // Vorlage hat. Dieselbe Formatierung wie beim Skalieren, also keine zweite Regel.
+                text = todo.quantity
+                    ?.takeIf { isTemplateEntry }
+                    ?.let { "${formatQuantity(it)} ${todo.title}" }
+                    ?: todo.title,
                 textDecoration = if (todo.isDone) TextDecoration.LineThrough else null
             )
         },

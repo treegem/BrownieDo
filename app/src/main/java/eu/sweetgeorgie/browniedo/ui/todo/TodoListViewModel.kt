@@ -9,6 +9,10 @@ import eu.sweetgeorgie.browniedo.domain.list.TodoList
 import eu.sweetgeorgie.browniedo.domain.todo.Todo
 import eu.sweetgeorgie.browniedo.domain.todo.TodoPriority
 import eu.sweetgeorgie.browniedo.domain.todo.TodoRepository
+import eu.sweetgeorgie.browniedo.domain.todo.TodoUpdate
+import eu.sweetgeorgie.browniedo.domain.todo.formatQuantity
+import eu.sweetgeorgie.browniedo.domain.todo.scaledBy
+import eu.sweetgeorgie.browniedo.domain.todo.toPositiveDecimalOrNull
 import eu.sweetgeorgie.browniedo.domain.user.PartnerRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -216,6 +220,10 @@ class TodoListViewModel(
         if (shared && it.partner == null) it else it.copy(newList = it.newList?.copy(shared = shared))
     }
 
+    fun onNewListFactorChange(factor: String) = mutableUiState.update {
+        it.copy(newList = it.newList?.copy(factor = factor))
+    }
+
     fun onNewListDismiss() = mutableUiState.update { it.copy(newList = null) }
 
     /**
@@ -236,6 +244,14 @@ class TodoListViewModel(
         } else {
             emptyList()
         }
+        val factor = if (newList.kind == NewListKind.FROM_TEMPLATE) {
+            // Wie beim Mengenfeld: Die Oberfläche blendet „Anlegen" bei unlesbarem Faktor ab, das
+            // hier ist die zweite Verteidigungslinie.
+            newList.factor.toPositiveDecimalOrNull() ?: return
+        } else {
+            // Die anderen beiden Wege legen leer an, es gibt nichts zu skalieren.
+            1.0
+        }
 
         viewModelScope.launch {
             val created = when (newList.kind) {
@@ -245,8 +261,13 @@ class TodoListViewModel(
                     // Eine frische Liste ist offen. Vorlagen kennen kein Abhaken, das ist also
                     // Vorsorge für einen Bestand, der von Hand entstanden sein kann — und es sagt,
                     // was eine Instanz erbt und was nicht.
+                    //
+                    // Skaliert wird hier und nicht im Repository: Es ist eine Regel darüber, was
+                    // eine Instanz erbt, und sie gehört zu der aus ADR 0037 (ADR 0034 hält dasselbe
+                    // schon für den Erledigt-Zustand fest).
                     todos = templateEntries.map {
                         it.copy(isDone = false, completedBy = null, completedAt = null)
+                            .scaledBy(factor)
                     }
                 )
 
@@ -358,7 +379,10 @@ class TodoListViewModel(
                     priority = todo.priority,
                     targetListId = listId,
                     // Aus null wird der leere Puffer des Textfelds; beim Speichern wieder zurück.
-                    notes = todo.notes.orEmpty()
+                    notes = todo.notes.orEmpty(),
+                    // Formatiert und nicht `toString()`: Im Feld soll „1,5" stehen und nicht „1.5" —
+                    // und was der Nutzer dort sieht, ist auch das, was er wieder eintippen würde.
+                    quantity = todo.quantity?.let(::formatQuantity).orEmpty()
                 ),
                 error = null
             )
@@ -381,6 +405,10 @@ class TodoListViewModel(
         it.copy(editedTodo = it.editedTodo?.copy(notes = notes))
     }
 
+    fun onEditedQuantityChange(quantity: String) = mutableUiState.update {
+        it.copy(editedTodo = it.editedTodo?.copy(quantity = quantity))
+    }
+
     fun onEditDismiss() = mutableUiState.update { it.copy(editedTodo = null) }
 
     /**
@@ -397,14 +425,24 @@ class TodoListViewModel(
         // hier wieder zu null — „keine Notiz" hat damit genau eine Form.
         val notes = editedTodo.notes.trim().takeIf { it.isNotBlank() }
 
+        val quantityText = editedTodo.quantity.trim()
+        val quantity = quantityText.toPositiveDecimalOrNull()
+        // Leer heißt „keine Menge" und ist erlaubt; unlesbar heißt, dass wir nicht wissen, was
+        // gemeint war — und dann wird nichts geschrieben, statt die Menge still zu löschen. Die
+        // Oberfläche blendet „Speichern" dafür ab, das hier ist die zweite Verteidigungslinie.
+        if (quantityText.isNotEmpty() && quantity == null) return
+
         if (editedTodo.targetListId == listId) {
-            // Titel, Priorität und Notiz gehen zusammen raus (ADR 0025).
+            // Titel, Priorität, Notiz und Menge gehen zusammen raus (ADR 0025).
             todoRepository.updateTodo(
                 listId = listId,
                 todoId = editedTodo.todoId,
-                title = title,
-                priority = editedTodo.priority,
-                notes = notes
+                update = TodoUpdate(
+                    title = title,
+                    priority = editedTodo.priority,
+                    notes = notes,
+                    quantity = quantity
+                )
             ).fold(
                 // Bei einem Fehlschlag bleibt der Dialog offen, damit der getippte Titel nicht
                 // verloren geht.
@@ -437,8 +475,14 @@ class TodoListViewModel(
             fromListId = listId,
             toListId = target.id,
             // Was der Dialog besitzt, überschreibt den Snapshot — sonst reiste beim gleichzeitigen
-            // Verschieben und Ändern die *alte* Notiz mit und die getippte wäre verloren.
-            todo = todo.copy(title = title, priority = editedTodo.priority, notes = notes)
+            // Verschieben und Ändern die *alte* Notiz mit und die getippte wäre verloren. Dasselbe
+            // gilt seit Phase 14b für die Menge; kein Mapper-Test findet diesen Fall.
+            todo = todo.copy(
+                title = title,
+                priority = editedTodo.priority,
+                notes = notes,
+                quantity = quantity
+            )
         ).fold(
             onSuccess = {
                 mutableUiState.update {
