@@ -1016,6 +1016,88 @@ class TodoListViewModelTest {
         assertEquals(500.0, todoRepository.lastMoveTodoCall?.todo?.sortOrder)
     }
 
+    // --- Erledigte auf einmal löschen (ADR 0040) ---
+
+    @Test
+    fun `the dialog for clearing finished entries opens and closes`() = runTest(testDispatcher) {
+        seedMixedListInFirstList()
+
+        viewModel.onDeleteFinishedClick()
+        assertTrue(viewModel.uiState.value.finishedTodosPendingDeletion)
+
+        viewModel.onDeleteFinishedDismiss()
+        assertFalse(viewModel.uiState.value.finishedTodosPendingDeletion)
+        assertNull(todoRepository.lastDeleteTodosCall)
+    }
+
+    /** Der Kern: Genau die abgehakten Einträge gehen, keiner der offenen. */
+    @Test
+    fun `clearing finished entries deletes exactly the ticked ones`() = runTest(testDispatcher) {
+        seedMixedListInFirstList()
+
+        viewModel.onDeleteFinishedClick()
+        viewModel.onDeleteFinishedConfirm()
+
+        assertEquals(
+            DeleteTodosCall(LIST_A.id, listOf(FINISHED_TODO_ENTRY.id, SECOND_FINISHED_ENTRY.id)),
+            todoRepository.lastDeleteTodosCall
+        )
+        assertFalse(viewModel.uiState.value.finishedTodosPendingDeletion)
+    }
+
+    @Test
+    fun `a failing clear reports its own error and keeps the dialog open`() =
+        runTest(testDispatcher) {
+            seedMixedListInFirstList()
+            todoRepository.deleteTodosResult = Result.failure(IllegalStateException("nope"))
+
+            viewModel.onDeleteFinishedClick()
+            viewModel.onDeleteFinishedConfirm()
+
+            assertEquals(TodoListError.DELETE_FINISHED_FAILED, viewModel.uiState.value.error)
+            // Wie beim Löschen einer Liste: Die Snackbar legt sich davor, der Dialog bleibt stehen.
+            assertTrue(viewModel.uiState.value.finishedTodosPendingDeletion)
+        }
+
+    /**
+     * Sonst holte das „Rückgängig" einer vorherigen Einzellöschung eine Aufgabe zurück, die gerade
+     * mit weggeräumt wurde — das Angebot muss verfallen.
+     */
+    @Test
+    fun `clearing finished entries drops a pending undo offer`() = runTest(testDispatcher) {
+        seedMixedListInFirstList()
+        viewModel.onTodoSwipedAway(FINISHED_TODO_ENTRY)
+        assertNotNull(viewModel.uiState.value.deletedTodo)
+
+        viewModel.onDeleteFinishedClick()
+        viewModel.onDeleteFinishedConfirm()
+
+        assertNull(viewModel.uiState.value.deletedTodo)
+    }
+
+    /** Ohne Erledigtes gibt es den Menüeintrag nicht — und falls doch, schreibt hier nichts. */
+    @Test
+    fun `clearing writes nothing when no entry is ticked off`() = runTest(testDispatcher) {
+        seedEntryInFirstList()
+
+        viewModel.onDeleteFinishedClick()
+        viewModel.onDeleteFinishedConfirm()
+
+        assertEquals(0, todoRepository.deleteTodosCallCount)
+    }
+
+    /** Zwei offene und zwei erledigte Einträge — die Liste, die man nach einer Woche aufräumt. */
+    private fun TestScope.seedMixedListInFirstList() {
+        advanceUntilIdle()
+        todoRepository.emit(
+            LIST_A.id,
+            Result.success(
+                listOf(TODO_ENTRY, FINISHED_TODO_ENTRY, SECOND_ENTRY, SECOND_FINISHED_ENTRY)
+            )
+        )
+        advanceUntilIdle()
+    }
+
     /** Drei offene Einträge derselben Stufe, absteigend nach Alter — die Gruppe, in der gezogen wird. */
     private fun TestScope.seedGroupInFirstList() {
         advanceUntilIdle()
@@ -1576,6 +1658,12 @@ private val FINISHED_TODO_ENTRY = TODO_ENTRY.copy(
     completedAt = Instant.parse("2026-08-07T20:05:00Z")
 )
 
+private val SECOND_FINISHED_ENTRY = FINISHED_TODO_ENTRY.copy(
+    id = "todo-finished-2",
+    title = "Kaffee kaufen",
+    completedAt = Instant.parse("2026-08-07T20:10:00Z")
+)
+
 private data class AddCall(val listId: String, val title: String)
 
 private data class SetDoneCall(
@@ -1591,6 +1679,8 @@ private data class MoveTodoCall(val fromListId: String, val toListId: String, va
 
 private data class DeleteCall(val listId: String, val todoId: String)
 
+private data class DeleteTodosCall(val listId: String, val todoIds: List<String>)
+
 private data class RestoreTodoCall(val listId: String, val todo: Todo)
 
 private data class SetSortOrderCall(val listId: String, val todoId: String, val sortOrder: Double)
@@ -1603,6 +1693,7 @@ private class FakeTodoRepository : TodoRepository {
     var updateTodoResult: Result<Unit> = Result.success(Unit)
     var moveTodoResult: Result<Unit> = Result.success(Unit)
     var deleteResult: Result<Unit> = Result.success(Unit)
+    var deleteTodosResult: Result<Unit> = Result.success(Unit)
     var restoreTodoResult: Result<Unit> = Result.success(Unit)
     var setSortOrderResult: Result<Unit> = Result.success(Unit)
     var addCallCount = 0
@@ -1616,6 +1707,10 @@ private class FakeTodoRepository : TodoRepository {
     var lastMoveTodoCall: MoveTodoCall? = null
         private set
     var lastDeleteCall: DeleteCall? = null
+        private set
+    var lastDeleteTodosCall: DeleteTodosCall? = null
+        private set
+    var deleteTodosCallCount = 0
         private set
     var lastRestoreTodoCall: RestoreTodoCall? = null
         private set
@@ -1672,6 +1767,12 @@ private class FakeTodoRepository : TodoRepository {
     override fun deleteTodo(listId: String, todoId: String): Result<Unit> {
         lastDeleteCall = DeleteCall(listId, todoId)
         return deleteResult
+    }
+
+    override fun deleteTodos(listId: String, todoIds: List<String>): Result<Unit> {
+        deleteTodosCallCount++
+        lastDeleteTodosCall = DeleteTodosCall(listId, todoIds)
+        return deleteTodosResult
     }
 
     override fun restoreTodo(listId: String, todo: Todo): Result<Unit> {

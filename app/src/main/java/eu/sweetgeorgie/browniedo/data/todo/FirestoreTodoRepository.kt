@@ -180,6 +180,24 @@ class FirestoreTodoRepository(private val firestore: FirebaseFirestore) : TodoRe
         runCatching { todoCollection(listId).document(todoId).delete() }.map { }
 
     /**
+     * Gestückelt wie `ListRepository.deleteList`, das genau dieselbe Operation schon so macht: Ein
+     * Batch fasst 500 Schreibvorgänge. Anders als beim Instanziieren aus einer Vorlage ist die Grenze
+     * hier erreichbar — eine Liste, die ein Jahr lang nicht aufgeräumt wurde, hat mehr als 500
+     * abgehakte Zeilen, und genau die will man dann wegräumen.
+     *
+     * Die Stücke werden nicht abgewartet (ADR 0011). Scheitert eines, bleibt ein Teil der Aufgaben
+     * stehen — ein Zustand, den derselbe Menüeintrag einfach noch einmal aufräumt.
+     */
+    override fun deleteTodos(listId: String, todoIds: List<String>): Result<Unit> =
+        runCatching {
+            todoIds.chunked(MAX_DELETES_PER_BATCH).forEach { chunk ->
+                val batch = firestore.batch()
+                chunk.forEach { todoId -> batch.delete(todoCollection(listId).document(todoId)) }
+                batch.commit()
+            }
+        }.map { }
+
+    /**
      * `set()` auf denselben Pfad, den [deleteTodo] gerade geleert hat — die alte id kommt aus
      * [Todo.id]. Firestore stört es nicht, dass das Dokument dort eben noch stand: Offline reihen
      * sich Löschen und Anlegen in derselben lokalen Warteschlange, und der Endzustand ist ein
@@ -220,6 +238,12 @@ class FirestoreTodoRepository(private val firestore: FirebaseFirestore) : TodoRe
          * zwischen dem lokalen Anlegen einer Liste und ihrer Bestätigung durch den Server, nicht um
          * eine kaputte Verbindung — die bedient Firestore selbst aus dem Cache.
          */
+        /**
+         * Die harte Grenze eines Batches. Hier gehen ausschließlich Löschungen hinein, anders als
+         * beim Löschen einer ganzen Liste muss also kein Platz für das Listen-Dokument frei bleiben.
+         */
+        const val MAX_DELETES_PER_BATCH = 500
+
         const val LISTEN_RETRIES = 2
 
         /**

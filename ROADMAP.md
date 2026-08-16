@@ -987,12 +987,76 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   innen, und innen liegende Modifier bekommen die Zeigerereignisse zuerst. Kein Test hatte das
   gemerkt — dafür gibt es jetzt `aShortTapOnTheTitleOpensTheEditDialog`, die Gegenprobe, dass die
   Geste den kurzen Tipp nicht mitverschluckt
+- [x] **Nachtrag, aufgefallen erst beim Lint-Lauf von Phase 16:** Der `dragHandle`-Parameter hatte
+  zwei `ModifierParameter`-Warnungen eingebracht („Modifier parameter should be named modifier"), und
+  beide Composables schleppten zusätzlich ein **ungenutztes** `modifier` mit — jeder Aufrufer verließ
+  sich auf den Standardwert. Das ungenutzte ist raus (`remove-unused-code`), der Name bleibt und ist
+  jetzt begründet unterdrückt: `dragHandle` geht bewusst **nicht** an die Wurzel, sondern hinter den
+  Klick der Zeile, und genau dort entscheidet sich, wer den langen Druck gewinnt. Ein Parameter
+  namens `modifier`, der nicht an die Wurzel geht, wäre die schlechtere Lüge.
+  **Die Lehre für den nächsten Lauf:** Nach `lintDebug` nicht nur auf „BUILD SUCCESSFUL" sehen —
+  Lint schlägt bei Warnungen nicht fehl, die Befunde muss man zählen
   Canary-Gegenprobe mitgemacht: auf einen erfundenen Titel gedreht scheitert der Test mit „could not
   find any node that satisfies: (Text … contains 'CANARY Brot holen')" — ein aufgelöster Matcher
   gegen einen echten Baum, nicht „No compose hierarchies found". Danach zurückgedreht und erneut 47
   grün.
   **Nebenbei zu prüfen beim Geräteblick:** `combinedClickable` hängt eine `OnLongClick`-Semantik an
   die Zeile, die nichts tut — TalkBack könnte sie als Aktion ankündigen
+
+### Phase 16 – Erledigte auf einmal löschen
+> Nach einer Woche steht unter jeder Liste ein Haufen abgehakter Zeilen. Wegräumen ging nur einzeln —
+> wischen oder Bearbeiten-Dialog, je Eintrag —, und das passt nicht zu einem wöchentlichen Ritual.
+> Der Punkt stand bis hierher unter „Optionale / spätere Erweiterungen" und ist von dort hergewandert.
+>
+> Die Security Rules bleiben unberührt: Gelöscht werden Dokumente, für die `allow read, write: if
+> isListMember(listId)` ohnehin gilt. **Kein Schritt in der Firebase Console.**
+- [x] `TodoRepository.deleteTodos(listId, todoIds)` — ein `WriteBatch`, **gestückelt zu 500** wie in
+  `ListRepository.deleteList`, das genau dieselbe Operation schon so macht. Anders als beim
+  Instanziieren aus einer Vorlage ist die Grenze hier erreichbar: Eine Liste, die ein Jahr nicht
+  aufgeräumt wurde, hat mehr als 500 abgehakte Zeilen — und genau die will man dann wegräumen.
+  **Nicht suspend**, anders als `deleteList`: Dort muss erst nachgeschlagen werden, welche Aufgaben es
+  gibt, hier kommen die ids aus dem Snapshot. Damit bleibt der Weg bei
+  [ADR 0011](docs/decisions/0011-schreibvorgaenge-nicht-abwarten.md) und funktioniert offline
+- [x] **Rückfrage statt Rückgängig — und damit ist eine Trennlinie ausgesprochen, die vorher nur
+  implizit dalag:** Entscheidend ist die **Anzahl** der betroffenen Einträge, nicht ihre Art. Eine
+  Aufgabe → Rückgängig ([ADR 0031](docs/decisions/0031-rueckgaengig-statt-rueckfrage-beim-loeschen.md)),
+  viele auf einmal → Dialog mit der Zahl, weil die Zahl das ist, was die Folge greifbar macht. Das
+  ordnet nebenbei das Löschen einer Liste ein: Es ist kein Sonderfall, weil es eine *Liste* ist,
+  sondern weil alle ihre Aufgaben mitgehen. Begründung und verworfene Alternativen in
+  [ADR 0040](docs/decisions/0040-erledigte-loeschen-mit-rueckfrage.md)
+- [x] `DeleteFinishedDialog` in derselben Form wie „Liste löschen?" — Überschrift mit Fragezeichen,
+  Anzahl über `pluralStringResource`, gefüllter Bestätigungsknopf in `error`/`onError`
+  ([ADR 0032](docs/decisions/0032-gefuellte-bestaetigung-und-loeschen-im-inhalt.md)). **Beide teilen
+  sich jetzt ein privates `DestructiveConfirmButton`** — der Kommentar „die einzige gefüllte
+  Bestätigung in Fehlerfarbe" stimmte mit dem zweiten Dialog nicht mehr, und die Begründung soll an
+  einer Stelle stehen. Die Anzahl wird **beim Zeichnen live gezählt**, nicht beim Öffnen
+  festgehalten: Hakt der Partner ab, während der Dialog offensteht, stimmt die Zahl trotzdem
+- [x] Menüeintrag **über** Umbenennen und Löschen und ohne Fehlerfarbe — das ist Aufräumen, nicht
+  Zerstören, und es ist die Aktion, wegen der man das Menü nach einer Woche überhaupt öffnet.
+  **Nur sichtbar, wenn es Erledigtes gibt**, und in einer Vorlage nie: Dort wird nicht abgehakt
+  ([ADR 0034](docs/decisions/0034-vorlagen-sind-listen-mit-einem-flag.md)). Dieselbe Logik, mit der
+  „Umbenennen" und „Löschen" ohne offene Liste verschwinden
+- [x] **Ein offenes „Rückgängig" verfällt beim Aufräumen** — sonst holte es eine Aufgabe zurück, die
+  gerade mit weggeräumt wurde. Das ist die eine Stelle, an der die zwei Löschwege sich berühren, und
+  sie fällt durch keinen Mapper- und keinen Repository-Test auf; sie hat deshalb einen eigenen
+  ViewModel-Test
+- [x] Eigener Fehlerwert `DELETE_FINISHED_FAILED` statt `DELETE_FAILED` — dessen Meldung steht im
+  Singular und wäre für einen Schwung falsch. Wo die Meldung passt, wird weiterhin wiederverwendet:
+  Das Sortieren von Hand meldet seinen Fehlschlag als `UPDATE_FAILED` (ADR 0039). Ein Fehlschlag
+  lässt den Dialog stehen, wie beim Löschen einer Liste
+- [x] Unit-Tests — **205 grün** (vorher 200). Neu: Dialog öffnen und schließen · **Bestätigen löscht
+  genau die abgehakten ids, keine offene** · ein Fehlschlag meldet den eigenen Fehler und lässt den
+  Dialog offen · **Bestätigen verwirft ein offenes Rückgängig** · ohne Erledigtes schreibt nichts
+- [x] Instrumentierte Tests **am 2026-08-16 auf einem SM-S928B gelaufen, alle 52 grün** (vorher 48).
+  Vier neue im `TodoListScreenTest`: Der Menüeintrag meldet seinen Tipp · **Gegenprobe**, dass er ohne
+  erledigte Aufgabe fehlt · **Gegenprobe**, dass er in einer Vorlage fehlt · der Dialog nennt die
+  Anzahl und „Löschen" meldet den Tipp (auf den Dialog eingegrenzt, weil „Löschen" auch
+  `DeleteListDialog` und den Bearbeiten-Dialog beschriftet). Beide Gegenproben prüfen zusätzlich, dass
+  „Abmelden" dasteht — sonst belegte ein `assertDoesNotExist` nur, dass das Menü zu ist.
+  Canary-Gegenprobe mitgemacht: auf einen erfundenen Text gedreht scheitert der Test mit „could not
+  find any node that satisfies: (Text … contains 'CANARY Erledigte löschen')" — ein aufgelöster
+  Matcher gegen einen echten Baum, nicht „No compose hierarchies found". Danach zurückgedreht und
+  erneut 52 grün
 
 ### Handprüfungen auf dem Gerät
 > Alles, was **nur von Hand** geht, aus allen Phasen hier zusammengezogen: echte Firestore-Daten,
@@ -1118,6 +1182,15 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
   behält die Reihenfolge · einmal mit TalkBack über die zwei Aktionen · hell und dunkel.
   **Und der Blick, der die Bibliothek beurteilt:** Wischen zum Löschen und das Antippen zum
   Bearbeiten müssen unverändert funktionieren — beide teilen sich die Zeile jetzt mit der Ziehgeste
+- [x] **(Phase 16)** Erledigte löschen — **am 2026-08-16 von Hand durchgespielt und für gut
+  befunden.** Der Weg trägt: Menüeintrag, Dialog, Aufräumen.
+  **Was dabei nicht einzeln bestätigt wurde**, damit hier niemand mehr hineinliest, als belegt ist:
+  Singular- gegen Pluralform des Dialogtexts · offline aufräumen und wieder verbinden · hell und
+  dunkel, besonders der gefüllte Knopf in Fehlerfarbe im dunklen Schema · und der Fall, der die zwei
+  Löschwege verbindet — **eine Aufgabe einzeln löschen, das „Rückgängig" stehen lassen und dann
+  aufräumen**, wobei das Angebot verschwinden muss, statt eine mitgelöschte Aufgabe zurückzuholen.
+  Der letzte ist der einzige davon, der etwas kaputt machen könnte; ein Unit-Test hält ihn, ein Blick
+  darauf bleibt nachzuholen
 
 #### Mit zwei Handys
 - [x] **(Phase 0)** Beide Galaxy-Phones als Testgeräte einrichten (Entwickleroptionen +
@@ -1141,6 +1214,8 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
 - [ ] **(Phase 14a)** Geteilte Vorlage instanziieren und beim Partner nachsehen
 - [ ] **(Phase 15)** Auf einem Gerät ziehen, auf dem anderen nachsehen, dass die neue Reihenfolge
   ankommt — und nicht durch den Realtime-Listener des zweiten Geräts wieder verworfen wird
+- [ ] **(Phase 16)** Erledigte auf einem Gerät aufräumen und beim Partner nachsehen, dass sie auch
+  dort weg sind — das ist die Zusage, die der Dialogtext gibt („Auch beim Partner.")
 
 ### Querlaufend – Werkzeuge & Doku
 > Läuft neben den Phasen und gehört zu keiner.
@@ -1233,8 +1308,6 @@ eine `contentDescription`, Fehler laufen als `Result` und das ViewModel kennt ke
 - [ ] Mehrere Aufgaben auf einmal verschieben — Auswahlmodus mit Häkchen und *einem* Ziel-Tipp. Die
   wöchentliche Besprechung ist heute vier Tipper pro Punkt; ein `WriteBatch` trägt bis 250 Aufgaben.
   Erst entscheiden, wenn ein paar Besprechungen zeigen, wie viele Punkte es wirklich pro Woche sind
-- [ ] „Erledigte löschen" als eine Aktion im Überlauf-Menü — nach einer Woche steht unten ein Haufen
-  abgehakter Zeilen, und einzeln wegwischen passt nicht zu einem wöchentlichen Ritual
 - [ ] Wiederkehrende Aufgaben — **bewusst offen gelassen.** Sie brauchen einen Auslöser
   (WorkManager) und führen damit geradewegs zu dem Benachrichtigungsweg, den ADR 0027 vermeidet
 - [ ] Play-Store-Veröffentlichung (Developer-Account, Store-Eintrag, Datenschutzerklärung)

@@ -65,3 +65,4 @@ der den alten als „abgelöst" markiert.
 | [0037](0037-menge-am-eintrag-statt-zahl-im-titel.md) | Menge am Eintrag statt Zahl im Titel | akzeptiert |
 | [0038](0038-instanziieren-als-schwebender-knopf.md) | Instanziieren als schwebender Knopf statt Eintrag im Überlauf-Menü | akzeptiert |
 | [0039](0039-manuelle-sortierung-ueber-createdat-als-anker.md) | Manuelle Sortierung über `createdAt` als Anker, gezogen mit einer Bibliothek | akzeptiert |
+| [0040](0040-erledigte-loeschen-mit-rueckfrage.md) | Erledigte löschen mit Rückfrage: die Anzahl entscheidet, nicht die Art | akzeptiert |

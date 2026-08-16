@@ -41,6 +41,7 @@ data class TodoListTopBarActions(
     val onNewTemplateClick: () -> Unit,
     val onRenameListClick: () -> Unit,
     val onDeleteListClick: () -> Unit,
+    val onDeleteFinishedClick: () -> Unit,
     val onSignOutClick: () -> Unit
 )
 
@@ -60,7 +61,9 @@ data class ListDialogActions(
     val onRenameListConfirm: () -> Unit,
     val onRenameListDismiss: () -> Unit,
     val onDeleteListConfirm: () -> Unit,
-    val onDeleteListDismiss: () -> Unit
+    val onDeleteListDismiss: () -> Unit,
+    val onDeleteFinishedConfirm: () -> Unit,
+    val onDeleteFinishedDismiss: () -> Unit
 )
 
 /**

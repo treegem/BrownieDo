@@ -213,6 +213,7 @@ fun TodoListScreen(
                 lists = uiState.lists,
                 templates = uiState.templates,
                 selectedList = uiState.selectedList,
+                hasFinishedTodos = uiState.todos.any(Todo::isDone),
                 actions = topBarActions
             )
         },
@@ -398,6 +399,16 @@ fun TodoListScreen(
         )
     }
 
+    if (uiState.finishedTodosPendingDeletion) {
+        DeleteFinishedDialog(
+            // Live gezählt statt beim Öffnen festgehalten: Hakt der Partner ab, während der Dialog
+            // offensteht, stimmt die Zahl darin trotzdem.
+            finishedCount = uiState.todos.count(Todo::isDone),
+            onConfirm = listDialogActions.onDeleteFinishedConfirm,
+            onDismiss = listDialogActions.onDeleteFinishedDismiss
+        )
+    }
+
     uiState.editedTodo?.let { editedTodo ->
         EditTodoDialog(
             title = editedTodo.title,
@@ -491,6 +502,7 @@ private fun TodoListError.messageResId() = when (this) {
     TodoListError.ADD_FAILED -> R.string.todo_list_error_add_failed
     TodoListError.UPDATE_FAILED -> R.string.todo_list_error_update_failed
     TodoListError.DELETE_FAILED -> R.string.todo_list_error_delete_failed
+    TodoListError.DELETE_FINISHED_FAILED -> R.string.todo_list_error_delete_finished_failed
     TodoListError.RESTORE_FAILED -> R.string.todo_list_error_restore_failed
     TodoListError.MOVE_FAILED -> R.string.todo_list_error_move_failed
     TodoListError.LIST_ADD_FAILED -> R.string.todo_list_error_list_add_failed
@@ -682,6 +694,7 @@ private val PREVIEW_TOP_BAR_ACTIONS = TodoListTopBarActions(
     onNewTemplateClick = {},
     onRenameListClick = {},
     onDeleteListClick = {},
+    onDeleteFinishedClick = {},
     onSignOutClick = {}
 )
 
@@ -695,7 +708,9 @@ private val PREVIEW_LIST_DIALOG_ACTIONS = ListDialogActions(
     onRenameListConfirm = {},
     onRenameListDismiss = {},
     onDeleteListConfirm = {},
-    onDeleteListDismiss = {}
+    onDeleteListDismiss = {},
+    onDeleteFinishedConfirm = {},
+    onDeleteFinishedDismiss = {}
 )
 
 private val PREVIEW_TODO_ACTIONS = TodoActions(

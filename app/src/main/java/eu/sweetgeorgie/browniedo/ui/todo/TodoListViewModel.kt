@@ -628,4 +628,42 @@ class TodoListViewModel(
     }
 
     fun onDeletedMessageShown() = mutableUiState.update { it.copy(deletedTodo = null) }
+
+    // --- Erledigte auf einmal löschen (ADR 0040) ---
+
+    fun onDeleteFinishedClick() =
+        mutableUiState.update { it.copy(finishedTodosPendingDeletion = true, error = null) }
+
+    fun onDeleteFinishedDismiss() =
+        mutableUiState.update { it.copy(finishedTodosPendingDeletion = false) }
+
+    /**
+     * Räumt alle abgehakten Aufgaben der offenen Liste weg — mit Rückfrage statt Rückgängig, weil
+     * hier viele auf einmal gehen und die Anzahl im Dialog die Folge greifbar macht (ADR 0040).
+     *
+     * Ein Fehlschlag lässt den Dialog stehen, so wie beim Löschen einer Liste: Die Fehler-Snackbar
+     * legt sich davor, und wer will, versucht es noch einmal.
+     */
+    fun onDeleteFinishedConfirm() {
+        val listId = selectedListId.value ?: return
+        val finishedIds = mutableUiState.value.todos.filter(Todo::isDone).map(Todo::id)
+        if (finishedIds.isEmpty()) return
+
+        todoRepository.deleteTodos(listId, finishedIds).fold(
+            onSuccess = {
+                mutableUiState.update {
+                    it.copy(
+                        finishedTodosPendingDeletion = false,
+                        error = null,
+                        // Ein offenes „Rückgängig" aus einer Einzellöschung holte sonst eine
+                        // Aufgabe zurück, die gerade mit weggeräumt wurde — das Angebot verfällt.
+                        deletedTodo = null
+                    )
+                }
+            },
+            onFailure = {
+                mutableUiState.update { it.copy(error = TodoListError.DELETE_FINISHED_FAILED) }
+            }
+        )
+    }
 }

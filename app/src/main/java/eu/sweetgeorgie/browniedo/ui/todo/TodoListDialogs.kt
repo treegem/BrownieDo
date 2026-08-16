@@ -287,26 +287,71 @@ internal fun DeleteListDialog(
                 }
             )
         },
-        confirmButton = {
-            // Die einzige gefüllte Bestätigung in Fehlerfarbe: Hier *ist* das Löschen die Hauptaktion
-            // des Dialogs, und es gibt kein Rückgängig wie bei einer Aufgabe (ADR 0031 gilt nur für
-            // die). Die Bremse ist der Dialog selbst, nicht ein leiser Knopf — siehe ADR 0032.
-            Button(
-                onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    contentColor = MaterialTheme.colorScheme.onError
-                )
-            ) {
-                Text(text = stringResource(R.string.todo_list_delete))
-            }
-        },
+        confirmButton = { DestructiveConfirmButton(onClick = onConfirm) },
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text(text = stringResource(R.string.todo_list_cancel))
             }
         }
     )
+}
+
+/**
+ * Räumt alle abgehakten Aufgaben der offenen Liste weg, siehe
+ * docs/decisions/0040-erledigte-loeschen-mit-rueckfrage.md.
+ *
+ * Rückfrage statt Rückgängig, und der Grund ist derselbe wie bei [DeleteListDialog]: Es gehen viele
+ * auf einmal, auch beim Partner, und die Anzahl im Text ist das, was die Folge greifbar macht. Ein
+ * Text für „nichts erledigt" fehlt bewusst — ohne Erledigtes gibt es den Menüeintrag nicht, der
+ * Dialog ist dann gar nicht erreichbar.
+ */
+@Composable
+internal fun DeleteFinishedDialog(
+    finishedCount: Int,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = stringResource(R.string.todo_list_delete_finished_headline)) },
+        text = {
+            Text(
+                text = pluralStringResource(
+                    R.plurals.todo_list_delete_finished_question,
+                    finishedCount,
+                    finishedCount
+                )
+            )
+        },
+        confirmButton = { DestructiveConfirmButton(onClick = onConfirm) },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(R.string.todo_list_cancel))
+            }
+        }
+    )
+}
+
+/**
+ * Die gefüllte Bestätigung in Fehlerfarbe — die Form, die genau die zwei Dialoge tragen, in denen
+ * das Löschen die **Hauptaktion** ist und kein Rückgängig folgt (ADR 0031 gilt nur für die einzelne
+ * Aufgabe). Die Bremse ist dort der Dialog samt seiner Anzahl, nicht ein leiser Knopf — siehe
+ * docs/decisions/0032-gefuellte-bestaetigung-und-loeschen-im-inhalt.md.
+ *
+ * Nicht zu verwechseln mit dem Löschen **im Inhalt** des Bearbeiten-Dialogs: Das ist ein Textknopf in
+ * Fehlerfarbe ([DialogAction]), weil es dort mit „Speichern" um die Hauptaktion streiten würde.
+ */
+@Composable
+private fun DestructiveConfirmButton(onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.error,
+            contentColor = MaterialTheme.colorScheme.onError
+        )
+    ) {
+        Text(text = stringResource(R.string.todo_list_delete))
+    }
 }
 
 // Für die Segment-Auswahl der Priorität; das Zielliste-Feld braucht denselben Opt-in noch einmal für

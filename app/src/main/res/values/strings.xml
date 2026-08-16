@@ -36,6 +36,17 @@
         <item quantity="other">„%1$s“ und die %2$d enthaltenen Aufgaben endgültig löschen? Auch beim Partner.</item>
     </plurals>
     <string name="todo_list_delete_list_question_empty">„%1$s“ endgültig löschen? Die Liste ist leer.</string>
+    <!--
+        Das wöchentliche Aufräumen (ADR 0040). Kein Text für „keine erledigte Aufgabe“ nötig: Ohne
+        Erledigtes gibt es den Menüeintrag gar nicht, der Dialog ist dann nicht erreichbar.
+    -->
+    <string name="todo_list_delete_finished">Erledigte löschen</string>
+    <string name="todo_list_delete_finished_headline">Erledigte löschen?</string>
+    <plurals name="todo_list_delete_finished_question">
+        <item quantity="one">Die erledigte Aufgabe endgültig löschen? Auch beim Partner.</item>
+        <item quantity="other">Die %1$d erledigten Aufgaben endgültig löschen? Auch beim Partner.</item>
+    </plurals>
+    <string name="todo_list_error_delete_finished_failed">Die erledigten Aufgaben konnten nicht gelöscht werden.</string>
     <string name="todo_list_error_list_add_failed">Die Liste konnte nicht angelegt werden.</string>
     <string name="todo_list_error_list_update_failed">Die Liste konnte nicht umbenannt werden.</string>
     <string name="todo_list_error_list_delete_failed">Die Liste konnte nicht gelöscht werden.</string>

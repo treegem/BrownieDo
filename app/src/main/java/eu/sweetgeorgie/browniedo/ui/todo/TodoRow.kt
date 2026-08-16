@@ -51,7 +51,15 @@ private const val DELETE_SWIPE_FRACTION = 0.85f
 /**
  * Umschließt eine Zeile mit der Wischgeste. Gelöscht wird nur, was schon erledigt ist, und nur
  * nach rechts — siehe docs/decisions/0016-wischen-loescht-nur-erledigte-aufgaben.md.
+ *
+ * [dragHandle] heißt bewusst **nicht** `modifier`, obwohl Lint das anmahnt: Er wird nicht auf das
+ * äußere Element gelegt, sondern bis an die Zeile durchgereicht und dort *hinter* dem Klick
+ * eingehängt — die Stelle entscheidet, ob die Ziehgeste den langen Druck gewinnt (ADR 0039). Ein
+ * Parameter namens `modifier`, der nicht an die Wurzel geht, wäre die schlechtere Lüge. Ein eigenes
+ * `modifier` gibt es hier nicht mehr: Die Positionierung in der Liste trägt seit ADR 0039 das
+ * `animateItemModifier` des `ReorderableItem`.
  */
+@Suppress("ModifierParameter")
 @Composable
 internal fun SwipeableTodoRow(
     todo: Todo,
@@ -62,8 +70,7 @@ internal fun SwipeableTodoRow(
     onSwipedAway: () -> Unit,
     onMoveUp: (() -> Unit)?,
     onMoveDown: (() -> Unit)?,
-    dragHandle: Modifier,
-    modifier: Modifier = Modifier
+    dragHandle: Modifier
 ) {
     val swipeState = rememberSwipeToDismissBoxState(
         positionalThreshold = { totalDistance -> totalDistance * DELETE_SWIPE_FRACTION }
@@ -93,7 +100,6 @@ internal fun SwipeableTodoRow(
     SwipeToDismissBox(
         state = swipeState,
         backgroundContent = { DeleteBackground() },
-        modifier = modifier,
         // Nach links wird nie gelöscht, und offene Aufgaben lassen sich gar nicht erst bewegen:
         // Was sich ziehen lässt, ist erledigt.
         enableDismissFromEndToStart = false,
@@ -135,6 +141,8 @@ private fun DeleteBackground() {
     }
 }
 
+/** [dragHandle] heißt aus demselben Grund nicht `modifier` wie in [SwipeableTodoRow]. */
+@Suppress("ModifierParameter")
 @Composable
 private fun TodoRow(
     todo: Todo,
@@ -143,8 +151,7 @@ private fun TodoRow(
     onClick: () -> Unit,
     onMoveUp: (() -> Unit)?,
     onMoveDown: (() -> Unit)?,
-    dragHandle: Modifier,
-    modifier: Modifier = Modifier
+    dragHandle: Modifier
 ) {
     val markerIconResId = todo.priority.markerIconResId()
     val moveUpLabel = stringResource(R.string.todo_list_move_up)
@@ -189,7 +196,7 @@ private fun TodoRow(
         // `SwipeToDismissBox`, verschluckte das `combinedClickable` den Druck auf der ganzen Zeile,
         // und ziehen ließ sich nur noch an der Checkbox: die trägt einen eigenen Erkenner, hat aber
         // keinen langen Druck und reichte ihn deshalb nach oben durch.
-        modifier = modifier
+        modifier = Modifier
             .combinedClickable(onClick = onClick, onLongClick = {})
             .then(dragHandle)
             .semantics { customActions = reorderActions },

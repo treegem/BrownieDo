@@ -37,6 +37,7 @@ internal fun TodoListTopBar(
     lists: List<TodoList>,
     templates: List<TodoList>,
     selectedList: TodoList?,
+    hasFinishedTodos: Boolean,
     actions: TodoListTopBarActions
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -137,6 +138,21 @@ internal fun TodoListTopBar(
                 // es nichts zu tun. Beide gelten für Vorlagen genauso, nur heißen sie dort anders:
                 // Eine Vorlage ist eine Liste, aber niemand nennt sie so (ADR 0034).
                 if (selectedList != null) {
+                    // Steht über Umbenennen und Löschen und **ohne** Fehlerfarbe: Das ist Aufräumen,
+                    // nicht Zerstören — und es ist die Aktion, wegen der man das Menü nach einer
+                    // Woche überhaupt öffnet (ADR 0040). Ohne Erledigtes gibt es sie nicht, in einer
+                    // Vorlage nie: Dort wird nicht abgehakt (ADR 0034).
+                    if (!isTemplateOpen && hasFinishedTodos) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(text = stringResource(R.string.todo_list_delete_finished))
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                actions.onDeleteFinishedClick()
+                            }
+                        )
+                    }
                     DropdownMenuItem(
                         text = {
                             Text(

@@ -62,6 +62,7 @@ class MainActivity : ComponentActivity() {
                             onNewTemplateClick = todoListViewModel::onNewTemplateClick,
                             onRenameListClick = todoListViewModel::onRenameListClick,
                             onDeleteListClick = todoListViewModel::onDeleteListClick,
+                            onDeleteFinishedClick = todoListViewModel::onDeleteFinishedClick,
                             onSignOutClick = { appContainer.authRepository.signOut() }
                         )
                     }
@@ -76,7 +77,9 @@ class MainActivity : ComponentActivity() {
                             onRenameListConfirm = todoListViewModel::onRenameListConfirm,
                             onRenameListDismiss = todoListViewModel::onRenameListDismiss,
                             onDeleteListConfirm = todoListViewModel::onDeleteListConfirm,
-                            onDeleteListDismiss = todoListViewModel::onDeleteListDismiss
+                            onDeleteListDismiss = todoListViewModel::onDeleteListDismiss,
+                            onDeleteFinishedConfirm = todoListViewModel::onDeleteFinishedConfirm,
+                            onDeleteFinishedDismiss = todoListViewModel::onDeleteFinishedDismiss
                         )
                     }
                     val todoActions = remember(todoListViewModel) {

@@ -570,6 +570,98 @@ class TodoListScreenTest {
         composeTestRule.onNodeWithContentDescription(createListLabel()).assertDoesNotExist()
     }
 
+    // --- Erledigte auf einmal löschen (ADR 0040) ---
+
+    @Test
+    fun theClearFinishedMenuEntryReportsTheTap() {
+        var clickCount = 0
+        setScreenContent(
+            uiState = TodoListUiState(selectedList = LIST, isLoading = false, todos = TODOS),
+            topBarActions = NO_TOP_BAR_ACTIONS.copy(onDeleteFinishedClick = { clickCount++ })
+        )
+
+        openOverflowMenu()
+        composeTestRule.onNodeWithText(label(R.string.todo_list_delete_finished)).performClick()
+
+        assertEquals(1, clickCount)
+    }
+
+    /**
+     * Die Gegenprobe zum Test darüber: Ohne Erledigtes gibt es nichts aufzuräumen. Ohne sie belegt
+     * ein `assertDoesNotExist` nur, dass der Matcher nichts findet — nicht, dass der Eintrag
+     * überhaupt vom Zustand abhängt.
+     */
+    @Test
+    fun theClearFinishedMenuEntryIsAbsentWithoutAnyFinishedEntry() {
+        setScreenContent(
+            uiState = TodoListUiState(
+                selectedList = LIST,
+                isLoading = false,
+                todos = listOf(OPEN_TODO)
+            )
+        )
+
+        openOverflowMenu()
+
+        composeTestRule.onNodeWithText(label(R.string.todo_list_delete_finished))
+            .assertDoesNotExist()
+        // Die Gegenprobe, dass das Menü überhaupt offen ist.
+        composeTestRule.onNodeWithText(label(R.string.todo_list_sign_out)).assertIsDisplayed()
+    }
+
+    /** In einer Vorlage wird nicht abgehakt (ADR 0034), also gibt es dort auch nichts aufzuräumen. */
+    @Test
+    fun theClearFinishedMenuEntryIsAbsentInATemplate() {
+        setScreenContent(uiState = openTemplate())
+
+        openOverflowMenu()
+
+        composeTestRule.onNodeWithText(label(R.string.todo_list_delete_finished))
+            .assertDoesNotExist()
+        composeTestRule.onNodeWithText(label(R.string.todo_list_sign_out)).assertIsDisplayed()
+    }
+
+    @Test
+    fun theClearFinishedDialogNamesTheCountAndReportsTheConfirmation() {
+        var confirmCount = 0
+        setScreenContent(
+            uiState = TodoListUiState(
+                selectedList = LIST,
+                isLoading = false,
+                todos = SORTABLE_TODOS,
+                finishedTodosPendingDeletion = true
+            ),
+            listDialogActions = NO_LIST_DIALOG_ACTIONS.copy(
+                onDeleteFinishedConfirm = { confirmCount++ }
+            )
+        )
+
+        // Genau eine erledigte Aufgabe steckt in SORTABLE_TODOS — also die Singular-Form.
+        composeTestRule
+            .onNodeWithText(
+                composeTestRule.activity.resources.getQuantityString(
+                    R.plurals.todo_list_delete_finished_question,
+                    1,
+                    1
+                )
+            )
+            .assertIsDisplayed()
+
+        // Eingegrenzt auf den Dialog: „Löschen" beschriftet auch den Bearbeiten-Dialog und
+        // „Liste löschen?".
+        composeTestRule
+            .onNode(hasAnyAncestor(isDialog()) and hasText(label(R.string.todo_list_delete)))
+            .performClick()
+
+        assertEquals(1, confirmCount)
+    }
+
+    private fun openOverflowMenu() {
+        composeTestRule
+            .onNodeWithContentDescription(label(R.string.todo_list_more_actions))
+            .performClick()
+    }
+
     // --- Von Hand sortieren (ADR 0039) ---
 
     /*
@@ -891,13 +983,14 @@ class TodoListScreenTest {
         onMovedMessageShown: () -> Unit = {},
         onUndoDelete: () -> Unit = {},
         onDeletedMessageShown: () -> Unit = {},
-        onCreateListFromTemplateClick: () -> Unit = {}
+        onCreateListFromTemplateClick: () -> Unit = {},
+        topBarActions: TodoListTopBarActions = NO_TOP_BAR_ACTIONS
     ) {
         composeTestRule.setContent {
             BrownieDoTheme {
                 TodoListScreen(
                     uiState = uiState,
-                    topBarActions = NO_TOP_BAR_ACTIONS,
+                    topBarActions = topBarActions,
                     listDialogActions = listDialogActions,
                     todoActions = todoActions,
                     editActions = editActions,
@@ -932,6 +1025,7 @@ class TodoListScreenTest {
             onNewTemplateClick = {},
             onRenameListClick = {},
             onDeleteListClick = {},
+            onDeleteFinishedClick = {},
             onSignOutClick = {}
         )
 
@@ -945,7 +1039,9 @@ class TodoListScreenTest {
             onRenameListConfirm = {},
             onRenameListDismiss = {},
             onDeleteListConfirm = {},
-            onDeleteListDismiss = {}
+            onDeleteListDismiss = {},
+            onDeleteFinishedConfirm = {},
+            onDeleteFinishedDismiss = {}
         )
 
         val NO_TODO_ACTIONS = TodoActions(

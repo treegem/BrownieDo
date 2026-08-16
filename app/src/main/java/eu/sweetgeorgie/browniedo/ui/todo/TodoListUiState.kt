@@ -11,6 +11,15 @@ enum class TodoListError {
     UPDATE_FAILED,
     DELETE_FAILED,
 
+    /**
+     * Das Aufräumen der erledigten Aufgaben ist gescheitert (ADR 0040).
+     *
+     * Ein eigener Wert und nicht [DELETE_FAILED]: Dessen Meldung steht im Singular und wäre für
+     * einen ganzen Schwung schlicht falsch. Wo die Meldung passt, wird wiederverwendet — beim
+     * Sortieren von Hand etwa läuft der Fehlschlag über [UPDATE_FAILED].
+     */
+    DELETE_FINISHED_FAILED,
+
     /** Das „Rückgängig" nach dem Löschen ist gescheitert — die Aufgabe bleibt weg (ADR 0031). */
     RESTORE_FAILED,
     MOVE_FAILED,
@@ -45,6 +54,14 @@ data class TodoListUiState(
     val newList: NewList? = null,
     val renamedList: RenamedList? = null,
     val listPendingDeletion: TodoList? = null,
+    /**
+     * Steht der Dialog „Erledigte löschen?" offen (ADR 0040)?
+     *
+     * Ein Flag und keine Nutzlast, anders als bei [listPendingDeletion]: Die Listen-id kennt das
+     * ViewModel ohnehin, und die Anzahl rechnet sich beim Zeichnen live aus [todos] — hakt der
+     * Partner ab, während der Dialog offensteht, stimmt die Zahl darin trotzdem.
+     */
+    val finishedTodosPendingDeletion: Boolean = false,
     val error: TodoListError? = null,
     /**
      * Name der Liste, in die zuletzt verschoben wurde — null, sobald die Bestätigung gezeigt wurde.

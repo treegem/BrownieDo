@@ -69,6 +69,19 @@ interface TodoRepository {
     fun deleteTodo(listId: String, todoId: String): Result<Unit>
 
     /**
+     * Löscht mehrere Aufgaben einer Liste in einem Zug — das „Erledigte löschen" des Überlauf-Menüs,
+     * siehe docs/decisions/0040-erledigte-loeschen-mit-rueckfrage.md.
+     *
+     * **Nicht suspend, anders als `ListRepository.deleteList`:** Dort muss erst nachgeschlagen
+     * werden, welche Aufgaben es überhaupt gibt. Hier kommen die ids aus dem Snapshot, den der
+     * Bildschirm ohnehin schon hat — damit bleibt der Aufruf bei
+     * docs/decisions/0011-schreibvorgaenge-nicht-abwarten.md und funktioniert offline.
+     *
+     * Ein leerer Aufruf schreibt nichts.
+     */
+    fun deleteTodos(listId: String, todoIds: List<String>): Result<Unit>
+
+    /**
      * Legt eine gelöschte Aufgabe wieder an — das „Rückgängig" der Snackbar nach dem Löschen, siehe
      * docs/decisions/0031-rueckgaengig-statt-rueckfrage-beim-loeschen.md.
      *
